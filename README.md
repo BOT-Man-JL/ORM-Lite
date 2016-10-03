@@ -9,13 +9,12 @@ written in C++ 11 style.
 - Light Weight
 - High Performance
 
-## Basic Usage
+## Usage
 
-### Step 1
-
+Before we start,
 Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
 
-Add `ORMAP (MyClass, ...)` into your Mapped Class/Struct;
+### Include *ORM Lite*
 
 ``` C++
 #include "ORMLite.h"
@@ -23,6 +22,7 @@ using namespace BOT_ORM;
 
 class MyClass
 {
+    // Inject ORM-Lite into this Class
     ORMAP (MyClass, id, real, str)
 public:
     long id;
@@ -31,15 +31,15 @@ public:
 };
 ```
 
-For example, `ORMAP (MyClass, id, real, str)` means that:
+In this Sample, `ORMAP (MyClass, id, real, str)` means that:
 - `Class MyClass` will be mapped into `TABLE MyClass`;
 - `int id`, `double real` and `std::string str` will be mapped
   into `INT id`, `REAL real` and `TEXT str` respectively;
 - The first item `id` will be set as the **Primary Key** of the Table;
 
-### Step 2
+_(Note that: **No Semicolon ';'** after the **ORMAP**)_ :wink:
 
-New a `ORMapper` to Handle the Ops;
+### Handle with a *ORMapper*
 
 ``` C++
 // Store the Data in "test.db"
@@ -52,44 +52,64 @@ mapper.CreateTbl ();
 mapper.Insert (MyClass { 1, 0.2, "John" });
 mapper.Insert (MyClass { 2, 0.4, "Jack" });
 mapper.Insert (MyClass { 3, 0.6, "Jess" });
+mapper.Insert (MyClass { 4, 0.8, "July" });
+mapper.Insert (MyClass { 5, 1.0, "July" });
 
-// Update the Value by its KEY (id)
+// Update Entry by KEY (id)
 mapper.Update (MyClass { 2, 0.6, "Jack" });
 
-// Delete the Value by its KEY (id)
+// Delete Entry by KEY (id)
 mapper.Delete (MyClass { 3, 0.6, "Jess" });
 
-// Query the Entries in the table, and Set to entries
-std::vector<MyClass> entries;
-mapper.Query (entries);  // entries = [MyClass { 1, 0.2, "John" },
-                         //            MyClass { 2, 0.6, "Jack" }]
+// Query Entries
+std::vector<MyClass> query1;
+mapper.Query (query1);
+// query1 = [MyClass { 1, 0.2, "John" },
+//           MyClass { 2, 0.6, "Jack" },
+//           MyClass { 4, 0.8, "July" },
+//           MyClass { 5, 1.0, "July" }]
 
-// Get the Count of Entries in the table
-auto count = mapper.Count ();  // count = 2
+// Count Entries
+auto count1 = mapper.Count ();  // count = 4
 
-// Drop the table "MyClass"
-//mapper.DropTbl ();
+// Query Entries by Condition
+std::vector<MyClass> query2;
+mapper.Query (query2, "where str='July' order by real desc");
+// query2 = [MyClass { 5, 1.0, "July" },
+//           MyClass { 4, 0.8, "July" }]
+
+// Delete Entries by Condition
+mapper.Delete ("where str='July'");
+
+// Count Entries by Condition
+auto count2 = mapper.Count ("where str='July'");  // count = 0
 
 // View the latest Error Message
-//auto errStr = mapper.ErrMsg ();
+mapper.Insert (MyClass { 1, 0, "Admin" });
+auto errStr = mapper.ErrMsg ();
+// errStr = "SQL error: UNIQUE constraint failed: MyClass.id"
+
+// Drop the table "MyClass"
+mapper.DropTbl ();
 ```
 
-And the final table **MyClass** in **test.db** will be:
+**MyClass** Format in **test.db**:
 
 | id| real|  str|
 |---|-----|-----|
 |  1|  0.2| John|
-|  2|  0.6| Jack|
+|...|  ...|  ...|
+
+_(Note that: Wrap **String** with **''** in **SQL**)_ :joy:
 
 ## Constraints
 
-- Hooked Class/Struct Must have a **Default Constructor**
-  (POD is Better :relieved:)
+- Hooked Class MUST have **Default Constructor**
 - Currently Only Support `long`, `double` and `std::string` Types,
   which are stored in DB as `INTEGER`, `REAL` and `TEXT` (**SQLite3**)
-- If you Attempt to Use other Types, you will see the Error:
+- If you Attempt to Use other Types, you will see the Compile Error:
   `Only Support long, double, std::string :-(`
-- Only Support Basic [**CRUD**](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) as described above...
+- Currently Only Support Basic [**CRUD**](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) as described above...
 
 ## Implementation Details
 

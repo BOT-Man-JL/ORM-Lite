@@ -1,3 +1,8 @@
+// ORM Lite
+// An ORM for SQLite in C++11
+// https://github.com/BOT-Man-JL/ORM-Lite
+// BOT Man, 2016
+
 #ifndef BOT_ORM_H
 #define BOT_ORM_H
 
@@ -283,6 +288,16 @@ namespace BOT_ORM
 
 				connector.Excute ("insert into " + _tblName +
 								  " values (" + strIns + ");");
+			});
+		}
+
+		bool Delete (const std::string &cond)
+		{
+			return HandleException ([&] (
+				BOT_ORM_Impl::SQLConnector &connector)
+			{
+				connector.Excute ("delete from " + _tblName +
+								  " " + cond + ";");
 			});
 		}
 

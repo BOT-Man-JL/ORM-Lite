@@ -3,31 +3,20 @@
 #include <iostream>
 
 #include "src/ORMLite.h"
+using namespace BOT_ORM;
 
 class MyClass
 {
+	// Inject ORM-Lite into this Class
 	ORMAP (MyClass, id, real, str)
-
 public:
 	long id;
 	double real;
 	std::string str;
 };
 
-class MyClass2
-{
-	ORMAP (MyClass2, id, age, score, firstName, lastName)
-
-public:
-	long id, age;
-	double score;
-	std::string firstName, lastName;
-	int dummyInt;
-};
-
 int main ()
 {
-	using namespace BOT_ORM;
 	// Store the Data in "test.db"
 	ORMapper<MyClass> mapper ("test.db");
 
@@ -38,26 +27,45 @@ int main ()
 	mapper.Insert (MyClass { 1, 0.2, "John" });
 	mapper.Insert (MyClass { 2, 0.4, "Jack" });
 	mapper.Insert (MyClass { 3, 0.6, "Jess" });
+	mapper.Insert (MyClass { 4, 0.8, "July" });
+	mapper.Insert (MyClass { 5, 1.0, "July" });
 
-	// Update the Value by its KEY (id)
+	// Update Entry by KEY (id)
 	mapper.Update (MyClass { 2, 0.6, "Jack" });
 
-	// Delete the Value by its KEY (id)
+	// Delete Entry by KEY (id)
 	mapper.Delete (MyClass { 3, 0.6, "Jess" });
 
-	// Query the Entries in the table, and Set to entries
-	std::vector<MyClass> entries;
-	mapper.Query (entries);  // entries = [MyClass { 1, 0.2, "John" },
-							 //            MyClass { 2, 0.6, "Jack" }]
+	// Query Entries
+	std::vector<MyClass> query1;
+	mapper.Query (query1);
+	// query1 = [MyClass { 1, 0.2, "John" },
+	//           MyClass { 2, 0.6, "Jack" },
+	//           MyClass { 4, 0.8, "July" },
+	//           MyClass { 5, 1.0, "July" }]
 
-							 // Get the Count of Entries in the table
-	auto count = mapper.Count ();  // count = 2
+	// Count Entries
+	auto count1 = mapper.Count ();  // count = 4
 
-								   // Drop the table "MyClass"
-								   //mapper.DropTbl ();
+	// Query Entries by Condition
+	std::vector<MyClass> query2;
+	mapper.Query (query2, "where str='July' order by real desc");
+	// query2 = [MyClass { 5, 1.0, "July" },
+	//           MyClass { 4, 0.8, "July" }]
 
-								   // View the latest Error Message
-	mapper.ErrMsg ();
+	// Delete Entries by Condition
+	mapper.Delete ("where str='July'");
+
+	// Count Entries by Condition
+	auto count2 = mapper.Count ("where str='July'");  // count = 0
+
+	// View the latest Error Message
+	mapper.Insert (MyClass { 1, 0, "Admin" });
+	auto errStr = mapper.ErrMsg ();
+	// errStr = "SQL error: UNIQUE constraint failed: MyClass.id"
+
+	// Drop the table "MyClass"
+	mapper.DropTbl ();
 
 	getchar ();
 	return 0;
