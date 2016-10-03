@@ -61,9 +61,9 @@ mapper.Update (MyClass { 2, 0.6, "Jack" });
 // Delete Entry by KEY (id)
 mapper.Delete (MyClass { 3, 0.6, "Jess" });
 
-// Query Entries
+// Select Entries
 std::vector<MyClass> query1;
-mapper.Query (query1);
+mapper.Select (query1);
 // query1 = [MyClass { 1, 0.2, "John" },
 //           MyClass { 2, 0.6, "Jack" },
 //           MyClass { 4, 0.8, "July" },
@@ -72,9 +72,9 @@ mapper.Query (query1);
 // Count Entries
 auto count1 = mapper.Count ();  // count = 4
 
-// Query Entries by Condition
+// Select Entries by Condition
 std::vector<MyClass> query2;
-mapper.Query (query2, "where str='July' order by real desc");
+mapper.Select (query2, "where str='July' order by real desc");
 // query2 = [MyClass { 5, 1.0, "July" },
 //           MyClass { 4, 0.8, "July" }]
 

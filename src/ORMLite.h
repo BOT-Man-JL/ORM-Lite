@@ -122,15 +122,16 @@ namespace BOT_ORM_Impl
 
 	protected:
 		template <typename T, typename... Args>
-		void _Visit (T &property, Args & ... args)
+		inline void _Visit (T &property, Args & ... args)
 		{
 			_Visit (property);
 			_Visit (args...);
 		}
 
 		template <typename T>
-		void _Visit (T &property)
+		inline void _Visit (T &property)
 		{
+			// If you want to Use other Types, please Convert first...
 			static_assert (false,
 						   "Only Support long, double, std::string :-(");
 		}
@@ -225,7 +226,7 @@ namespace BOT_ORM
 			_tblName (C ().__ClassName ())
 		{}
 
-		const std::string &ErrMsg () const
+		inline const std::string &ErrMsg () const
 		{
 			return _errMsg;
 		}
@@ -357,7 +358,7 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Query (std::vector<C> &out,
+		bool Select (std::vector<C> &out,
 					const std::string &cond = "")
 		{
 			return HandleException ([&] (
@@ -380,9 +381,9 @@ namespace BOT_ORM
 			});
 		}
 
-		long Count (const std::string &cond = "")
+		size_t Count (const std::string &cond = "")
 		{
-			auto ret = -1;
+			auto ret = 0;
 			HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
