@@ -2,26 +2,27 @@
 #include <string>
 #include <iostream>
 
-#include "src/ORM.h"
+#include "src/ORMLite.h"
 
 class MyClass
 {
+	ORMAP (MyClass, id, real, str)
+
 public:
-	int id;
+	long id;
 	double real;
 	std::string str;
-
-	ORHOOK (id, real, str)
 };
 
 class MyClass2
 {
+	ORMAP (MyClass2, id, age, score, firstName, lastName)
+
 public:
-	int id, age;
+	long id, age;
 	double score;
 	std::string firstName, lastName;
-
-	ORHOOK (id, age, score, firstName, lastName)
+	int dummyInt;
 };
 
 int main ()
@@ -32,6 +33,8 @@ int main ()
 	auto fnQuery1 = [&] ()
 	{
 		std::vector<MyClass> dbState;
+		std::cout << "Count: " << mapper.Count ()
+			<< std::endl;
 		mapper.Query (dbState, "");
 		for (const auto &i : dbState)
 			std::cout << i.id << " " << i.real << " "
@@ -56,6 +59,8 @@ int main ()
 	auto fnQuery2 = [&] ()
 	{
 		std::vector<MyClass2> dbState;
+		std::cout << "Count = " << mapper2.Count ()
+			<< std::endl;
 		mapper2.Query (dbState, "");
 		for (const auto &i : dbState)
 			std::cout << i.id << " " << i.age << " "
@@ -64,11 +69,16 @@ int main ()
 		std::cout << std::endl;
 	};
 	mapper2.CreateTbl ();
-	mapper2.Insert (MyClass2 { 1, 20, 0.2, "John", "Lee" });
-	mapper2.Insert (MyClass2 { 2, 37, 0.4, "Jack", "Lee" });
+
+	mapper2.Insert (MyClass2 { 1, 20, 0.2, "John", "Lee", -1 });
+	mapper2.Insert (MyClass2 { 2, 37, 0.4, "Jack", "Lee", -1 });
 	fnQuery2 ();
-	mapper2.Delete (MyClass2 { 2, 37, 0.4, "Jack", "Lee" });
+
+	mapper2.Delete (MyClass2 { 2, 37, 0.4, "Jack", "Lee", -1 });
 	fnQuery2 ();
+
+	mapper.DropTbl ();
+	mapper2.DropTbl ();
 
 	getchar ();
 	return 0;
