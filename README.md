@@ -74,11 +74,10 @@ auto count = mapper.Count ();  // count = 2
 //auto errStr = mapper.ErrMsg ();
 ```
 
-And the final **test.db** will be:
+And the final table **MyClass** in **test.db** will be:
 
-|  *|MyClass|*  |
-|---------------|
 | id| real|  str|
+|---------------|
 |  1|  0.2| John|
 |  2|  0.6| Jack|
 
