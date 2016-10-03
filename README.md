@@ -76,10 +76,10 @@ auto count = mapper.Count ();  // count = 2
 
 And the final table **MyClass** in **test.db** will be:
 
-| id | real |  str |
-|------------------|
-|  1 |  0.2 | John |
-|  2 |  0.6 | Jack |
+| id| real|  str|
+|---|-----|-----|
+|  1|  0.2| John|
+|  2|  0.6| Jack|
 
 ## Constraints
 
