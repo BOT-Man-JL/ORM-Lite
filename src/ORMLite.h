@@ -12,11 +12,15 @@
 
 #define ORMAP(_MY_CLASS_, ...)                        \
 friend class BOT_ORM::ORMapper<_MY_CLASS_>;           \
-void Visit (BOT_ORM::ORVisitor &visitor)              \
+void __Accept (BOT_ORM_Impl::ORVisitor &visitor)      \
 {                                                     \
 	visitor.Visit (__VA_ARGS__);                      \
 }                                                     \
-std::string fieldNames () const                       \
+std::string __ClassName () const                      \
+{                                                     \
+	return #_MY_CLASS_;                               \
+}                                                     \
+std::string __FieldNames () const                     \
 {                                                     \
 	return #__VA_ARGS__;                              \
 }
@@ -101,10 +105,7 @@ namespace BOT_ORM_Impl
 		}
 		return std::string ();
 	}
-}
 
-namespace BOT_ORM
-{
 	class ORVisitor
 	{
 	public:
@@ -206,13 +207,17 @@ namespace BOT_ORM
 		}
 	};
 
+}
+
+namespace BOT_ORM
+{
 	template <typename C>
 	class ORMapper
 	{
 	public:
-		ORMapper (const std::string &dbName,
-				  const std::string &tblName)
-			: _dbName (dbName), _tblName (tblName)
+		ORMapper (const std::string &dbName)
+			: _dbName (dbName),
+			_tblName (C ().__ClassName ())
 		{}
 
 		const std::string &ErrMsg () const
@@ -226,8 +231,8 @@ namespace BOT_ORM
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				C cl;
-				TypeVisitor visitor;
-				cl.Visit (visitor);
+				BOT_ORM_Impl::TypeVisitor visitor;
+				cl.__Accept (visitor);
 
 				auto strTypes = std::move (visitor.serializedTypes);
 				auto strFieldNames = ExtractFieldName (cl);
@@ -265,8 +270,8 @@ namespace BOT_ORM
 			return HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				ReaderVisitor visitor;
-				value.Visit (visitor);
+				BOT_ORM_Impl::ReaderVisitor visitor;
+				value.__Accept (visitor);
 				auto strIns = std::move (visitor.serializedValues);
 
 				std::for_each (strIns.begin (), strIns.end (),
@@ -286,8 +291,8 @@ namespace BOT_ORM
 			return HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				ReaderVisitor visitor;
-				value.Visit (visitor);
+				BOT_ORM_Impl::ReaderVisitor visitor;
+				value.__Accept (visitor);
 
 				auto strVals = std::move (visitor.serializedValues);
 				auto strFieldNames = ExtractFieldName (value);
@@ -308,8 +313,8 @@ namespace BOT_ORM
 			return HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				ReaderVisitor visitor;
-				value.Visit (visitor);
+				BOT_ORM_Impl::ReaderVisitor visitor;
+				value.__Accept (visitor);
 
 				auto strVals = std::move (visitor.serializedValues);
 				auto strFieldNames = ExtractFieldName (value);
@@ -354,7 +359,7 @@ namespace BOT_ORM
 						serialized += char (0);
 					}
 					C obj;
-					obj.Visit (WriterVisitor (serialized));
+					obj.__Accept (BOT_ORM_Impl::WriterVisitor (serialized));
 					out.push_back (std::move (obj));
 				});
 			});
@@ -400,7 +405,7 @@ namespace BOT_ORM
 		static std::string ExtractFieldName (const C& obj)
 		{
 			std::string ret;
-			auto rawStr = obj.fieldNames ();
+			auto rawStr = obj.__FieldNames ();
 			ret.reserve (rawStr.size ());
 			for (const auto &ch : rawStr)
 			{
