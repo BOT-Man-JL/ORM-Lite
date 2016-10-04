@@ -11,6 +11,8 @@ written in C++ 11 style.
 
 ## Usage
 
+[**View Full Documents**](https://github.com/BOT-Man-JL/ORM-Lite/tree/master/docs/doc.md)
+
 Before we start,
 Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
 
@@ -23,18 +25,18 @@ using namespace BOT_ORM;
 class MyClass
 {
     // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, real, str)
+    ORMAP (MyClass, id, score, name)
 public:
     long id;
-    double real;
-    std::string str;
+    double score;
+    std::string name;
 };
 ```
 
-In this Sample, `ORMAP (MyClass, id, real, str)` means that:
+In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 - `Class MyClass` will be mapped into `TABLE MyClass`;
-- `int id`, `double real` and `std::string str` will be mapped
-  into `INT id`, `REAL real` and `TEXT str` respectively;
+- `int id`, `double score` and `std::string name` will be mapped
+  into `INT id`, `REAL score` and `TEXT name` respectively;
 - The first item `id` will be set as the **Primary Key** of the Table;
 
 _(Note that: **No Semicolon ';'** after the **ORMAP**)_ :wink:
@@ -80,7 +82,7 @@ if (!mapper.Insert (MyClass { 1, 0, "Joke" }))
 
 **MyClass** in **test.db**:
 
-| id| real|  str|
+| id| score|  str|
 |---|-----|-----|
 |  1|  0.2| John|
 |...|  ...|  ...|
@@ -138,20 +140,10 @@ mapper.Query (_mc)                  // Link '_mc' to its fields
 mapper.Delete ("where (name='July')");
 ```
 
-
-## Constraints
-
-- Hooked Class MUST have **Default Constructor**
-- Currently Only Support `long`, `double` and `std::string` Types,
-  which are stored in DB as `INTEGER`, `REAL` and `TEXT` (**SQLite3**)
-- If you Attempt to Use other Types, you will see the Compile Error:
-  `Only Support long, double, std::string :-(`
-- Currently Only Support Basic [**CRUD**](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) as described above...
-
 ## Implementation Details
 
 - Using **Visitor Pattern** to *Hook* into the wanted Class/Struct;
 - Using **Template** to Generate Visitors in *Compile Time*;
-- Using **Variadic Template** to Fit into *Various Types*;
+- Using **Variadic Template** to Fit in *Various Types*;
 - Using **Macro** `#define (...)` to Generate Hook Codes;
 - Using **Serialization** and **Deserialization** to *Interchange Data*;

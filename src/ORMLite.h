@@ -462,7 +462,7 @@ namespace BOT_ORM
 
 			// Where
 			ORQuery &Where (long &property,
-							const std::string relOp,
+							const std::string &relOp,
 							long value)
 			{
 				_sqlWhere += _GetFieldName (&property) +
@@ -471,7 +471,7 @@ namespace BOT_ORM
 			}
 
 			ORQuery &Where (double &property,
-							const std::string relOp,
+							const std::string &relOp,
 							double value)
 			{
 				_sqlWhere += _GetFieldName (&property) +
