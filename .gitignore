@@ -240,4 +240,7 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+
+# ORM Lite
 *.db
+src/sqlite3.c
