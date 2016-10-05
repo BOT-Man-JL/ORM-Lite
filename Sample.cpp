@@ -77,7 +77,7 @@ int main ()
 	// Select by SQL
 	std::vector<MyClass> query2;
 	mapper.Select (query2,
-				   "where (name='July' and (id<=90 and id>=50))"
+				   "where (name='July' and (id<=90 and id>=60))"
 				   " order by id desc"
 				   " limit 3 offset 10");
 

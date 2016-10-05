@@ -11,12 +11,12 @@ written in C++ 11 style.
 
 ## Usage
 
-[**View Full Documents**](https://github.com/BOT-Man-JL/ORM-Lite/tree/master/docs/doc.md)
+### [View Full Documents](https://github.com/BOT-Man-JL/ORM-Lite/tree/master/docs/doc.md)
+
+### Include *ORM Lite*
 
 Before we start,
 Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
-
-### Include *ORM Lite*
 
 ``` C++
 #include "ORMLite.h"
@@ -59,7 +59,7 @@ std::vector<MyClass> initObjs =
     { 1, 0.4, "Jack" },
     { 2, 0.6, "Jess" }
 };
-for (auto obj : initObjs)
+for (const auto obj : initObjs)
     mapper.Insert (obj);
 
 // Update Entry by KEY (id)
@@ -95,17 +95,17 @@ for (long i = 50; i < 100; i++)
     mapper.Insert (MyClass { i, i * 0.2, "July" });
 
 // Define a Query Helper Object
-MyClass _mc;
+const MyClass _mc;
 
 // Select by Query
 auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
     .Where (_mc.name, "=", "July")
     .WhereAnd ()
-    .WhereBracket (true)
+    .WhereLBracket ()
         .Where (_mc.id, "<=", 90)
         .WhereAnd ()
         .Where (_mc.id, ">=", 60)
-    .WhereBracket (false)
+    .WhereRBracket ()
     .OrderBy (_mc.id, true)
     .Limit (3, 10)
     .ToVector ();
@@ -113,7 +113,7 @@ auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
 // Select by SQL
 std::vector<MyClass> query2;
 mapper.Select (query2,
-               "where (name='July' and (id<=90 and id>=50))"
+               "where (name='July' and (id<=90 and id>=60))"
                " order by id desc"
                " limit 3 offset 10");
 
