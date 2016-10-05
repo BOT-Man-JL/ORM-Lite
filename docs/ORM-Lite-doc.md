@@ -135,14 +135,14 @@ it would return `true`; otherwise, return `false`;
 
 ## ORQuery
 
-### ORQuery &Where (const T &property, const std::string &relOp, T value)
+### ORQuery &Where (const T &property, const std::string &relOp = "=", T value = property)
 
 Generate `WHERE` String: `field name of (property)` `relOp` `value`;
 
 Remarks:
-
-If `property` is not a member of `queryHelper`,
-throw `std::runtime_error`;
+- `Where (property)` is short for `Where (property, "=", property)`
+- If `property` is not a member of `queryHelper`,
+  throw `std::runtime_error`;
 
 ### ORQuery &WhereLBracket () / WhereRBracket () / WhereAnd () / WhereOr ()
 
@@ -153,9 +153,8 @@ Generate `WHERE` String: `(` / `)` / `and` / `or`;
 Generate `ORDER BY` `field name of (property)` or `ORDER BY` `field name of (property)` `DESC` (if isDecrease);
 
 Remarks:
-
-If `property` is not a member of `queryHelper`,
-throw `std::runtime_error`;
+- If `property` is not a member of `queryHelper`,
+  throw `std::runtime_error`;
 
 ### ORQuery &Limit (size_t count, size_t offset = 0)
 

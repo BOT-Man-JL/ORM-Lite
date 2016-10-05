@@ -11,7 +11,7 @@ written in C++ 11 style.
 
 ## Usage
 
-### [View Full Documents](https://github.com/BOT-Man-JL/ORM-Lite/tree/master/docs/doc.md)
+### [View Full Documents](https://github.com/BOT-Man-JL/ORM-Lite/tree/master/docs/ORM-Lite-doc.md)
 
 ### Include *ORM Lite*
 

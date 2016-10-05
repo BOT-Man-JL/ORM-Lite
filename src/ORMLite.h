@@ -546,6 +546,13 @@ namespace BOT_ORM
 			{}
 
 			// Where
+			template <typename T>
+			inline ORQuery &Where (const T &property,
+								   const std::string &relOp = "=")
+			{
+				return Where (property, relOp, property);
+			}
+
 			ORQuery &Where (const long &property,
 							const std::string &relOp,
 							long value)
@@ -643,13 +650,13 @@ namespace BOT_ORM
 			// Count Result
 			inline long Count ()
 			{
-				return _pMapper->Count (" where " + _sqlWhere);
+				return _pMapper->Count (" where (" + _sqlWhere + ")");
 			}
 
 			// Delete Values
 			inline bool Delete ()
 			{
-				return _pMapper->Delete (" where " + _sqlWhere);
+				return _pMapper->Delete (" where (" + _sqlWhere + ")");
 			}
 
 		protected:
