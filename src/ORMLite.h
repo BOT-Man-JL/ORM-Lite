@@ -56,7 +56,7 @@ namespace BOT_ORM_Impl
 		}
 
 		// Don't throw in callback
-		void Excute (const std::string &cmd,
+		void Execute (const std::string &cmd,
 					 std::function<void (int argc, char **argv,
 										 char **azColName) noexcept>
 					 callback = _callback)
@@ -306,7 +306,7 @@ namespace BOT_ORM
 				}
 				strFmt.pop_back ();
 
-				connector.Excute ("create table " + _tblName +
+				connector.Execute ("create table " + _tblName +
 								  "(" + strFmt + ");");
 			});
 		}
@@ -316,7 +316,7 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				connector.Excute ("drop table " + _tblName + ";");
+				connector.Execute ("drop table " + _tblName + ";");
 			});
 		}
 
@@ -336,7 +336,7 @@ namespace BOT_ORM
 				});
 				strIns.pop_back ();
 
-				connector.Excute ("insert into " + _tblName +
+				connector.Execute ("insert into " + _tblName +
 								  " values (" + strIns + ");");
 			});
 		}
@@ -346,7 +346,7 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				connector.Excute ("delete from " + _tblName +
+				connector.Execute ("delete from " + _tblName +
 								  " " + sqlStr + ";");
 			});
 		}
@@ -368,7 +368,7 @@ namespace BOT_ORM
 				auto strDel =
 					std::move (fieldName) + "=" + std::move (val);
 
-				connector.Excute ("delete from " + _tblName +
+				connector.Execute ("delete from " + _tblName +
 								  " where " + strDel + ";");
 			});
 		}
@@ -401,7 +401,7 @@ namespace BOT_ORM
 				}
 				strUpd.pop_back ();
 
-				connector.Excute ("update " + _tblName +
+				connector.Execute ("update " + _tblName +
 								  " set " + strUpd +
 								  " where " + strKey + ";");
 			});
@@ -414,7 +414,7 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				connector.Excute ("select * from " + _tblName +
+				connector.Execute ("select * from " + _tblName +
 								  " " + sqlStr + ";",
 								  [&] (int argc, char **argv, char **)
 				{
@@ -431,20 +431,23 @@ namespace BOT_ORM
 			});
 		}
 
-		size_t Count (const std::string &sqlStr = "")
+		long Count (const std::string &sqlStr = "")
 		{
-			auto ret = 0;
-			_HandleException ([&] (
+			long ret;
+			auto isOk = _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				connector.Excute ("select count (*) as num from " +
+				connector.Execute ("select count (*) as num from " +
 								  _tblName + " " + sqlStr,
 								  [&] (int, char **argv, char **)
 				{
 					ret = std::stoi (argv[0]);
 				});
 			});
-			return ret;
+			if (isOk)
+				return ret;
+			else
+				return -1;
 		}
 
 		class ORQuery;
@@ -551,7 +554,7 @@ namespace BOT_ORM
 			}
 
 			// Count Result
-			size_t Count ()
+			long Count ()
 			{
 				return _pMapper->Count (" where " + _sqlWhere);
 			}

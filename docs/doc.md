@@ -56,50 +56,50 @@ Return the latest Error Message;
 
 Create Table `MyClass` for class `MyClass`;
 
-Excute `CREATE TABLE MyClass (...);`
+Execute `CREATE TABLE MyClass (...);`
 
 ### bool DropTbl ()
 
 Drop Table `MyClass` from the DB File;
 
-Excute `DROP TABLE MyClass;`
+Execute `DROP TABLE MyClass;`
 
 ### bool Insert (MyClass &value)
 
 Insert `value` into Table `MyClass`;
 
-Excute `INSERT INTO MyClass VALUES (...);`
+Execute `INSERT INTO MyClass VALUES (...);`
 
 ### bool Delete (const std::string &sqlStr = "")
 
-Excute "`DELETE FROM MyClass` `sqlStr;`
+Execute "`DELETE FROM MyClass` `sqlStr;`
 
 ### bool Delete (MyClass &value)
 
 Delete Entry `value` in Table `MyClass`
 with the Same `KEY` with variable `value`;
 
-Excute "`DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
+Execute "`DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
 
 ### bool Update (MyClass &value)
 
 Update Entry `value` in Table `MyClass`
 with the Same `KEY` with variable `value`;
 
-Excute "`UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
+Execute "`UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
 
 ### bool Select (T<MyClass> &out, const std::string &sqlStr = "")
 
-Excute "`SELECT * FROM MyClass` `sqlStr`",
+Execute "`SELECT * FROM MyClass` `sqlStr`",
 and Set the result into `out`;
 
-### size_t Count (const std::string &sqlStr = "")
+### long Count (const std::string &sqlStr = "")
 
-Excute "`SELECT COUNT(*) FROM MyClass` `sqlStr`",
+Execute "`SELECT COUNT(*) FROM MyClass` `sqlStr`",
 
 Return:
 - Count of entries fit `sqlStr` in `MyClass`;
-- 0 if **No entry Found** or **Query Error**
+- -1 if **Query Error**;
 
 ### ORQuery Query (C &qObj)
 
@@ -136,10 +136,22 @@ Generate `LIMIT` `count` `OFFSET` `offset`;
 
 Retrieve Select Result under **Constraints**;
 
-### size_t Count ()
+Execute `SELECT * FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
 
-Return Count under **Constraints**;
+### long Count ()
+
+Return:
+- Return Count under **_WHERE_ Constraints**;
+- -1 if **Query Error**;
+
+Execute `SELECT COUNT (*) FROM MyClass WHERE ... ;`
 
 ### bool Delete ()
 
-Delete Entries under **Constraints**;
+Delete Entries under **_WHERE_ Constraints**;
+
+Execute `DELETE FROM MyClass WHERE ... ;`
+
+Return:
+- `true` if Succeeded;
+- `false` otherwise;
