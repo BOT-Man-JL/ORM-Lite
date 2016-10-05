@@ -34,7 +34,7 @@ int main ()
 		{ 1, 0.4, "Jack" },
 		{ 2, 0.6, "Jess" }
 	};
-	for (auto obj : initObjs)
+	for (const auto obj : initObjs)
 		mapper.Insert (obj);
 
 	// Update Entry by KEY (id)
@@ -59,17 +59,17 @@ int main ()
 		mapper.Insert (MyClass { i, i * 0.2, "July" });
 
 	// Define a Query Helper Object
-	MyClass _mc;
+	const MyClass _mc;
 
 	// Select by Query
 	auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
 		.Where (_mc.name, "=", "July")
 		.WhereAnd ()
-		.WhereBracket (true)
+		.WhereLBracket ()
 			.Where (_mc.id, "<=", 90)
 			.WhereAnd ()
 			.Where (_mc.id, ">=", 60)
-		.WhereBracket (false)
+		.WhereRBracket ()
 		.OrderBy (_mc.id, true)
 		.Limit (3, 10)
 		.ToVector ();

@@ -8,7 +8,9 @@ using namespace BOT_ORM;
 ```
 
 Remarks:
-- Remember to Build `sqlite3.c` in your Project
+- Remember to Build `sqlite3.c` in your Project;
+- And `sqlite3.c` has been zipped
+  (because of its large size :sweat_smile:)
 
 ## Hook Class
 
@@ -64,7 +66,7 @@ Drop Table `MyClass` from the DB File;
 
 Execute `DROP TABLE MyClass;`
 
-### bool Insert (MyClass &value)
+### bool Insert (const MyClass &value)
 
 Insert `value` into Table `MyClass`;
 
@@ -74,24 +76,27 @@ Execute `INSERT INTO MyClass VALUES (...);`
 
 Execute "`DELETE FROM MyClass` `sqlStr;`
 
-### bool Delete (MyClass &value)
+### bool Delete (const MyClass &value)
 
 Delete Entry `value` in Table `MyClass`
 with the Same `KEY` with variable `value`;
 
 Execute "`DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
 
-### bool Update (MyClass &value)
+### bool Update (const MyClass &value)
 
 Update Entry `value` in Table `MyClass`
 with the Same `KEY` with variable `value`;
 
 Execute "`UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
 
-### bool Select (T<MyClass> &out, const std::string &sqlStr = "")
+### bool Select (T\<MyClass\> &out, const std::string &sqlStr = "")
 
-Execute "`SELECT * FROM MyClass` `sqlStr`",
-and Set the result into `out`;
+Set the Select into Container `out`;
+
+`out` should **HAVE** `push_back (const MyClass &)` Function;
+
+Execute "`SELECT * FROM MyClass` `sqlStr`";
 
 ### long Count (const std::string &sqlStr = "")
 
@@ -101,9 +106,11 @@ Return:
 - Count of entries fit `sqlStr` in `MyClass`;
 - -1 if **Query Error**;
 
-### ORQuery Query (C &qObj)
+### ORQuery Query (const MyClass &queryHelper)
 
-Return new `ORQuery` object and Capturing `qObj`;
+Return new `ORQuery` object and Capturing `queryHelper`;
+
+Details in `## ORQuery` Section;
 
 ### Note that
 
@@ -112,27 +119,33 @@ it would return `true`; otherwise, return `false`;
 
 ## ORQuery
 
-### ORQuery &Where (T &property, const std::string &relOp, T value)
+### ORQuery &Where (const T &property, const std::string &relOp, T value)
 
 Generate `WHERE` String: `field name of (property)` `relOp` `value`;
 
-### ORQuery &WhereBracket (bool isLeft)
+Remarks:
 
-Generate `WHERE` String: `(` **(isLeft == true)** or `)` **(isLeft == false)**;
+If `property` is not a member of `queryHelper`,
+throw `std::runtime_error`;
 
-### ORQuery &WhereAnd () / WhereOr ()
+### ORQuery &WhereLBracket () / WhereRBracket () / WhereAnd () / WhereOr ()
 
-Generate `WHERE` String: `and` / `or`;
+Generate `WHERE` String: `(` / `)` / `and` / `or`;
 
-### ORQuery &OrderBy (T &property, bool isDecreasing = false)
+### ORQuery &OrderBy (const T &property, bool isDecreasing = false)
 
-Generate `ORDER BY` `field name of (property)` or `ORDER BY` `field name of (property)` `DESC`;
+Generate `ORDER BY` `field name of (property)` or `ORDER BY` `field name of (property)` `DESC` (if isDecrease);
+
+Remarks:
+
+If `property` is not a member of `queryHelper`,
+throw `std::runtime_error`;
 
 ### ORQuery &Limit (size_t count, size_t offset = 0)
 
 Generate `LIMIT` `count` `OFFSET` `offset`;
 
-### std::vector\<C\> ToVector () / std::list\<C\> ToList ()
+### std::vector\<MyClass\> ToVector () / std::list\<MyClass\> ToList ()
 
 Retrieve Select Result under **Constraints**;
 

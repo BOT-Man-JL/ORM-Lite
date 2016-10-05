@@ -18,19 +18,23 @@
 
 #include "sqlite3.h"
 
-#define ORMAP(_MY_CLASS_, ...)                      \
-friend class BOT_ORM::ORMapper<_MY_CLASS_>;         \
-void __Accept (BOT_ORM_Impl::ORVisitor &visitor)    \
-{                                                   \
-	visitor.Visit (__VA_ARGS__);                    \
-}                                                   \
-std::string __ClassName () const                    \
-{                                                   \
-	return #_MY_CLASS_;                             \
-}                                                   \
-std::string __FieldNames () const                   \
-{                                                   \
-	return #__VA_ARGS__;                            \
+#define ORMAP(_MY_CLASS_, ...)                            \
+friend class BOT_ORM::ORMapper<_MY_CLASS_>;               \
+void __Accept (BOT_ORM_Impl::ORVisitor &visitor)          \
+{                                                         \
+	visitor.Visit (__VA_ARGS__);                          \
+}                                                         \
+void __Accept (BOT_ORM_Impl::ORVisitor &visitor) const   \
+{                                                         \
+	visitor.Visit (__VA_ARGS__);                          \
+}                                                         \
+std::string __ClassName () const                          \
+{                                                         \
+	return #_MY_CLASS_;                                   \
+}                                                         \
+std::string __FieldNames () const                         \
+{                                                         \
+	return #__VA_ARGS__;                                  \
 }
 
 namespace BOT_ORM_Impl
@@ -57,9 +61,9 @@ namespace BOT_ORM_Impl
 
 		// Don't throw in callback
 		void Execute (const std::string &cmd,
-					 std::function<void (int argc, char **argv,
-										 char **azColName) noexcept>
-					 callback = _callback)
+					  std::function<void (int argc, char **argv,
+										  char **azColName) noexcept>
+					  callback = _callback)
 		{
 			const size_t MAX_TRIAL = 16;
 			char *zErrMsg = 0;
@@ -149,8 +153,13 @@ namespace BOT_ORM_Impl
 		}
 
 		virtual void _Visit (long &property) = 0;
+		virtual void _Visit (const long &property) = 0;
+
 		virtual void _Visit (double &property) = 0;
+		virtual void _Visit (const double &property) = 0;
+
 		virtual void _Visit (std::string &property) = 0;
+		virtual void _Visit (const std::string &property) = 0;
 	};
 
 	class ReaderVisitor : public ORVisitor
@@ -159,22 +168,27 @@ namespace BOT_ORM_Impl
 		std::string serializedValues;
 
 	protected:
-		void _Visit (long &property) override
+		void _Visit (const long &property) override final
 		{
 			serializedValues += std::to_string (property);
 			serializedValues += char (0);
 		}
-		void _Visit (double &property) override
+		void _Visit (const double &property) override final
 		{
 			serializedValues +=
 				BOT_ORM_Impl::DoubleToStr (property);
 			serializedValues += char (0);
 		}
-		void _Visit (std::string &property) override
+		void _Visit (const std::string &property) override final
 		{
 			serializedValues += "'" + property + "'";
 			serializedValues += char (0);
 		}
+
+	private:
+		void _Visit (long &property) override final {}
+		void _Visit (double &property) override final {}
+		void _Visit (std::string &property) override final {}
 	};
 
 	class TypeVisitor : public ORVisitor
@@ -183,21 +197,26 @@ namespace BOT_ORM_Impl
 		std::string serializedTypes;
 
 	protected:
-		void _Visit (long &property) override
+		void _Visit (const long &property) override final
 		{
 			serializedTypes += "integer";
 			serializedTypes += char (0);
 		}
-		void _Visit (double &property) override
+		void _Visit (const double &property) override final
 		{
 			serializedTypes += "real";
 			serializedTypes += char (0);
 		}
-		void _Visit (std::string &property) override
+		void _Visit (const std::string &property) override final
 		{
 			serializedTypes += "text";
 			serializedTypes += char (0);
 		}
+
+	private:
+		void _Visit (long &property) override final {}
+		void _Visit (double &property) override final {}
+		void _Visit (std::string &property) override final {}
 	};
 
 	class WriterVisitor : public ORVisitor
@@ -210,57 +229,67 @@ namespace BOT_ORM_Impl
 		{}
 
 	protected:
-		void _Visit (long &property) override
+		void _Visit (long &property) override final
 		{
 			property = std::stol (
 				BOT_ORM_Impl::SplitStr (_serializedValues));
 		}
-		void _Visit (double &property) override
+		void _Visit (double &property) override final
 		{
 			property = std::stod (
 				BOT_ORM_Impl::SplitStr (_serializedValues));
 		}
-		void _Visit (std::string &property) override
+		void _Visit (std::string &property) override final
 		{
 			property = BOT_ORM_Impl::SplitStr (_serializedValues);
 		}
+
+	private:
+		void _Visit (const long &property) override final {}
+		void _Visit (const double &property) override final {}
+		void _Visit (const std::string &property) override final {}
 	};
 
 	class IndexVisitor : public ORVisitor
 	{
-		void *_pointer;
-		bool _isFound;
+		const void *_pointer;
 
 	public:
+		bool isFound;
 		size_t index;
 
-		IndexVisitor (void *pointer)
-			: index (0), _isFound (false),
+		IndexVisitor (const void *pointer)
+			: index (0), isFound (false),
 			_pointer (pointer)
 		{}
 
 	protected:
-		void _Visit (long &property) override
+		void _Visit (const long &property) override final
 		{
-			if ((void *) &property == _pointer)
-				_isFound = true;
-			else if (!_isFound)
+			if ((const void *) &property == _pointer)
+				isFound = true;
+			else if (!isFound)
 				index++;
 		}
-		void _Visit (double &property) override
+		void _Visit (const double &property) override final
 		{
-			if ((void *) &property == _pointer)
-				_isFound = true;
-			else if (!_isFound)
+			if ((const void *) &property == _pointer)
+				isFound = true;
+			else if (!isFound)
 				index++;
 		}
-		void _Visit (std::string &property) override
+		void _Visit (const std::string &property) override final
 		{
-			if ((void *) &property == _pointer)
-				_isFound = true;
-			else if (!_isFound)
+			if ((const void *) &property == _pointer)
+				isFound = true;
+			else if (!isFound)
 				index++;
 		}
+
+	private:
+		void _Visit (long &property) override final {}
+		void _Visit (double &property) override final {}
+		void _Visit (std::string &property) override final {}
 	};
 }
 
@@ -285,12 +314,12 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				C cl;
+				const C obj;
 				BOT_ORM_Impl::TypeVisitor visitor;
-				cl.__Accept (visitor);
+				obj.__Accept (visitor);
 
 				auto strTypes = std::move (visitor.serializedTypes);
-				auto strFieldNames = _ExtractFieldName (cl);
+				auto strFieldNames = _ExtractFieldName (obj);
 
 				auto typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
 				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
@@ -307,7 +336,7 @@ namespace BOT_ORM
 				strFmt.pop_back ();
 
 				connector.Execute ("create table " + _tblName +
-								  "(" + strFmt + ");");
+								   "(" + strFmt + ");");
 			});
 		}
 
@@ -320,7 +349,7 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Insert (C &value)
+		bool Insert (const C &value)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
@@ -337,7 +366,7 @@ namespace BOT_ORM
 				strIns.pop_back ();
 
 				connector.Execute ("insert into " + _tblName +
-								  " values (" + strIns + ");");
+								   " values (" + strIns + ");");
 			});
 		}
 
@@ -347,11 +376,11 @@ namespace BOT_ORM
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				connector.Execute ("delete from " + _tblName +
-								  " " + sqlStr + ";");
+								   " " + sqlStr + ";");
 			});
 		}
 
-		bool Delete (C &value)
+		bool Delete (const C &value)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
@@ -369,11 +398,11 @@ namespace BOT_ORM
 					std::move (fieldName) + "=" + std::move (val);
 
 				connector.Execute ("delete from " + _tblName +
-								  " where " + strDel + ";");
+								   " where " + strDel + ";");
 			});
 		}
 
-		bool Update (C &value)
+		bool Update (const C &value)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
@@ -402,8 +431,8 @@ namespace BOT_ORM
 				strUpd.pop_back ();
 
 				connector.Execute ("update " + _tblName +
-								  " set " + strUpd +
-								  " where " + strKey + ";");
+								   " set " + strUpd +
+								   " where " + strKey + ";");
 			});
 		}
 
@@ -415,8 +444,8 @@ namespace BOT_ORM
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				connector.Execute ("select * from " + _tblName +
-								  " " + sqlStr + ";",
-								  [&] (int argc, char **argv, char **)
+								   " " + sqlStr + ";",
+								   [&] (int argc, char **argv, char **)
 				{
 					std::string serialized;
 					for (int i = 0; i < argc; i++)
@@ -438,8 +467,8 @@ namespace BOT_ORM
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				connector.Execute ("select count (*) as num from " +
-								  _tblName + " " + sqlStr,
-								  [&] (int, char **argv, char **)
+								   _tblName + " " + sqlStr,
+								   [&] (int, char **argv, char **)
 				{
 					ret = std::stoi (argv[0]);
 				});
@@ -450,21 +479,15 @@ namespace BOT_ORM
 				return -1;
 		}
 
-		class ORQuery;
-		ORQuery Query (C &qObj)
-		{
-			return ORQuery (&qObj, this);
-		}
-
 		class ORQuery
 		{
 		public:
-			ORQuery (C *qObj, ORMapper<C> *pMapper)
-				: _qObj (qObj), _pMapper (pMapper)
+			ORQuery (const C &queryHelper, ORMapper<C> *pMapper)
+				: _qObj (&queryHelper), _pMapper (pMapper)
 			{}
 
 			// Where
-			ORQuery &Where (long &property,
+			ORQuery &Where (const long &property,
 							const std::string &relOp,
 							long value)
 			{
@@ -473,7 +496,7 @@ namespace BOT_ORM
 				return *this;
 			}
 
-			ORQuery &Where (double &property,
+			ORQuery &Where (const double &property,
 							const std::string &relOp,
 							double value)
 			{
@@ -482,22 +505,25 @@ namespace BOT_ORM
 				return *this;
 			}
 
-			ORQuery &Where (std::string &property,
+			ORQuery &Where (const std::string &property,
 							const std::string &relOp,
-							const std::string &value)
+							std::string value)
 			{
 				_sqlWhere += _GetFieldName (&property) +
-					relOp + "'" + value + "'";
+					relOp + "'" + std::move (value) + "'";
 				return *this;
 			}
 
 			// Where Helper
-			ORQuery &WhereBracket (bool isLeft)
+			ORQuery &WhereLBracket ()
 			{
-				if (isLeft)
-					_sqlWhere += "(";
-				else
-					_sqlWhere += ")";
+				_sqlWhere += "(";
+				return *this;
+			}
+
+			ORQuery &WhereRBracket ()
+			{
+				_sqlWhere += "(";
 				return *this;
 			}
 
@@ -515,7 +541,7 @@ namespace BOT_ORM
 
 			// Order By
 			template <typename T>
-			ORQuery &OrderBy (T &property,
+			ORQuery &OrderBy (const T &property,
 							  bool isDecreasing = false)
 			{
 				_sqlOrderBy = " order by " + _GetFieldName (&property);
@@ -566,15 +592,18 @@ namespace BOT_ORM
 			}
 
 		protected:
-			C *_qObj;
+			const C *_qObj;
 			ORMapper<C> *_pMapper;
 			std::string _sqlWhere;
 			std::string _sqlOrderBy, _sqlLimit;
 
-			std::string _GetFieldName (void *property)
+			std::string _GetFieldName (const void *property)
 			{
 				BOT_ORM_Impl::IndexVisitor visitor (property);
 				(*_qObj).__Accept (visitor);
+
+				if (!visitor.isFound)
+					throw std::runtime_error ("No such Field in the Table");
 
 				auto strFieldNames = _ExtractFieldName (*_qObj);
 				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
@@ -585,6 +614,11 @@ namespace BOT_ORM
 				return std::move (fieldName);
 			}
 		};
+
+		ORQuery Query (const C &queryHelper)
+		{
+			return ORQuery (queryHelper, this);
+		}
 
 	private:
 		std::string _dbName, _tblName;
