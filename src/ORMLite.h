@@ -12,7 +12,6 @@
 #include <list>
 #include <string>
 #include <cctype>
-#include <algorithm>
 #include <thread>
 #include <strstream>
 
@@ -358,11 +357,9 @@ namespace BOT_ORM
 				value.__Accept (visitor);
 				auto strIns = std::move (visitor.serializedValues);
 
-				std::for_each (strIns.begin (), strIns.end (),
-							   [] (auto &ch)
-				{
-					if (ch == char (0)) ch = ',';
-				});
+				for (auto &ch : strIns)
+					if (ch == char (0))
+						ch = ',';
 				strIns.pop_back ();
 
 				connector.Execute ("insert into " + _tblName +
@@ -370,13 +367,28 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Delete (const std::string &sqlStr)
+		template <typename In>
+		bool Insert (const In &values)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				connector.Execute ("delete from " + _tblName +
-								   " " + sqlStr + ";");
+				std::string strIns;
+				for (const auto &value : values)
+				{
+					BOT_ORM_Impl::ReaderVisitor visitor;
+					value.__Accept (visitor);
+					auto strValues = std::move (visitor.serializedValues);
+
+					for (auto &ch : strValues)
+						if (ch == char (0))
+							ch = ',';
+					strValues.pop_back ();
+					strIns += "(" + strValues + "),";
+				}
+				strIns.pop_back ();
+				connector.Execute ("insert into " + _tblName +
+								   " values " + strIns + ";");
 			});
 		}
 
@@ -399,6 +411,16 @@ namespace BOT_ORM
 
 				connector.Execute ("delete from " + _tblName +
 								   " where " + strDel + ";");
+			});
+		}
+
+		bool Delete (const std::string &sqlStr)
+		{
+			return _HandleException ([&] (
+				BOT_ORM_Impl::SQLConnector &connector)
+			{
+				connector.Execute ("delete from " + _tblName +
+								   " " + sqlStr + ";");
 			});
 		}
 
@@ -431,8 +453,45 @@ namespace BOT_ORM
 				strUpd.pop_back ();
 
 				connector.Execute ("update " + _tblName +
-								   " set " + strUpd +
-								   " where " + strKey + ";");
+								   " set " + std::move (strUpd) +
+								   " where " + std::move (strKey) + ";");
+			});
+		}
+
+		template <typename In>
+		bool Update (const In &values)
+		{
+			return _HandleException ([&] (
+				BOT_ORM_Impl::SQLConnector &connector)
+			{
+				auto strFieldNames = _ExtractFieldName (*values.begin ());
+				std::vector<std::string> fieldNames;
+				while (!strFieldNames.empty ())
+					fieldNames.emplace_back (BOT_ORM_Impl::SplitStr (strFieldNames));
+
+				std::string strUpdate;
+				for (const auto &value : values)
+				{
+					BOT_ORM_Impl::ReaderVisitor visitor;
+					value.__Accept (visitor);
+
+					auto strVals = std::move (visitor.serializedValues);
+					auto curIndex = 0;
+
+					std::string strKey = fieldNames[curIndex++] +
+						"=" + BOT_ORM_Impl::SplitStr (strVals);
+
+					std::string strUpd;
+					while (!strVals.empty ())
+						strUpd += fieldNames[curIndex++] + "=" +
+						BOT_ORM_Impl::SplitStr (strVals) + ",";
+					strUpd.pop_back ();
+
+					strUpdate += "update " + _tblName +
+						" set " + std::move (strUpd) +
+						" where " + std::move (strKey) + ";";
+				}
+				connector.Execute (strUpdate);
 			});
 		}
 

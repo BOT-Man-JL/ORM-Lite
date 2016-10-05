@@ -72,35 +72,51 @@ Insert `value` into Table `MyClass`;
 
 Execute `INSERT INTO MyClass VALUES (...);`
 
-### bool Delete (const std::string &sqlStr = "")
+### bool Insert (const T\<MyClass\> &values)
 
-Execute "`DELETE FROM MyClass` `sqlStr;`
+Insert `values` into Table `MyClass`;
+
+`values` must **SUPPORT** `forward_iterator`;
+    
+Execute `INSERT INTO MyClass VALUES (...), (...) ...;`
 
 ### bool Delete (const MyClass &value)
 
 Delete Entry `value` in Table `MyClass`
 with the Same `KEY` with variable `value`;
 
-Execute "`DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
+Execute `DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
+
+### bool Delete (const std::string &sqlStr = "")
+
+Execute `DELETE FROM MyClass` `sqlStr;`
 
 ### bool Update (const MyClass &value)
 
 Update Entry `value` in Table `MyClass`
 with the Same `KEY` with variable `value`;
 
-Execute "`UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
+Execute `UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
+
+### bool Update (const T\<MyClass\> &values)
+    
+Update Entries with the Same `KEY` with `values`;
+
+`values` must **SUPPORT** `forward_iterator`;
+
+Execute Multiple `UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
 
 ### bool Select (T\<MyClass\> &out, const std::string &sqlStr = "")
 
 Set the Select into Container `out`;
 
-`out` should **HAVE** `push_back (const MyClass &)` Function;
+`out` must **SUPPORT** `push_back (const MyClass &)` Function;
 
-Execute "`SELECT * FROM MyClass` `sqlStr`";
+Execute `SELECT * FROM MyClass` `sqlStr`";
 
 ### long Count (const std::string &sqlStr = "")
 
-Execute "`SELECT COUNT(*) FROM MyClass` `sqlStr`",
+Execute `SELECT COUNT(*) FROM MyClass` `sqlStr`",
 
 Return:
 - Count of entries fit `sqlStr` in `MyClass`;

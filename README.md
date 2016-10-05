@@ -87,13 +87,26 @@ if (!mapper.Insert (MyClass { 1, 0, "Joke" }))
 |  1|  0.2| John|
 |...|  ...|  ...|
 
-#### Complex Usage :-)
+#### Batch Operations
 
 ``` C++
-// ReSeed data :-)
+// Insert by Batch Insert
+// Performance is much Better than Separated Insert :-)
+std::vector<MyClass> dataToSeed;
 for (long i = 50; i < 100; i++)
-    mapper.Insert (MyClass { i, i * 0.2, "July" });
+    dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
+mapper.Insert (dataToSeed);
 
+// Update by Batch Update
+// Performance is little Better than Separated Update :-(
+for (size_t i = 0; i < 50; i++)
+    dataToSeed[i].score += 1;
+mapper.Update (dataToSeed);
+```
+
+#### Composite Query
+
+``` C++
 // Define a Query Helper Object
 const MyClass _mc;
 
@@ -118,7 +131,7 @@ mapper.Select (query2,
                " limit 3 offset 10");
 
 // Note that: query1 = query2 =
-// [{ 80, 16.0, "July"}, { 79, 15.8, "July"}, { 78, 15.6, "July"}]
+// [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
 // Count by Query
 auto count1 = mapper.Query (_mc)    // Link '_mc' to its fields
