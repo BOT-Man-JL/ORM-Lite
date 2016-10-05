@@ -27,14 +27,8 @@ void __Accept (BOT_ORM_Impl::ORVisitor &visitor) const   \
 {                                                         \
 	visitor.Visit (__VA_ARGS__);                          \
 }                                                         \
-std::string __ClassName () const                          \
-{                                                         \
-	return #_MY_CLASS_;                                   \
-}                                                         \
-std::string __FieldNames () const                         \
-{                                                         \
-	return #__VA_ARGS__;                                  \
-}
+static constexpr char *__ClassName = #_MY_CLASS_;         \
+static constexpr char *__FieldNames = #__VA_ARGS__;       \
 
 namespace BOT_ORM_Impl
 {
@@ -300,7 +294,7 @@ namespace BOT_ORM
 	public:
 		ORMapper (const std::string &dbName)
 			: _dbName (dbName),
-			_tblName (C ().__ClassName ())
+			_tblName (C::__ClassName)
 		{}
 
 		inline const std::string &ErrMsg () const
@@ -318,7 +312,7 @@ namespace BOT_ORM
 				obj.__Accept (visitor);
 
 				auto strTypes = std::move (visitor.serializedTypes);
-				auto strFieldNames = _ExtractFieldName (obj);
+				auto strFieldNames = _ExtractFieldName ();
 
 				auto typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
 				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
@@ -401,7 +395,7 @@ namespace BOT_ORM
 				value.__Accept (visitor);
 
 				auto strVals = std::move (visitor.serializedValues);
-				auto strFieldNames = _ExtractFieldName (value);
+				auto strFieldNames = _ExtractFieldName ();
 
 				// Only Set Key
 				auto val = BOT_ORM_Impl::SplitStr (strVals);
@@ -433,7 +427,7 @@ namespace BOT_ORM
 				value.__Accept (visitor);
 
 				auto strVals = std::move (visitor.serializedValues);
-				auto strFieldNames = _ExtractFieldName (value);
+				auto strFieldNames = _ExtractFieldName ();
 
 				std::string strKey;
 				{
@@ -464,7 +458,7 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				auto strFieldNames = _ExtractFieldName (*values.begin ());
+				auto strFieldNames = _ExtractFieldName ();
 				std::vector<std::string> fieldNames;
 				while (!strFieldNames.empty ())
 					fieldNames.emplace_back (BOT_ORM_Impl::SplitStr (strFieldNames));
@@ -673,7 +667,7 @@ namespace BOT_ORM
 				if (!visitor.isFound)
 					throw std::runtime_error ("No such Field in the Table");
 
-				auto strFieldNames = _ExtractFieldName (*_qObj);
+				auto strFieldNames = _ExtractFieldName ();
 				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
 				for (auto index = visitor.index; index > 0; index--)
 				{
@@ -708,10 +702,9 @@ namespace BOT_ORM
 			}
 		}
 
-		static std::string _ExtractFieldName (const C& obj)
+		static std::string _ExtractFieldName ()
 		{
-			std::string ret;
-			auto rawStr = obj.__FieldNames ();
+			std::string ret, rawStr (C::__FieldNames);
 			ret.reserve (rawStr.size ());
 			for (const auto &ch : rawStr)
 			{
