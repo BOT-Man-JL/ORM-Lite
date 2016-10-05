@@ -523,7 +523,7 @@ namespace BOT_ORM
 
 			ORQuery &WhereRBracket ()
 			{
-				_sqlWhere += "(";
+				_sqlWhere += ")";
 				return *this;
 			}
 
@@ -558,35 +558,37 @@ namespace BOT_ORM
 				return *this;
 			}
 
+			std::string GetSQL () const
+			{
+				if (!_sqlWhere.empty ())
+					return " where (" + _sqlWhere + ")" + _sqlOrderBy + _sqlLimit;
+				else
+					return _sqlOrderBy + _sqlLimit;
+			}
+
 			// Retrieve Select Result
 			std::vector<C> ToVector ()
 			{
 				std::vector<C> ret;
-				if (!_sqlWhere.empty ())
-					_pMapper->Select (ret, " where (" + _sqlWhere + ")" + _sqlOrderBy + _sqlLimit);
-				else
-					_pMapper->Select (ret, _sqlOrderBy + _sqlLimit);
+				_pMapper->Select (ret, GetSQL ());
 				return std::move (ret);
 			}
 
 			std::list<C> ToList ()
 			{
 				std::list<C> ret;
-				if (!_sqlWhere.empty ())
-					_pMapper->Select (ret, " where (" + _sqlWhere + ")" + _sqlOrderBy + _sqlLimit);
-				else
-					_pMapper->Select (ret, _sqlOrderBy + _sqlLimit);
+				_pMapper->Select (ret, GetSQL ());
 				return std::move (ret);
 			}
 
 			// Count Result
-			long Count ()
+			inline long Count ()
 			{
 				return _pMapper->Count (" where " + _sqlWhere);
 			}
 
 			// Delete Values
-			bool Delete ()
+			inline bool Delete ()
 			{
 				return _pMapper->Delete (" where " + _sqlWhere);
 			}

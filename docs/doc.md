@@ -145,6 +145,12 @@ throw `std::runtime_error`;
 
 Generate `LIMIT` `count` `OFFSET` `offset`;
 
+### std::string GetSQL () const
+
+Get the Generated SQL String of this Query;
+
+And you can Use this String to Call `Select`, `Count` and `Delete`;
+
 ### std::vector\<MyClass\> ToVector () / std::list\<MyClass\> ToList ()
 
 Retrieve Select Result under **Constraints**;
