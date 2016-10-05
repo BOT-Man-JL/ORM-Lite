@@ -9,8 +9,8 @@ using namespace BOT_ORM;
 
 Remarks:
 - Remember to Build `sqlite3.c` in your Project;
-- And `sqlite3.c` has been zipped
-  (because of its large size :sweat_smile:)
+- And `sqlite3.c/.h` have been zipped
+  (because of their large size :sweat_smile:)
 
 ## Hook Class
 
