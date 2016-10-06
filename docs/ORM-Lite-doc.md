@@ -9,10 +9,10 @@ using namespace BOT_ORM;
 
 Remarks:
 - Remember to Build `sqlite3.c` in your Project;
-- And `sqlite3.c/.h` have been zipped
+- And `sqlite3.c` and `sqlite3.h` have been zipped
   (because of their large size :sweat_smile:)
 
-## Hook Class
+## Inject Class
 
 ``` C++
 #include "ORMLite.h"
@@ -135,18 +135,11 @@ it would return `true`; otherwise, return `false`;
 
 ## ORQuery
 
-### ORQuery &Where (const T &property, const std::string &relOp = "=", T value = property)
+### ORQuery &Where (const Expr &expr)
 
-Generate `WHERE` String: `field name of (property)` `relOp` `value`;
+Generate `WHERE (` `expr` `)`;
 
-Remarks:
-- `Where (property)` is short for `Where (property, "=", property)`
-- If `property` is not a member of `queryHelper`,
-  throw `std::runtime_error`;
-
-### ORQuery &WhereLBracket () / WhereRBracket () / WhereAnd () / WhereOr ()
-
-Generate `WHERE` String: `(` / `)` / `and` / `or`;
+Details in `## Expr` Section;
 
 ### ORQuery &OrderBy (const T &property, bool isDecreasing = false)
 
@@ -189,3 +182,18 @@ Execute `DELETE FROM MyClass WHERE ... ;`
 Return:
 - `true` if Succeeded;
 - `false` otherwise;
+    
+## Expr
+
+### Expr (const T &property, const std::string &relOp = "=", T value = property)
+
+Generate `field name of (property)` `relOp` `value`;
+
+Remarks:
+- `Expr (property)` is short for `Expr (property, "=", property)`
+- If `property` is not a member of `queryHelper`,
+  throw `std::runtime_error` at Calling `Where`;
+
+### Expr operator && / || (const Expr &left, const Expr &right)
+
+Generate `(` `left` `&& / ||` `right` `)`;

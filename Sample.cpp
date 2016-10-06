@@ -75,22 +75,22 @@ int main ()
 	/* #3 Composite Query */
 
 	// Define a Query Helper Object
-	const MyClass _mc;
+	MyClass _mc;
 
-	// Select by Query
+	// Select by Query :-)
 	auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
-		.Where (_mc.name, "=", "July")
-		.WhereAnd ()
-		.WhereLBracket ()
-			.Where (_mc.id, "<=", 90)
-			.WhereAnd ()
-			.Where (_mc.id, ">=", 60)
-		.WhereRBracket ()
+		.Where (
+			Expr (_mc.name, "=", "July") &&
+			(
+				Expr (_mc.id, "<=", 90) &&
+				Expr (_mc.id, ">=", 60)
+				)
+		)
 		.OrderBy (_mc.id, true)
 		.Limit (3, 10)
 		.ToVector ();
 
-	// Select by SQL
+	// Select by SQL, NOT Recommended :-(
 	std::vector<MyClass> query2;
 	mapper.Select (query2,
 				   "where (name='July' and (id<=90 and id>=60))"
@@ -100,23 +100,25 @@ int main ()
 	// Note that: query1 = query2 =
 	// [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
-	// Count by Query
+	// Count by Query :-)
 	auto count1 = mapper.Query (_mc)    // Link '_mc' to its fields
-		.Where (_mc.name, "=", "July")
+		// Auto Cosntruct Expr { _mc.name, "=", "July" } :-)
+		.Where ({ _mc.name, "=", "July" })
 		.Count ();
 
-	// Count by SQL
+	// Count by SQL, NOT Recommended :-(
 	auto count2 = mapper.Count ("where (name='July')");
 
 	// Note that:
 	// count1 = count2 = 50
 
-	// Delete by Query
+	// Delete by Query :-)
 	mapper.Query (_mc)                  // Link '_mc' to its fields
-		.Where (_mc.name, "=", "July")
+		// Auto Cosntruct Expr { _mc.name, "=", "July" } :-)
+		.Where ({ _mc.name = "July" })
 		.Delete ();
 
-	// Delete by SQL
+	// Delete by SQL, NOT Recommended :-(
 	mapper.Delete ("where (name='July')");
 
 	// Drop the table "MyClass"
