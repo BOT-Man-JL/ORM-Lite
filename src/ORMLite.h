@@ -414,8 +414,8 @@ namespace BOT_ORM
 						ch = ',';
 				strIns.pop_back ();
 
-				connector.Execute ("insert into " + _tblName +
-								   " values (" + strIns + ");");
+				connector.Execute ("begin transaction;insert into " + _tblName +
+								   " values (" + strIns + ");commit transaction;");
 			});
 		}
 
@@ -521,7 +521,7 @@ namespace BOT_ORM
 				while (!strFieldNames.empty ())
 					fieldNames.emplace_back (BOT_ORM_Impl::SplitStr (strFieldNames));
 
-				std::string strUpdate;
+				std::string strUpdate ("begin transaction;");
 				for (const auto &value : values)
 				{
 					BOT_ORM_Impl::ReaderVisitor visitor;
@@ -543,6 +543,7 @@ namespace BOT_ORM
 						" set " + std::move (strUpd) +
 						" where " + std::move (strKey) + ";";
 				}
+				strUpdate += "commit transaction;";
 				connector.Execute (strUpdate);
 			});
 		}

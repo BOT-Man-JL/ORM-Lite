@@ -65,12 +65,14 @@ int main ()
 	// Insert by Batch Insert
 	// Performance is much Better than Separated Insert :-)
 	std::vector<MyClass> dataToSeed;
-	for (long i = 50; i < 100; i++)
+	for (long i = 50; i < 10000; i++)
 		dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
+	auto tb = clock ();
 	mapper.Insert (dataToSeed);
+	std::cout << clock () - tb << std::endl;
 
 	// Update by Batch Update
-	for (size_t i = 0; i < 50; i++)
+	for (size_t i = 0; i < 9950; i++)
 		dataToSeed[i].score += 1;
 	mapper.Update (dataToSeed);
 
