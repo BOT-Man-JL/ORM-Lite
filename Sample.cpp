@@ -3,6 +3,8 @@
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
 
+// gcc -std=c++11 Sample.cpp "src/sqlite3.c" -lstdc++ -lpthread -ldl -o Sample
+
 #include <string>
 #include <iostream>
 
@@ -84,7 +86,7 @@ int main ()
 			(
 				Expr (_mc.id, "<=", 90) &&
 				Expr (_mc.id, ">=", 60)
-				)
+			)
 		)
 		.OrderBy (_mc.id, true)
 		.Limit (3, 10)
@@ -124,5 +126,19 @@ int main ()
 	// Drop the table "MyClass"
 	mapper.DropTbl ();
 
+	// Output to Console
+	auto printVec = [] (const std::vector<MyClass> vec)
+	{
+		for (auto& item : vec)
+			std::cout << item.id << "\t" << item.score
+				<< "\t" << item.name << std::endl;
+		std::cout << std::endl;
+	};
+	printVec (query0);
+	printVec (query1);
+	printVec (query2);
+	std::cout << count1 << " " << count2 << std::endl;
+
+	std::cin.get ();
 	return 0;
 }

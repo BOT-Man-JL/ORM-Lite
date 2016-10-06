@@ -36,11 +36,9 @@ In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 - The first item `id` will be set as the **Primary Key** of the Table;
 
 Note that:
-- Hooked Class MUST have **Default Constructor**
+- Hooked Class MUST have **Default Constructor**;
 - Currently Only Support `long`, `double` and `std::string` Types,
-  which are stored in DB as `INTEGER`, `REAL` and `TEXT` (**SQLite3**)
-- If you Attempt to Use other Types, you will see the Compile Error:
-  `Only Support long, double, std::string :-(`
+  which are stored as `INTEGER`, `REAL` and `TEXT` (**SQLite3**);
 
 ## ORMapper
 

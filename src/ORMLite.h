@@ -13,7 +13,7 @@
 #include <string>
 #include <cctype>
 #include <thread>
-#include <strstream>
+#include <sstream>
 
 #include "sqlite3.h"
 
@@ -23,12 +23,12 @@ void __Accept (BOT_ORM_Impl::ORVisitor &visitor)          \
 {                                                         \
 	visitor.Visit (__VA_ARGS__);                          \
 }                                                         \
-void __Accept (BOT_ORM_Impl::ORVisitor &visitor) const   \
+void __Accept (BOT_ORM_Impl::ORVisitor &visitor) const    \
 {                                                         \
 	visitor.Visit (__VA_ARGS__);                          \
 }                                                         \
-static constexpr char *__ClassName = #_MY_CLASS_;         \
-static constexpr char *__FieldNames = #__VA_ARGS__;       \
+static constexpr const char *__ClassName = #_MY_CLASS_;   \
+static constexpr const char *__FieldNames = #__VA_ARGS__; \
 
 namespace BOT_ORM_Impl
 {
@@ -114,7 +114,7 @@ namespace BOT_ORM_Impl
 	std::string DoubleToStr (double val)
 	{
 		std::string ret;
-		std::strstream strs;
+		std::stringstream strs;
 		strs << val;
 		strs >> ret;
 		return std::move (ret);
@@ -135,14 +135,6 @@ namespace BOT_ORM_Impl
 		{
 			_Visit (property);
 			_Visit (args...);
-		}
-
-		template <typename T>
-		inline void _Visit (T &property)
-		{
-			// If you want to Use other Types, please Convert first...
-			static_assert (false,
-						   "Only Support long, double, std::string :-(");
 		}
 
 		virtual void _Visit (long &property) = 0;
@@ -373,7 +365,7 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				const C obj;
+				const C obj {};
 				BOT_ORM_Impl::TypeVisitor visitor;
 				obj.__Accept (visitor);
 
@@ -573,7 +565,8 @@ namespace BOT_ORM
 						serialized += char (0);
 					}
 					C obj;
-					obj.__Accept (BOT_ORM_Impl::WriterVisitor (serialized));
+					BOT_ORM_Impl::WriterVisitor visitor (serialized);
+					obj.__Accept (visitor);
 					out.push_back (std::move (obj));
 				});
 			});
