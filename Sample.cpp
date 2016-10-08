@@ -3,8 +3,6 @@
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
 
-// gcc -std=c++11 Sample.cpp "src/sqlite3.c" -lstdc++ -lpthread -ldl -o Sample
-
 #include <string>
 #include <iostream>
 

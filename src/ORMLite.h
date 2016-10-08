@@ -354,8 +354,8 @@ namespace BOT_ORM
 	{
 	public:
 		ORMapper (const std::string &dbName)
-			: _dbName (dbName),
-			_tblName (C::__ClassName)
+			: _dbName (dbName), _tblName (C::__ClassName),
+			_fieldNames (_ExtractFieldName ())
 		{}
 
 		inline const std::string &ErrMsg () const
@@ -373,18 +373,16 @@ namespace BOT_ORM
 				obj.__Accept (visitor);
 
 				auto strTypes = std::move (visitor.serializedTypes);
-				auto strFieldNames = _ExtractFieldName ();
+				size_t indexFieldName = 0;
 
 				auto typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
-				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-				auto strFmt = std::move (fieldName) + " " +
+				auto strFmt = _fieldNames[indexFieldName++] + " " +
 					std::move (typeFmt) + " primary key,";
 
 				while (!strTypes.empty ())
 				{
 					typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
-					fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-					strFmt += std::move (fieldName) + " " +
+					strFmt += _fieldNames[indexFieldName++] + " " +
 						std::move (typeFmt) + ",";
 				}
 				strFmt.pop_back ();
@@ -455,14 +453,9 @@ namespace BOT_ORM
 				BOT_ORM_Impl::ReaderVisitor visitor;
 				value.__Accept (visitor);
 
-				auto strVals = std::move (visitor.serializedValues);
-				auto strFieldNames = _ExtractFieldName ();
-
 				// Only Set Key
-				auto val = BOT_ORM_Impl::SplitStr (strVals);
-				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-				auto strDel =
-					std::move (fieldName) + "=" + std::move (val);
+				auto strDel = _fieldNames[0] + "=" +
+					BOT_ORM_Impl::SplitStr (visitor.serializedValues);
 
 				connector.Execute ("delete from " + _tblName +
 								   " where " + strDel + ";");
@@ -488,22 +481,21 @@ namespace BOT_ORM
 				value.__Accept (visitor);
 
 				auto strVals = std::move (visitor.serializedValues);
-				auto strFieldNames = _ExtractFieldName ();
+				size_t indexFieldName = 0;
 
 				std::string strKey;
 				{
 					auto val = BOT_ORM_Impl::SplitStr (strVals);
-					auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-					strKey = std::move (fieldName) + "=" + std::move (val);
+					strKey = _fieldNames[indexFieldName++] + "=" +
+						std::move (val);
 				}
 
 				std::string strUpd;
-				strUpd.reserve (2 * strVals.size () + strFieldNames.size ());
 				while (!strVals.empty ())
 				{
 					auto val = BOT_ORM_Impl::SplitStr (strVals);
-					auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-					strUpd += std::move (fieldName) + "=" + std::move (val) + ",";
+					strUpd += _fieldNames[indexFieldName++] + "=" +
+						std::move (val) + ",";
 				}
 				strUpd.pop_back ();
 
@@ -519,11 +511,6 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				auto strFieldNames = _ExtractFieldName ();
-				std::vector<std::string> fieldNames;
-				while (!strFieldNames.empty ())
-					fieldNames.emplace_back (BOT_ORM_Impl::SplitStr (strFieldNames));
-
 				std::string strUpdate ("begin transaction;");
 				for (const auto &value : values)
 				{
@@ -533,12 +520,12 @@ namespace BOT_ORM
 					auto strVals = std::move (visitor.serializedValues);
 					auto curIndex = 0;
 
-					std::string strKey = fieldNames[curIndex++] +
+					std::string strKey = _fieldNames[curIndex++] +
 						"=" + BOT_ORM_Impl::SplitStr (strVals);
 
 					std::string strUpd;
 					while (!strVals.empty ())
-						strUpd += fieldNames[curIndex++] + "=" +
+						strUpd += _fieldNames[curIndex++] + "=" +
 						BOT_ORM_Impl::SplitStr (strVals) + ",";
 					strUpd.pop_back ();
 
@@ -586,13 +573,11 @@ namespace BOT_ORM
 								   _tblName + " " + sqlStr,
 								   [&] (int, char **argv, char **)
 				{
-					ret = std::stoi (argv[0]);
+					ret = std::stol (argv[0]);
 				});
 			});
-			if (isOk)
-				return ret;
-			else
-				return -1;
+			if (isOk) return ret;
+			else return -1;
 		}
 
 		class ORQuery
@@ -682,13 +667,7 @@ namespace BOT_ORM
 				if (!visitor.isFound)
 					throw std::runtime_error ("No such Field in the Table");
 
-				auto strFieldNames = _ExtractFieldName ();
-				auto fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-				for (auto index = visitor.index; index > 0; index--)
-				{
-					fieldName = BOT_ORM_Impl::SplitStr (strFieldNames);
-				}
-				return std::move (fieldName);
+				return _pMapper->_fieldNames[visitor.index];
 			}
 		};
 
@@ -698,7 +677,8 @@ namespace BOT_ORM
 		}
 
 	private:
-		std::string _dbName, _tblName;
+		const std::string _dbName, _tblName;
+		const std::vector<std::string> _fieldNames;
 		std::string _errMsg;
 
 		bool _HandleException (std::function <void (
@@ -717,26 +697,29 @@ namespace BOT_ORM
 			}
 		}
 
-		static std::string _ExtractFieldName ()
+		static std::vector<std::string> _ExtractFieldName ()
 		{
-			std::string ret, rawStr (C::__FieldNames);
-			ret.reserve (rawStr.size ());
+			std::string rawStr (C::__FieldNames), tmpStr;
+			rawStr.push_back (',');
+			tmpStr.reserve (rawStr.size ());
+
+			std::vector<std::string> ret;
 			for (const auto &ch : rawStr)
 			{
 				switch (ch)
 				{
 				case ',':
-					ret += char (0);
+					ret.push_back (tmpStr);
+					tmpStr.clear ();
 					break;
 
 				case '_':
 				default:
 					if (isalnum (ch) || isalpha (ch))
-						ret += ch;
+						tmpStr += ch;
 					break;
 				}
 			}
-			ret += char (0);
 			return std::move (ret);
 		}
 	};
