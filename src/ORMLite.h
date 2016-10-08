@@ -254,7 +254,8 @@ namespace BOT_ORM_Impl
 		inline void _Visit (T &property, Args & ... args)
 		{
 			_Visit (property);
-			_Visit (args...);
+			if (!isFound)
+				_Visit (args...);
 		}
 
 		inline void _Visit (const long &property)
