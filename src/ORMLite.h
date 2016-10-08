@@ -19,11 +19,13 @@
 
 #define ORMAP(_MY_CLASS_, ...)                            \
 friend class BOT_ORM::ORMapper<_MY_CLASS_>;               \
-void __Accept (BOT_ORM_Impl::ORVisitor &visitor)          \
+template <typename VISITOR>                               \
+void __Accept (VISITOR &visitor)                          \
 {                                                         \
 	visitor.Visit (__VA_ARGS__);                          \
 }                                                         \
-void __Accept (BOT_ORM_Impl::ORVisitor &visitor) const    \
+template <typename VISITOR>                               \
+void __Accept (VISITOR &visitor) const                    \
 {                                                         \
 	visitor.Visit (__VA_ARGS__);                          \
 }                                                         \
@@ -120,15 +122,16 @@ namespace BOT_ORM_Impl
 		return std::move (ret);
 	}
 
-	class ORVisitor
+	class ReaderVisitor
 	{
 	public:
+		std::string serializedValues;
+
 		template <typename... Args>
 		inline void Visit (Args & ... args)
 		{
 			return _Visit (args...);
 		}
-
 	protected:
 		template <typename T, typename... Args>
 		inline void _Visit (T &property, Args & ... args)
@@ -137,74 +140,60 @@ namespace BOT_ORM_Impl
 			_Visit (args...);
 		}
 
-		virtual void _Visit (long &property) = 0;
-		virtual void _Visit (const long &property) = 0;
-
-		virtual void _Visit (double &property) = 0;
-		virtual void _Visit (const double &property) = 0;
-
-		virtual void _Visit (std::string &property) = 0;
-		virtual void _Visit (const std::string &property) = 0;
-	};
-
-	class ReaderVisitor : public ORVisitor
-	{
-	public:
-		std::string serializedValues;
-
-	protected:
-		void _Visit (const long &property) override final
+		inline void _Visit (const long &property)
 		{
 			serializedValues += std::to_string (property);
 			serializedValues += char (0);
 		}
-		void _Visit (const double &property) override final
+		inline void _Visit (const double &property)
 		{
 			serializedValues +=
 				BOT_ORM_Impl::DoubleToStr (property);
 			serializedValues += char (0);
 		}
-		void _Visit (const std::string &property) override final
+		inline void _Visit (const std::string &property)
 		{
 			serializedValues += "'" + property + "'";
 			serializedValues += char (0);
 		}
-
-	private:
-		void _Visit (long &property) override final {}
-		void _Visit (double &property) override final {}
-		void _Visit (std::string &property) override final {}
 	};
 
-	class TypeVisitor : public ORVisitor
+	class TypeVisitor
 	{
 	public:
 		std::string serializedTypes;
 
+		template <typename... Args>
+		inline void Visit (Args & ... args)
+		{
+			return _Visit (args...);
+		}
 	protected:
-		void _Visit (const long &property) override final
+		template <typename T, typename... Args>
+		inline void _Visit (T &property, Args & ... args)
+		{
+			_Visit (property);
+			_Visit (args...);
+		}
+
+		inline void _Visit (const long &property)
 		{
 			serializedTypes += "integer";
 			serializedTypes += char (0);
 		}
-		void _Visit (const double &property) override final
+		inline void _Visit (const double &property)
 		{
 			serializedTypes += "real";
 			serializedTypes += char (0);
 		}
-		void _Visit (const std::string &property) override final
+		inline void _Visit (const std::string &property)
 		{
 			serializedTypes += "text";
 			serializedTypes += char (0);
 		}
-
-	private:
-		void _Visit (long &property) override final {}
-		void _Visit (double &property) override final {}
-		void _Visit (std::string &property) override final {}
 	};
 
-	class WriterVisitor : public ORVisitor
+	class WriterVisitor
 	{
 		std::string _serializedValues;
 
@@ -213,29 +202,36 @@ namespace BOT_ORM_Impl
 			: _serializedValues (serializedValues)
 		{}
 
+		template <typename... Args>
+		inline void Visit (Args & ... args)
+		{
+			return _Visit (args...);
+		}
 	protected:
-		void _Visit (long &property) override final
+		template <typename T, typename... Args>
+		inline void _Visit (T &property, Args & ... args)
+		{
+			_Visit (property);
+			_Visit (args...);
+		}
+
+		inline void _Visit (long &property)
 		{
 			property = std::stol (
 				BOT_ORM_Impl::SplitStr (_serializedValues));
 		}
-		void _Visit (double &property) override final
+		inline void _Visit (double &property)
 		{
 			property = std::stod (
 				BOT_ORM_Impl::SplitStr (_serializedValues));
 		}
-		void _Visit (std::string &property) override final
+		inline void _Visit (std::string &property)
 		{
 			property = BOT_ORM_Impl::SplitStr (_serializedValues);
 		}
-
-	private:
-		void _Visit (const long &property) override final {}
-		void _Visit (const double &property) override final {}
-		void _Visit (const std::string &property) override final {}
 	};
 
-	class IndexVisitor : public ORVisitor
+	class IndexVisitor
 	{
 		const void *_pointer;
 
@@ -248,33 +244,40 @@ namespace BOT_ORM_Impl
 			_pointer (pointer)
 		{}
 
+		template <typename... Args>
+		inline void Visit (Args & ... args)
+		{
+			return _Visit (args...);
+		}
 	protected:
-		void _Visit (const long &property) override final
+		template <typename T, typename... Args>
+		inline void _Visit (T &property, Args & ... args)
 		{
-			if ((const void *) &property == _pointer)
-				isFound = true;
-			else if (!isFound)
-				index++;
-		}
-		void _Visit (const double &property) override final
-		{
-			if ((const void *) &property == _pointer)
-				isFound = true;
-			else if (!isFound)
-				index++;
-		}
-		void _Visit (const std::string &property) override final
-		{
-			if ((const void *) &property == _pointer)
-				isFound = true;
-			else if (!isFound)
-				index++;
+			_Visit (property);
+			_Visit (args...);
 		}
 
-	private:
-		void _Visit (long &property) override final {}
-		void _Visit (double &property) override final {}
-		void _Visit (std::string &property) override final {}
+		inline void _Visit (const long &property)
+		{
+			if ((const void *) &property == _pointer)
+				isFound = true;
+			else if (!isFound)
+				index++;
+		}
+		inline void _Visit (const double &property)
+		{
+			if ((const void *) &property == _pointer)
+				isFound = true;
+			else if (!isFound)
+				index++;
+		}
+		inline void _Visit (const std::string &property)
+		{
+			if ((const void *) &property == _pointer)
+				isFound = true;
+			else if (!isFound)
+				index++;
+		}
 	};
 }
 
