@@ -11,14 +11,14 @@ using namespace BOT_ORM;
 
 /* #0 Basic Usage */
 
-class MyClass
+struct MyClass
 {
-	// Inject ORM-Lite into this Class
-	ORMAP (MyClass, id, score, name)
-public:
 	long id;
 	double score;
 	std::string name;
+
+	// Inject ORM-Lite into this Class
+	ORMAP (MyClass, id, score, name)
 };
 
 int main ()
@@ -84,7 +84,7 @@ int main ()
 			(
 				Expr (_mc.id, "<=", 90) &&
 				Expr (_mc.id, ">=", 60)
-			)
+				)
 		)
 		.OrderBy (_mc.id, true)
 		.Limit (3, 10)
@@ -129,7 +129,7 @@ int main ()
 	{
 		for (auto& item : vec)
 			std::cout << item.id << "\t" << item.score
-				<< "\t" << item.name << std::endl;
+			<< "\t" << item.name << std::endl;
 		std::cout << std::endl;
 	};
 	printVec (query0);

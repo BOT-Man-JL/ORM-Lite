@@ -18,6 +18,7 @@
 #include "sqlite3.h"
 
 #define ORMAP(_MY_CLASS_, ...)                            \
+private:                                                  \
 friend class BOT_ORM::ORMapper<_MY_CLASS_>;               \
 template <typename VISITOR>                               \
 void __Accept (VISITOR &visitor)                          \
@@ -29,8 +30,8 @@ void __Accept (VISITOR &visitor) const                    \
 {                                                         \
 	visitor.Visit (__VA_ARGS__);                          \
 }                                                         \
-static constexpr const char *__ClassName = #_MY_CLASS_;   \
-static constexpr const char *__FieldNames = #__VA_ARGS__; \
+constexpr static const char *__ClassName = #_MY_CLASS_;   \
+constexpr static const char *__FieldNames = #__VA_ARGS__; \
 
 namespace BOT_ORM_Impl
 {

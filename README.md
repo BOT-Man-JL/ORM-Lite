@@ -22,14 +22,14 @@ Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
 #include "ORMLite.h"
 using namespace BOT_ORM;
 
-class MyClass
+struct MyClass
 {
-    // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, score, name)
-public:
     long id;
     double score;
     std::string name;
+
+    // Inject ORM-Lite into this Class
+    ORMAP (MyClass, id, score, name)
 };
 ```
 

@@ -18,14 +18,14 @@ Remarks:
 #include "ORMLite.h"
 using namespace BOT_ORM;
 
-class MyClass
+struct MyClass
 {
-    // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, score, name)
-public:
     long id;
     double score;
     std::string name;
+
+    // Inject ORM-Lite into this Class
+    ORMAP (MyClass, id, score, name)
 };
 ```
 
@@ -36,6 +36,8 @@ In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 - The first item `id` will be set as the **Primary Key** of the Table;
 
 Note that:
+- `ORMAP (...)` will **auto** Inject some **private members**
+  , but **NO damage** to the Class :wink:
 - Hooked Class MUST have **Default Constructor**;
 - Currently Only Support `long`, `double` and `std::string` Types,
   which are stored as `INTEGER`, `REAL` and `TEXT` (**SQLite3**);
