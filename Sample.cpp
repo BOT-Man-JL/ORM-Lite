@@ -80,11 +80,8 @@ int main ()
 	// Select by Query :-)
 	auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
 		.Where (
-			Expr (_mc.name, "=", "July") &&
-			(
-				Expr (_mc.id, "<=", 90) &&
-				Expr (_mc.id, ">=", 60)
-			)
+			Field (_mc.name) == "July" &&
+			(Field (_mc.id) <= 90 && Field (_mc.id) >= 60)
 		)
 		.OrderBy (_mc.id, true)
 		.Limit (3, 10)
@@ -102,8 +99,7 @@ int main ()
 
 	// Count by Query :-)
 	auto count1 = mapper.Query (_mc)    // Link '_mc' to its fields
-		// Auto Cosntruct Expr { _mc.name, "=", "July" } :-)
-		.Where ({ _mc.name, "=", "July" })
+		.Where (Field (_mc.name) == "July")
 		.Count ();
 
 	// Count by SQL, NOT Recommended :-(
@@ -114,8 +110,7 @@ int main ()
 
 	// Delete by Query :-)
 	mapper.Query (_mc)                  // Link '_mc' to its fields
-		// Auto Cosntruct Expr { _mc.name, "=", "July" } :-)
-		.Where ({ _mc.name = "July" })
+		.Where (_mc.name = "July")      // Trick ;-)
 		.Delete ();
 
 	// Delete by SQL, NOT Recommended :-(

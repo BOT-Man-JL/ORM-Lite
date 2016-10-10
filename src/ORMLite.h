@@ -319,6 +319,30 @@ namespace BOT_ORM
 				relOp + "'" + std::move (value) + "'") }
 		{}
 
+		template <typename T>
+		struct Field_Expr
+		{
+			const T& _property;
+			Field_Expr (const T &property)
+				: _property (property)
+			{}
+
+			inline Expr operator == (T value)
+			{ return Expr { _property, "=", std::move (value) }; }
+			inline Expr operator != (T value)
+			{ return Expr { _property, "!=", std::move (value) }; }
+
+			inline Expr operator > (T value)
+			{ return Expr { _property, ">", std::move (value) }; }
+			inline Expr operator >= (T value)
+			{ return Expr { _property, ">=", std::move (value) }; }
+
+			inline Expr operator < (T value)
+			{ return Expr { _property, "<", std::move (value) }; }
+			inline Expr operator <= (T value)
+			{ return Expr { _property, "<=", std::move (value) }; }
+		};
+
 		inline Expr operator && (const Expr &right)
 		{
 			return And_Or (right, " and ");
@@ -350,6 +374,12 @@ namespace BOT_ORM
 			return *this;
 		}
 	};
+
+	template <typename T>
+	Expr::Field_Expr<T> Field (T &property)
+	{
+		return Expr::Field_Expr<T> { property };
+	}
 
 	template <typename C>
 	class ORMapper

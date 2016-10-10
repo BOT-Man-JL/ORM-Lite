@@ -197,3 +197,22 @@ Remarks:
 ### Expr operator && / || (const Expr &left, const Expr &right)
 
 Generate `(` `left` `&& / ||` `right` `)`;
+
+### struct Field_Expr\<T\> (const T &property) (*Helper Struct of Expr*)
+
+#### Expr operator *OP* (T value)
+
+Return `Expr { property, OP_STR, value }; }`;
+
+| OP |  OP_STR  |
+|----|----------|
+| == |    "="   |
+| != |   "!="   |
+|  > |    ">"   |
+| >= |   ">="   |
+|  < |    "<"   |
+| <= |   "<="   |
+
+### Field_Expr<T> Field (T &property)
+
+Return `Field_Expr<T> { property }`;
