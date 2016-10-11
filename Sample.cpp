@@ -24,20 +24,20 @@ struct MyClass
 int main ()
 {
 	/* #1 Basic Usage */
-
-	// Store the Data in "test.db"
-	ORMapper<MyClass> mapper ("test.db");
-
-	// Create a table for "MyClass"
-	mapper.CreateTbl ();
-
-	// Insert Values into the table
 	std::vector<MyClass> initObjs =
 	{
 		{ 0, 0.2, "John" },
 		{ 1, 0.4, "Jack" },
 		{ 2, 0.6, "Jess" }
 	};
+
+	// Open a Connection with *test.db*
+	ORMapper<MyClass> mapper ("test.db");
+
+	// Create a table for "MyClass"
+	mapper.CreateTbl ();
+
+	// Insert Values into the table
 	for (const auto obj : initObjs)
 		mapper.Insert (obj);
 

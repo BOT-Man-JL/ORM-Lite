@@ -41,24 +41,40 @@ In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 
 _(Note that: **No Semicolon ';'** after the **ORMAP**)_ :wink:
 
-### Working on *db* with *ORMapper*
-
-#### Basic Usage
+### Create or Drop a Table for this Class
 
 ``` C++
-// Store the Data in "test.db"
+// Open a Connection with *test.db*
 ORMapper<MyClass> mapper ("test.db");
 
 // Create a table for "MyClass"
 mapper.CreateTbl ();
 
-// Insert Values into the table
+// Drop the table "MyClass"
+mapper.DropTbl ();
+```
+
+| id| score| name|
+|---|------|-----|
+|  1|   0.2| John|
+|...|   ...|  ...|
+
+### Working on *db* with *ORMapper*
+
+#### Basic Usage
+
+``` C++
 std::vector<MyClass> initObjs =
 {
     { 0, 0.2, "John" },
     { 1, 0.4, "Jack" },
     { 2, 0.6, "Jess" }
 };
+
+// Open a Connection with *test.db*
+ORMapper<MyClass> mapper ("test.db");
+
+// Insert Values into the table
 for (const auto obj : initObjs)
     mapper.Insert (obj);
 
@@ -79,13 +95,6 @@ if (!mapper.Insert (MyClass { 1, 0, "Joke" }))
     auto err = mapper.ErrMsg ();
 // err = "SQL error: UNIQUE constraint failed: MyClass.id"
 ```
-
-**MyClass** in **test.db**:
-
-| id| score|  str|
-|---|-----|-----|
-|  1|  0.2| John|
-|...|  ...|  ...|
 
 #### Batch Operations
 
