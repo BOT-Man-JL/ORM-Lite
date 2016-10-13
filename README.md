@@ -129,34 +129,30 @@ auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
     .Limit (3, 10)
     .ToVector ();
 
-// Select by SQL, NOT Recommended :-(
-std::vector<MyClass> query2;
-mapper.Select (query2,
-               "where (name='July' and (id<=90 and id>=60))"
-               " order by id desc"
-               " limit 3 offset 10");
-
-// Note that: query1 = query2 =
+// Remarks:
+// sql = SELECT * FROM MyClass
+//       WHERE (name='July' and (id<=90 and id>=60))
+//       ORDER BY id DESC
+//       LIMIT 3 OFFSET 10
+// query1 =
 // [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
 // Count by Query :-)
-auto count1 = mapper.Query (_mc)    // Link '_mc' to its fields
+auto count = mapper.Query (_mc)    // Link '_mc' to its fields
     .Where (Field (_mc.name) == "July")
     .Count ();
 
-// Count by SQL, NOT Recommended :-(
-auto count2 = mapper.Count ("where (name='July')");
-
-// Note that:
-// count1 = count2 = 50
+// Remarks:
+// sql = SELECT COUNT (*) AS NUM FROM MyClass WHERE (name='July')
+// count = 50
 
 // Delete by Query :-)
 mapper.Query (_mc)                  // Link '_mc' to its fields
     .Where (_mc.name = "July")      // Trick ;-)
     .Delete ();
 
-// Delete by SQL, NOT Recommended :-(
-mapper.Delete ("where (name='July')");
+// Remarks:
+// sql = DELETE FROM MyClass WHERE (name='July')
 ```
 
 ## Implementation Details
@@ -166,4 +162,4 @@ mapper.Delete ("where (name='July')");
 - Using **Variadic Template** to Fit in *Various Types*
   (Maybe refactor into `std::tuple` :confused:);
 - Using **Macro** `#define (...)` to Generate Hook Codes;
-- Using **Serialization** and **Deserialization** to *Interchange Data*;
+- Using **Serialization** and **Deserialization** to *exchange Data*;

@@ -477,33 +477,6 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Delete (const C &value)
-		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
-			{
-				BOT_ORM_Impl::ReaderVisitor visitor;
-				value.__Accept (visitor);
-
-				// Only Set Key
-				auto strDel = _fieldNames[0] + "=" +
-					BOT_ORM_Impl::SplitStr (visitor.serializedValues);
-
-				connector.Execute ("delete from " + _tblName +
-								   " where " + strDel + ";");
-			});
-		}
-
-		bool Delete (const std::string &sqlStr)
-		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
-			{
-				connector.Execute ("delete from " + _tblName +
-								   " " + sqlStr + ";");
-			});
-		}
-
 		bool Update (const C &value)
 		{
 			return _HandleException ([&] (
@@ -570,46 +543,21 @@ namespace BOT_ORM
 			});
 		}
 
-		template <typename Out>
-		bool Select (Out &out,
-					 const std::string &sqlStr = "")
+		bool Delete (const C &value)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				connector.Execute ("select * from " + _tblName +
-								   " " + sqlStr + ";",
-								   [&] (int argc, char **argv, char **)
-				{
-					std::string serialized;
-					for (int i = 0; i < argc; i++)
-					{
-						serialized += argv[i];
-						serialized += char (0);
-					}
-					C obj;
-					BOT_ORM_Impl::WriterVisitor visitor (serialized);
-					obj.__Accept (visitor);
-					out.push_back (std::move (obj));
-				});
-			});
-		}
+				BOT_ORM_Impl::ReaderVisitor visitor;
+				value.__Accept (visitor);
 
-		long Count (const std::string &sqlStr = "")
-		{
-			long ret;
-			auto isOk = _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
-			{
-				connector.Execute ("select count (*) as num from " +
-								   _tblName + " " + sqlStr,
-								   [&] (int, char **argv, char **)
-				{
-					ret = std::stol (argv[0]);
-				});
+				// Only Set Key
+				auto strDel = _fieldNames[0] + "=" +
+					BOT_ORM_Impl::SplitStr (visitor.serializedValues);
+
+				connector.Execute ("delete from " + _tblName +
+								   " where " + strDel + ";");
 			});
-			if (isOk) return ret;
-			else return -1;
 		}
 
 		class ORQuery
@@ -650,39 +598,31 @@ namespace BOT_ORM
 				return *this;
 			}
 
-			std::string GetSQL () const
-			{
-				if (!_sqlWhere.empty ())
-					return " where (" + _sqlWhere + ")" + _sqlOrderBy + _sqlLimit;
-				else
-					return _sqlOrderBy + _sqlLimit;
-			}
-
 			// Retrieve Select Result
 			std::vector<C> ToVector ()
 			{
 				std::vector<C> ret;
-				_pMapper->Select (ret, GetSQL ());
+				_pMapper->_Select (ret, _GetSQL ());
 				return std::move (ret);
 			}
 
 			std::list<C> ToList ()
 			{
 				std::list<C> ret;
-				_pMapper->Select (ret, GetSQL ());
+				_pMapper->_Select (ret, _GetSQL ());
 				return std::move (ret);
 			}
 
 			// Count Result
 			inline long Count ()
 			{
-				return _pMapper->Count (" where (" + _sqlWhere + ")");
+				return _pMapper->_Count (" where (" + _sqlWhere + ")");
 			}
 
 			// Delete Values
 			inline bool Delete ()
 			{
-				return _pMapper->Delete (" where (" + _sqlWhere + ")");
+				return _pMapper->_Delete (" where (" + _sqlWhere + ")");
 			}
 
 		protected:
@@ -700,6 +640,14 @@ namespace BOT_ORM
 					throw std::runtime_error ("No such Field in the Table");
 
 				return _pMapper->_fieldNames[visitor.index];
+			}
+
+			std::string _GetSQL () const
+			{
+				if (!_sqlWhere.empty ())
+					return " where (" + _sqlWhere + ")" + _sqlOrderBy + _sqlLimit;
+				else
+					return _sqlOrderBy + _sqlLimit;
 			}
 		};
 
@@ -727,6 +675,58 @@ namespace BOT_ORM
 				_errMsg = ex.what ();
 				return false;
 			}
+		}
+
+		template <typename Out>
+		bool _Select (Out &out,
+					  const std::string &sqlStr = "")
+		{
+			return _HandleException ([&] (
+				BOT_ORM_Impl::SQLConnector &connector)
+			{
+				connector.Execute ("select * from " + _tblName +
+								   " " + sqlStr + ";",
+								   [&] (int argc, char **argv, char **)
+				{
+					std::string serialized;
+					for (int i = 0; i < argc; i++)
+					{
+						serialized += argv[i];
+						serialized += char (0);
+					}
+					C obj;
+					BOT_ORM_Impl::WriterVisitor visitor (serialized);
+					obj.__Accept (visitor);
+					out.push_back (std::move (obj));
+				});
+			});
+		}
+
+		long _Count (const std::string &sqlStr = "")
+		{
+			long ret = 0;
+			auto isOk = _HandleException ([&] (
+				BOT_ORM_Impl::SQLConnector &connector)
+			{
+				connector.Execute ("select count (*) as num from " +
+								   _tblName + " " + sqlStr,
+								   [&] (int, char **argv, char **)
+				{
+					ret = std::stol (argv[0]);
+				});
+			});
+			if (isOk) return ret;
+			else return -1;
+		}
+
+		bool _Delete (const std::string &sqlStr)
+		{
+			return _HandleException ([&] (
+				BOT_ORM_Impl::SQLConnector &connector)
+			{
+				connector.Execute ("delete from " + _tblName +
+								   " " + sqlStr + ";");
+			});
 		}
 
 		static std::vector<std::string> _ExtractFieldName ()

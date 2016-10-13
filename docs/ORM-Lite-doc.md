@@ -80,17 +80,6 @@ Insert `values` into Table `MyClass`;
     
 Execute `INSERT INTO MyClass VALUES (...), (...) ...;`
 
-### bool Delete (const MyClass &value)
-
-Delete Entry `value` in Table `MyClass`
-with the Same `KEY` with variable `value`;
-
-Execute `DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
-
-### bool Delete (const std::string &sqlStr = "")
-
-Execute `DELETE FROM MyClass` `sqlStr;`
-
 ### bool Update (const MyClass &value)
 
 Update Entry `value` in Table `MyClass`
@@ -106,21 +95,12 @@ Update Entries with the Same `KEY` with `values`;
 
 Execute Multiple `UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
 
-### bool Select (T\<MyClass\> &out, const std::string &sqlStr = "")
+### bool Delete (const MyClass &value)
 
-Set the Select into Container `out`;
+Delete Entry `value` in Table `MyClass`
+with the Same `KEY` with variable `value`;
 
-`out` must **SUPPORT** `push_back (const MyClass &)` Function;
-
-Execute `SELECT * FROM MyClass` `sqlStr`";
-
-### long Count (const std::string &sqlStr = "")
-
-Execute `SELECT COUNT(*) FROM MyClass` `sqlStr`",
-
-Return:
-- Count of entries fit `sqlStr` in `MyClass`;
-- -1 if **Query Error**;
+Execute `DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
 
 ### ORQuery Query (const MyClass &queryHelper)
 
@@ -152,12 +132,6 @@ Remarks:
 ### ORQuery &Limit (size_t count, size_t offset = 0)
 
 Generate `LIMIT` `count` `OFFSET` `offset`;
-
-### std::string GetSQL () const
-
-Get the Generated SQL String of this Query;
-
-And you can Use this String to Call `Select`, `Count` and `Delete`;
 
 ### std::vector\<MyClass\> ToVector () / std::list\<MyClass\> ToList ()
 
