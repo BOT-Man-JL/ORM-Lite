@@ -616,13 +616,13 @@ namespace BOT_ORM
 			// Count Result
 			inline long Count ()
 			{
-				return _pMapper->_Count (" where (" + _sqlWhere + ")");
+				return _pMapper->_Count (_GetSQL ());
 			}
 
 			// Delete Values
 			inline bool Delete ()
 			{
-				return _pMapper->_Delete (" where (" + _sqlWhere + ")");
+				return _pMapper->_Delete (_GetSQL ());
 			}
 
 		protected:

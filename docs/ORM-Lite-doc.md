@@ -145,13 +145,13 @@ Return:
 - Return Count under **_WHERE_ Constraints**;
 - -1 if **Query Error**;
 
-Execute `SELECT COUNT (*) FROM MyClass WHERE ... ;`
+Execute `SELECT COUNT (*) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
 
 ### bool Delete ()
 
 Delete Entries under **_WHERE_ Constraints**;
 
-Execute `DELETE FROM MyClass WHERE ... ;`
+Execute `DELETE FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
 
 Return:
 - `true` if Succeeded;
