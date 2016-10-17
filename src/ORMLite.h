@@ -14,8 +14,11 @@
 #include <cctype>
 #include <thread>
 #include <sstream>
+#include <type_traits>
 
 #include "sqlite3.h"
+
+// Public Macro
 
 #define ORMAP(_MY_CLASS_, ...)                            \
 private:                                                  \
@@ -32,6 +35,23 @@ void __Accept (VISITOR &visitor) const                    \
 }                                                         \
 constexpr static const char *__ClassName = #_MY_CLASS_;   \
 constexpr static const char *__FieldNames = #__VA_ARGS__; \
+
+// Private Macro
+
+#define __VISITOR                                         \
+public:                                                   \
+    template <typename... Args>                           \
+    inline void Visit (Args & ... args)                   \
+    {                                                     \
+        return _Visit (args...);                          \
+    }                                                     \
+protected:                                                \
+    template <typename T, typename... Args>               \
+    inline void _Visit (T &property, Args & ... args)     \
+    {                                                     \
+        _Visit (property);                                \
+        _Visit (args...);                                 \
+    }                                                     \
 
 namespace BOT_ORM_Impl
 {
@@ -100,12 +120,12 @@ namespace BOT_ORM_Impl
 		{ return; }
 	};
 
-	// Helper Funcion
+	// Helper - Split String
 	std::string SplitStr (std::string &inputStr,
-						  char chSeg = char (0))
+						  char delim = char (0))
 	{
 		size_t pos = 0;
-		if ((pos = inputStr.find (chSeg, 0)) != std::string::npos)
+		if ((pos = inputStr.find (delim, 0)) != std::string::npos)
 		{
 			auto ret = inputStr.substr (0, pos);
 			inputStr.erase (0, pos + 1);
@@ -114,128 +134,133 @@ namespace BOT_ORM_Impl
 		return std::string ();
 	}
 
-	std::string DoubleToStr (double val)
+	// Helper - Serialize
+	template <typename T>
+	std::string SerializeValue (T value)
 	{
-		std::string ret;
 		std::stringstream strs;
-		strs << val;
-		strs >> ret;
-		return std::move (ret);
+		strs << value;
+		return strs.str ();
 	}
 
-	class ReaderVisitor
+	template <>  // Assume not CV string
+	inline std::string SerializeValue
+		<std::string> (std::string value)
 	{
-	public:
-		std::string serializedValues;
+		return "'" + value + "'";
+	}
 
-		template <typename... Args>
-		inline void Visit (Args & ... args)
-		{
-			return _Visit (args...);
-		}
-	protected:
-		template <typename T, typename... Args>
-		inline void _Visit (T &property, Args & ... args)
-		{
-			_Visit (property);
-			_Visit (args...);
-		}
+	// Helper - Deserialize
+	template <typename T>
+	inline void DeserializeValue (T &property, std::string value)
+	{
+		std::stringstream ostr (value);
+		ostr >> property;
+	}
 
-		inline void _Visit (const long &property)
-		{
-			serializedValues += std::to_string (property);
-			serializedValues += char (0);
-		}
-		inline void _Visit (const double &property)
-		{
-			serializedValues +=
-				BOT_ORM_Impl::DoubleToStr (property);
-			serializedValues += char (0);
-		}
-		inline void _Visit (const std::string &property)
-		{
-			serializedValues += "'" + property + "'";
-			serializedValues += char (0);
-		}
-	};
+	template <>  // Assume not CV string
+	inline void DeserializeValue <std::string>
+		(std::string &property, std::string value)
+	{
+		property = std::move (value);
+	}
 
 	class TypeVisitor
 	{
+		// Visitor Scheme
+		__VISITOR
+
 	public:
 		std::string serializedTypes;
-
-		template <typename... Args>
-		inline void Visit (Args & ... args)
-		{
-			return _Visit (args...);
-		}
 	protected:
-		template <typename T, typename... Args>
-		inline void _Visit (T &property, Args & ... args)
+		template <typename T>
+		struct IsString
 		{
-			_Visit (property);
-			_Visit (args...);
-		}
+			// Remarks:
+			// Bad Support of std::remove_cv in gcc :-(
+			constexpr static bool value =
+				std::is_same<T, std::string>::value ||
+				std::is_same<T, const std::string>::value ||
+				std::is_same<T, volatile std::string>::value ||
+				std::is_same<T, const volatile std::string>::value;
+		};
 
-		inline void _Visit (const long &property)
+		template <typename T>
+		struct TypeString
 		{
-			serializedTypes += "integer";
+			// Remarks:
+			// Visual Studio not support SFINAE :-(
+			constexpr static const char *typeStr =
+				std::is_integral<T>::value ? "integer" : (
+					std::is_floating_point<T>::value ? "real" : (
+						IsString<T>::value ? "text" : nullptr
+						)
+					);
+			static_assert (typeStr != nullptr,
+						   "Only Support Integral, Floating Point and"
+						   " std::string :-(");
+		};
+
+		template <typename T>
+		inline void _Visit (T &property)
+		{
+			serializedTypes += TypeString<T>::typeStr;
 			serializedTypes += char (0);
 		}
-		inline void _Visit (const double &property)
+	};
+
+	class ReaderVisitor
+	{
+		// Visitor Scheme
+		__VISITOR
+
+	private:
+		char _delim;
+	public:
+		std::stringstream serializedValues;
+
+		ReaderVisitor (char delim = char (0))
+			: _delim (delim)
+		{}
+	protected:
+		template <typename T>
+		inline void _Visit (T &property)
 		{
-			serializedTypes += "real";
-			serializedTypes += char (0);
-		}
-		inline void _Visit (const std::string &property)
-		{
-			serializedTypes += "text";
-			serializedTypes += char (0);
+			serializedValues
+				<< SerializeValue (T (property))
+				<< _delim;
 		}
 	};
 
 	class WriterVisitor
 	{
-		std::string _serializedValues;
+		// Visitor Scheme
+		__VISITOR
 
+	private:
+		std::string _serializedValues;
 	public:
 		WriterVisitor (std::string serializedValues)
 			: _serializedValues (serializedValues)
 		{}
-
-		template <typename... Args>
-		inline void Visit (Args & ... args)
-		{
-			return _Visit (args...);
-		}
 	protected:
-		template <typename T, typename... Args>
-		inline void _Visit (T &property, Args & ... args)
+		template <typename T>
+		inline void _Visit (T &property)
 		{
-			_Visit (property);
-			_Visit (args...);
-		}
-
-		inline void _Visit (long &property)
-		{
-			property = std::stol (
-				BOT_ORM_Impl::SplitStr (_serializedValues));
-		}
-		inline void _Visit (double &property)
-		{
-			property = std::stod (
-				BOT_ORM_Impl::SplitStr (_serializedValues));
-		}
-		inline void _Visit (std::string &property)
-		{
-			property = BOT_ORM_Impl::SplitStr (_serializedValues);
+			// Remarks:
+			// GCC Hell: explicit specialization in non-namespace scope
+			// So, unable to Write Impl Here
+			DeserializeValue (property, SplitStr (_serializedValues));
 		}
 	};
 
 	class IndexVisitor
 	{
-		const void *_pointer;
+		// Visitor Scheme
+		__VISITOR
 
+	private:
+		const void *_pointer;
 	public:
 		bool isFound;
 		size_t index;
@@ -244,36 +269,9 @@ namespace BOT_ORM_Impl
 			: index (0), isFound (false),
 			_pointer (pointer)
 		{}
-
-		template <typename... Args>
-		inline void Visit (Args & ... args)
-		{
-			return _Visit (args...);
-		}
 	protected:
-		template <typename T, typename... Args>
-		inline void _Visit (T &property, Args & ... args)
-		{
-			_Visit (property);
-			if (!isFound)
-				_Visit (args...);
-		}
-
-		inline void _Visit (const long &property)
-		{
-			if ((const void *) &property == _pointer)
-				isFound = true;
-			else if (!isFound)
-				index++;
-		}
-		inline void _Visit (const double &property)
-		{
-			if ((const void *) &property == _pointer)
-				isFound = true;
-			else if (!isFound)
-				index++;
-		}
-		inline void _Visit (const std::string &property)
+		template <typename T>
+		inline void _Visit (const T &property)
 		{
 			if ((const void *) &property == _pointer)
 				isFound = true;
@@ -295,28 +293,14 @@ namespace BOT_ORM
 			: Expr (property, relOp, property)
 		{}
 
-		Expr (const long &property,
+		template <typename T>
+		Expr (const T &property,
 			  const std::string &relOp,
-			  long value)
+			  const T &value)
 			: expr { std::make_pair (
 				&property,
-				relOp + std::to_string (value)) }
-		{}
-
-		Expr (const double &property,
-			  const std::string &relOp,
-			  double value)
-			: expr { std::make_pair (
-				&property,
-				relOp + BOT_ORM_Impl::DoubleToStr (value)) }
-		{}
-
-		Expr (const std::string &property,
-			  const std::string &relOp,
-			  std::string value)
-			: expr { std::make_pair (
-				&property,
-				relOp + "'" + std::move (value) + "'") }
+				relOp + BOT_ORM_Impl::SerializeValue (
+					T (value))) }
 		{}
 
 		template <typename T>
@@ -386,8 +370,7 @@ namespace BOT_ORM
 	{
 	public:
 		ORMapper (const std::string &dbName)
-			: _dbName (dbName), _tblName (C::__ClassName),
-			_fieldNames (_ExtractFieldName ())
+			: _dbName (dbName), _tblName (C::__ClassName)
 		{}
 
 		inline const std::string &ErrMsg () const
@@ -400,21 +383,20 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				const C obj {};
 				BOT_ORM_Impl::TypeVisitor visitor;
-				obj.__Accept (visitor);
+				C ().__Accept (visitor);
 
-				auto strTypes = std::move (visitor.serializedTypes);
+				std::string strTypes = std::move (visitor.serializedTypes);
 				size_t indexFieldName = 0;
 
 				auto typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
-				auto strFmt = _fieldNames[indexFieldName++] + " " +
+				auto strFmt = _FieldNames ()[indexFieldName++] + " " +
 					std::move (typeFmt) + " primary key,";
 
 				while (!strTypes.empty ())
 				{
 					typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
-					strFmt += _fieldNames[indexFieldName++] + " " +
+					strFmt += _FieldNames ()[indexFieldName++] + " " +
 						std::move (typeFmt) + ",";
 				}
 				strFmt.pop_back ();
@@ -438,17 +420,15 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				BOT_ORM_Impl::ReaderVisitor visitor;
+				BOT_ORM_Impl::ReaderVisitor visitor (',');
 				value.__Accept (visitor);
-				auto strIns = std::move (visitor.serializedValues);
 
-				for (auto &ch : strIns)
-					if (ch == char (0))
-						ch = ',';
+				std::string strIns (visitor.serializedValues.str ());
 				strIns.pop_back ();
 
 				connector.Execute ("begin transaction;insert into " + _tblName +
-								   " values (" + strIns + ");commit transaction;");
+								   " values (" + std::move (strIns) +
+								   ");commit transaction;");
 			});
 		}
 
@@ -461,19 +441,17 @@ namespace BOT_ORM
 				std::string strIns;
 				for (const auto &value : values)
 				{
-					BOT_ORM_Impl::ReaderVisitor visitor;
+					BOT_ORM_Impl::ReaderVisitor visitor (',');
 					value.__Accept (visitor);
-					auto strValues = std::move (visitor.serializedValues);
 
-					for (auto &ch : strValues)
-						if (ch == char (0))
-							ch = ',';
+					std::string strValues (visitor.serializedValues.str ());
 					strValues.pop_back ();
-					strIns += "(" + strValues + "),";
+
+					strIns += "(" + std::move (strValues) + "),";
 				}
 				strIns.pop_back ();
 				connector.Execute ("insert into " + _tblName +
-								   " values " + strIns + ";");
+								   " values " + std::move (strIns) + ";");
 			});
 		}
 
@@ -485,13 +463,13 @@ namespace BOT_ORM
 				BOT_ORM_Impl::ReaderVisitor visitor;
 				value.__Accept (visitor);
 
-				auto strVals = std::move (visitor.serializedValues);
+				std::string strVals (visitor.serializedValues.str ());
 				size_t indexFieldName = 0;
 
 				std::string strKey;
 				{
 					auto val = BOT_ORM_Impl::SplitStr (strVals);
-					strKey = _fieldNames[indexFieldName++] + "=" +
+					strKey = _FieldNames ()[indexFieldName++] + "=" +
 						std::move (val);
 				}
 
@@ -499,7 +477,7 @@ namespace BOT_ORM
 				while (!strVals.empty ())
 				{
 					auto val = BOT_ORM_Impl::SplitStr (strVals);
-					strUpd += _fieldNames[indexFieldName++] + "=" +
+					strUpd += _FieldNames ()[indexFieldName++] + "=" +
 						std::move (val) + ",";
 				}
 				strUpd.pop_back ();
@@ -522,15 +500,15 @@ namespace BOT_ORM
 					BOT_ORM_Impl::ReaderVisitor visitor;
 					value.__Accept (visitor);
 
-					auto strVals = std::move (visitor.serializedValues);
+					std::string strVals (visitor.serializedValues.str ());
 					auto curIndex = 0;
 
-					std::string strKey = _fieldNames[curIndex++] +
+					std::string strKey = _FieldNames ()[curIndex++] +
 						"=" + BOT_ORM_Impl::SplitStr (strVals);
 
 					std::string strUpd;
 					while (!strVals.empty ())
-						strUpd += _fieldNames[curIndex++] + "=" +
+						strUpd += _FieldNames ()[curIndex++] + "=" +
 						BOT_ORM_Impl::SplitStr (strVals) + ",";
 					strUpd.pop_back ();
 
@@ -551,9 +529,11 @@ namespace BOT_ORM
 				BOT_ORM_Impl::ReaderVisitor visitor;
 				value.__Accept (visitor);
 
+				std::string strVals (visitor.serializedValues.str ());
+
 				// Only Set Key
-				auto strDel = _fieldNames[0] + "=" +
-					BOT_ORM_Impl::SplitStr (visitor.serializedValues);
+				auto strDel = _FieldNames ()[0] + "=" +
+					BOT_ORM_Impl::SplitStr (strVals);
 
 				connector.Execute ("delete from " + _tblName +
 								   " where " + strDel + ";");
@@ -639,7 +619,7 @@ namespace BOT_ORM
 				if (!visitor.isFound)
 					throw std::runtime_error ("No such Field in the Table");
 
-				return _pMapper->_fieldNames[visitor.index];
+				return _pMapper->_FieldNames ()[visitor.index];
 			}
 
 			std::string _GetSQL () const
@@ -658,7 +638,6 @@ namespace BOT_ORM
 
 	private:
 		const std::string _dbName, _tblName;
-		const std::vector<std::string> _fieldNames;
 		std::string _errMsg;
 
 		bool _HandleException (std::function <void (
@@ -729,30 +708,37 @@ namespace BOT_ORM
 			});
 		}
 
-		static std::vector<std::string> _ExtractFieldName ()
+		static const std::vector<std::string> &_FieldNames ()
 		{
-			std::string rawStr (C::__FieldNames), tmpStr;
-			rawStr.push_back (',');
-			tmpStr.reserve (rawStr.size ());
-
-			std::vector<std::string> ret;
-			for (const auto &ch : rawStr)
+			auto _ExtractFieldName = [] ()
 			{
-				switch (ch)
-				{
-				case ',':
-					ret.push_back (tmpStr);
-					tmpStr.clear ();
-					break;
+				std::string rawStr (C::__FieldNames), tmpStr;
+				rawStr.push_back (',');
+				tmpStr.reserve (rawStr.size ());
 
-				case '_':
-				default:
-					if (isalnum (ch) || isalpha (ch))
-						tmpStr += ch;
-					break;
+				std::vector<std::string> ret;
+				for (const auto &ch : rawStr)
+				{
+					switch (ch)
+					{
+					case ',':
+						ret.push_back (tmpStr);
+						tmpStr.clear ();
+						break;
+
+					case '_':
+					default:
+						if (isalnum (ch) || isalpha (ch))
+							tmpStr += ch;
+						break;
+					}
 				}
-			}
-			return std::move (ret);
+				return std::move (ret);
+			};
+
+			static const std::vector<std::string> _fieldNames (
+				_ExtractFieldName ());
+			return _fieldNames;
 		}
 	};
 }

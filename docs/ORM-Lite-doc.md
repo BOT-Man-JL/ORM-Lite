@@ -20,7 +20,7 @@ using namespace BOT_ORM;
 
 struct MyClass
 {
-    long id;
+    int id;
     double score;
     std::string name;
 
@@ -39,8 +39,12 @@ Note that:
 - `ORMAP (...)` will **auto** Inject some **private members**
   , but **NO damage** to the Class :wink:
 - Hooked Class MUST have **Default Constructor**;
-- Currently Only Support `long`, `double` and `std::string` Types,
-  which are stored as `INTEGER`, `REAL` and `TEXT` (**SQLite3**);
+- Currently Only Support
+  - T such that `std::is_integral<T>::value == true`
+  - T such that `std::is_floating_point<T>::value == true`
+  - T such that `std::is_same<T, std::string>::value == true`
+  - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
+- `std::string` Value MUST **NOT** contain `\0` (Impl Constraint);
 
 ## ORMapper
 

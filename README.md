@@ -24,7 +24,7 @@ using namespace BOT_ORM;
 
 struct MyClass
 {
-    long id;
+    int id;
     double score;
     std::string name;
 
@@ -102,7 +102,7 @@ if (!mapper.Insert (MyClass { 1, 0, "Joke" }))
 // Insert by Batch Insert
 // Performance is much Better than Separated Insert :-)
 std::vector<MyClass> dataToSeed;
-for (long i = 50; i < 100; i++)
+for (int i = 50; i < 100; i++)
     dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
 mapper.Insert (dataToSeed);
 
@@ -161,5 +161,7 @@ mapper.Query (_mc)                  // Link '_mc' to its fields
 - Using **Template** to Generate Visitors in *Compile Time*;
 - Using **Variadic Template** to Fit in *Various Types*
   (Maybe refactor into `std::tuple` :confused:);
-- Using **Macro** `#define (...)` to Generate Hook Codes;
+- Using **Macro** `#define (...)` to Generate Codes;
 - Using **Serialization** and **Deserialization** to *exchange Data*;
+- Using `std::stringstream` to **(De)serialization** data;
+- Using 

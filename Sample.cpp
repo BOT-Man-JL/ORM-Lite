@@ -13,12 +13,12 @@ using namespace BOT_ORM;
 
 struct MyClass
 {
-	long id;
+	int id;
 	double score;
 	std::string name;
 
 	// Inject ORM-Lite into this Class
-	ORMAP (MyClass, id, score, name)
+	ORMAP (MyClass, id, name, score)
 };
 
 int main ()
@@ -63,7 +63,7 @@ int main ()
 	// Insert by Batch Insert
 	// Performance is much Better than Separated Insert :-)
 	std::vector<MyClass> dataToSeed;
-	for (long i = 50; i < 100; i++)
+	for (int i = 50; i < 100; i++)
 		dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
 	mapper.Insert (dataToSeed);
 
