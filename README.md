@@ -11,7 +11,7 @@ written in C++ 11 style.
 
 ## Usage
 
-### [View Full Documents](https://github.com/BOT-Man-JL/ORM-Lite/tree/master/docs/ORM-Lite-doc.md)
+### [View Full Documents](docs/ORM-Lite-doc.md)
 
 ### Including *ORM Lite*
 
@@ -164,4 +164,3 @@ mapper.Query (_mc)                  // Link '_mc' to its fields
 - Using **Macro** `#define (...)` to Generate Codes;
 - Using **Serialization** and **Deserialization** to *exchange Data*;
 - Using `std::stringstream` to **(De)serialization** data;
-- Using 
