@@ -14,6 +14,7 @@
 #include <cctype>
 #include <thread>
 #include <sstream>
+#include <tuple>
 #include <type_traits>
 
 #include "sqlite3.h"
@@ -23,35 +24,12 @@
 #define ORMAP(_MY_CLASS_, ...)                            \
 private:                                                  \
 friend class BOT_ORM::ORMapper<_MY_CLASS_>;               \
-template <typename VISITOR>                               \
-void __Accept (VISITOR &visitor)                          \
-{                                                         \
-	visitor.Visit (__VA_ARGS__);                          \
-}                                                         \
-template <typename VISITOR>                               \
-void __Accept (VISITOR &visitor) const                    \
-{                                                         \
-	visitor.Visit (__VA_ARGS__);                          \
-}                                                         \
+inline decltype (auto) __ValTuple ()                      \
+{ return std::forward_as_tuple (__VA_ARGS__); }           \
+inline decltype (auto) __ValTuple () const                \
+{ return std::forward_as_tuple (__VA_ARGS__); }           \
 constexpr static const char *__ClassName = #_MY_CLASS_;   \
 constexpr static const char *__FieldNames = #__VA_ARGS__; \
-
-// Private Macro
-
-#define __VISITOR                                         \
-public:                                                   \
-    template <typename... Args>                           \
-    inline void Visit (Args & ... args)                   \
-    {                                                     \
-        return _Visit (args...);                          \
-    }                                                     \
-protected:                                                \
-    template <typename T, typename... Args>               \
-    inline void _Visit (T &property, Args & ... args)     \
-    {                                                     \
-        _Visit (property);                                \
-        _Visit (args...);                                 \
-    }                                                     \
 
 namespace BOT_ORM_Impl
 {
@@ -120,34 +98,19 @@ namespace BOT_ORM_Impl
 		{ return; }
 	};
 
-	// Helper - Split String
-	std::string SplitStr (std::string &inputStr,
-						  char delim = char (0))
-	{
-		size_t pos = 0;
-		if ((pos = inputStr.find (delim, 0)) != std::string::npos)
-		{
-			auto ret = inputStr.substr (0, pos);
-			inputStr.erase (0, pos + 1);
-			return std::move (ret);
-		}
-		return std::string ();
-	}
-
 	// Helper - Serialize
 	template <typename T>
-	std::string SerializeValue (T value)
+	inline std::ostream &SerializeValue (std::ostream &os,
+										 const T &value)
 	{
-		std::stringstream strs;
-		strs << value;
-		return strs.str ();
+		return os << value;
 	}
 
 	template <>  // Assume not CV string
-	inline std::string SerializeValue
-		<std::string> (std::string value)
+	inline std::ostream &SerializeValue <std::string> (
+		std::ostream &os, const std::string &value)
 	{
-		return "'" + value + "'";
+		return os << "'" << value << "'";
 	}
 
 	// Helper - Deserialize
@@ -165,120 +128,52 @@ namespace BOT_ORM_Impl
 		property = std::move (value);
 	}
 
-	class TypeVisitor
+	// Helper - Get TypeString
+	template <typename T>
+	const char *TypeString (T &)
 	{
-		// Visitor Scheme
-		__VISITOR
+		// Remarks:
+		// Visual Studio not support SFINAE :-(
+		constexpr const char *typeStr =
+			std::is_integral<T>::value ? "integer" : (
+				std::is_floating_point<T>::value ? "real" : (
+					std::is_same<typename std::remove_cv<T>::type,
+					std::string>::value ? "text" : nullptr
+					)
+				);
 
-	public:
-		std::string serializedTypes;
-	protected:
-		template <typename T>
-		struct IsString
-		{
-			// Remarks:
-			// Bad Support of std::remove_cv in gcc :-(
-			constexpr static bool value =
-				std::is_same<T, std::string>::value ||
-				std::is_same<T, const std::string>::value ||
-				std::is_same<T, volatile std::string>::value ||
-				std::is_same<T, const volatile std::string>::value;
-		};
+		static_assert (typeStr != nullptr,
+					   "Only Support Integral, Floating Point and"
+					   " std::string :-(");
 
-		template <typename T>
-		struct TypeString
-		{
-			// Remarks:
-			// Visual Studio not support SFINAE :-(
-			constexpr static const char *typeStr =
-				std::is_integral<T>::value ? "integer" : (
-					std::is_floating_point<T>::value ? "real" : (
-						IsString<T>::value ? "text" : nullptr
-						)
-					);
-			static_assert (typeStr != nullptr,
-						   "Only Support Integral, Floating Point and"
-						   " std::string :-(");
-		};
+		return typeStr;
+	}
 
-		template <typename T>
-		inline void _Visit (T &property)
-		{
-			serializedTypes += TypeString<T>::typeStr;
-			serializedTypes += char (0);
-		}
-	};
+	// Helper - Tuple Visitor
+	// Refrence:
+	// http://stackoverflow.com/questions/18155533
 
-	class ReaderVisitor
+	// Using a _SizeT to specify the Index :-), Cool
+	template < size_t > struct _SizeT {};
+
+	template < typename TupleType, typename ActionType >
+	inline void TupleVisitor (TupleType &tuple, ActionType action)
 	{
-		// Visitor Scheme
-		__VISITOR
+		TupleVisitor_Impl (tuple, action,
+						   _SizeT<std::tuple_size<TupleType>::value> ());
+	}
 
-	private:
-		char _delim;
-	public:
-		std::stringstream serializedValues;
+	template < typename TupleType, typename ActionType >
+	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
+								   _SizeT<0>) {}
 
-		ReaderVisitor (char delim = char (0))
-			: _delim (delim)
-		{}
-	protected:
-		template <typename T>
-		inline void _Visit (T &property)
-		{
-			serializedValues
-				<< SerializeValue (T (property))
-				<< _delim;
-		}
-	};
-
-	class WriterVisitor
+	template < typename TupleType, typename ActionType, size_t N >
+	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
+								   _SizeT<N>)
 	{
-		// Visitor Scheme
-		__VISITOR
-
-	private:
-		std::string _serializedValues;
-	public:
-		WriterVisitor (std::string serializedValues)
-			: _serializedValues (serializedValues)
-		{}
-	protected:
-		template <typename T>
-		inline void _Visit (T &property)
-		{
-			// Remarks:
-			// GCC Hell: explicit specialization in non-namespace scope
-			// So, unable to Write Impl Here
-			DeserializeValue (property, SplitStr (_serializedValues));
-		}
-	};
-
-	class IndexVisitor
-	{
-		// Visitor Scheme
-		__VISITOR
-
-	private:
-		const void *_pointer;
-	public:
-		bool isFound;
-		size_t index;
-
-		IndexVisitor (const void *pointer)
-			: index (0), isFound (false),
-			_pointer (pointer)
-		{}
-	protected:
-		template <typename T>
-		inline void _Visit (const T &property)
-		{
-			if ((const void *) &property == _pointer)
-				isFound = true;
-			else if (!isFound)
-				index++;
-		}
-	};
+		TupleVisitor_Impl (tuple, action, _SizeT<N - 1> ());
+		action (std::get<N - 1> (tuple));
+	}
 }
 
 namespace BOT_ORM
@@ -298,10 +193,12 @@ namespace BOT_ORM
 			  const std::string &relOp,
 			  const T &value)
 			: expr { std::make_pair (
-				&property,
-				relOp + BOT_ORM_Impl::SerializeValue (
-					T (value))) }
-		{}
+				&property, relOp) }
+		{
+			std::ostringstream os;
+			BOT_ORM_Impl::SerializeValue (os, value);
+			expr.front ().second.append (os.str ());
+		}
 
 		template <typename T>
 		struct Field_Expr
@@ -371,34 +268,42 @@ namespace BOT_ORM
 	public:
 		ORMapper (const std::string &dbName)
 			: _dbName (dbName), _tblName (C::__ClassName)
-		{}
+		{
+			static_assert (std::is_copy_constructible<C>::value,
+						   "It must be Copy Constructible");
+		}
 
 		inline const std::string &ErrMsg () const
 		{
 			return _errMsg;
 		}
 
-		bool CreateTbl ()
+		typename std::enable_if<std::is_default_constructible<C>::value,
+			bool>::type CreateTbl ()
+		{
+			C value {};
+			return CreateTbl (value);
+		}
+
+		bool CreateTbl (const C &value)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				BOT_ORM_Impl::TypeVisitor visitor;
-				C ().__Accept (visitor);
-
-				std::string strTypes = std::move (visitor.serializedTypes);
-				size_t indexFieldName = 0;
-
-				auto typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
-				auto strFmt = _FieldNames ()[indexFieldName++] + " " +
-					std::move (typeFmt) + " primary key,";
-
-				while (!strTypes.empty ())
+				const auto &fieldNames = ORMapper<C>::_FieldNames ();
+				size_t index = 0;
+				std::vector<std::string> strTypes (fieldNames.size ());
+				auto tuple = value.__ValTuple ();
+				BOT_ORM_Impl::TupleVisitor (
+					tuple, [&strTypes, &index] (auto &val)
 				{
-					typeFmt = BOT_ORM_Impl::SplitStr (strTypes);
-					strFmt += _FieldNames ()[indexFieldName++] + " " +
-						std::move (typeFmt) + ",";
-				}
+					strTypes[index++] = BOT_ORM_Impl::TypeString (val);
+				});
+
+				auto strFmt = fieldNames[0] + " " + strTypes[0] +
+					" primary key,";
+				for (size_t i = 1; i < fieldNames.size (); i++)
+					strFmt += fieldNames[i] + " " + strTypes[i] + ",";
 				strFmt.pop_back ();
 
 				connector.Execute ("create table " + _tblName +
@@ -420,15 +325,20 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				BOT_ORM_Impl::ReaderVisitor visitor (',');
-				value.__Accept (visitor);
+				std::ostringstream os;
+				size_t index = 0;
+				auto tuple = value.__ValTuple ();
+				BOT_ORM_Impl::TupleVisitor (
+					tuple, [&os, &index] (auto &val)
+				{
+					if (++index != ORMapper<C>::_FieldNames ().size ())
+						BOT_ORM_Impl::SerializeValue (os, val) << ',';
+					else
+						BOT_ORM_Impl::SerializeValue (os, val);
+				});
 
-				std::string strIns (visitor.serializedValues.str ());
-				strIns.pop_back ();
-
-				connector.Execute ("begin transaction;insert into " + _tblName +
-								   " values (" + std::move (strIns) +
-								   ");commit transaction;");
+				connector.Execute ("insert into " + _tblName +
+								   " values (" + os.str () + ");");
 			});
 		}
 
@@ -438,20 +348,31 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				std::string strIns;
+				std::ostringstream os;
+				size_t count = 0;
 				for (const auto &value : values)
 				{
-					BOT_ORM_Impl::ReaderVisitor visitor (',');
-					value.__Accept (visitor);
+					os << "(";
 
-					std::string strValues (visitor.serializedValues.str ());
-					strValues.pop_back ();
+					size_t index = 0;
+					auto tuple = value.__ValTuple ();
+					BOT_ORM_Impl::TupleVisitor (
+						tuple, [&os, &index] (auto &val)
+					{
+						if (++index != ORMapper<C>::_FieldNames ().size ())
+							BOT_ORM_Impl::SerializeValue (os, val) << ',';
+						else
+							BOT_ORM_Impl::SerializeValue (os, val);
+					});
 
-					strIns += "(" + std::move (strValues) + "),";
+					if (++count != values.size ())
+						os << "),";
+					else
+						os << ")";
 				}
-				strIns.pop_back ();
+
 				connector.Execute ("insert into " + _tblName +
-								   " values " + std::move (strIns) + ";");
+								   " values " + os.str () + ";");
 			});
 		}
 
@@ -460,31 +381,32 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				BOT_ORM_Impl::ReaderVisitor visitor;
-				value.__Accept (visitor);
+				const auto &fieldNames = ORMapper<C>::_FieldNames ();
 
-				std::string strVals (visitor.serializedValues.str ());
-				size_t indexFieldName = 0;
-
-				std::string strKey;
+				size_t index = 0;
+				std::stringstream os, osKey;
+				auto tuple = value.__ValTuple ();
+				BOT_ORM_Impl::TupleVisitor (
+					tuple, [&os, &osKey, &index, &fieldNames] (auto &val)
 				{
-					auto val = BOT_ORM_Impl::SplitStr (strVals);
-					strKey = _FieldNames ()[indexFieldName++] + "=" +
-						std::move (val);
-				}
-
-				std::string strUpd;
-				while (!strVals.empty ())
-				{
-					auto val = BOT_ORM_Impl::SplitStr (strVals);
-					strUpd += _FieldNames ()[indexFieldName++] + "=" +
-						std::move (val) + ",";
-				}
-				strUpd.pop_back ();
+					if (index == 0)
+					{
+						osKey << fieldNames[index++] << "=";
+						BOT_ORM_Impl::SerializeValue (osKey, val);
+					}
+					else
+					{
+						os << fieldNames[index++] << "=";
+						if (index != fieldNames.size ())
+							BOT_ORM_Impl::SerializeValue (os, val) << ',';
+						else
+							BOT_ORM_Impl::SerializeValue (os, val);
+					}
+				});
 
 				connector.Execute ("update " + _tblName +
-								   " set " + std::move (strUpd) +
-								   " where " + std::move (strKey) + ";");
+								   " set " + os.str () +
+								   " where " + osKey.str () + ";");
 			});
 		}
 
@@ -494,30 +416,39 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				std::string strUpdate ("begin transaction;");
+				const auto &fieldNames = ORMapper<C>::_FieldNames ();
+
+				std::stringstream os;
+				os << "begin transaction;";
 				for (const auto &value : values)
 				{
-					BOT_ORM_Impl::ReaderVisitor visitor;
-					value.__Accept (visitor);
+					os << "update " << _tblName << " set ";
 
-					std::string strVals (visitor.serializedValues.str ());
-					auto curIndex = 0;
+					size_t index = 0;
+					std::stringstream osKey;
+					auto tuple = value.__ValTuple ();
+					BOT_ORM_Impl::TupleVisitor (
+						tuple, [&os, &osKey, &index, &fieldNames] (auto &val)
+					{
+						if (index == 0)
+						{
+							osKey << fieldNames[index++] << "=";
+							BOT_ORM_Impl::SerializeValue (osKey, val);
+						}
+						else
+						{
+							os << fieldNames[index++] << "=";
+							if (index != fieldNames.size ())
+								BOT_ORM_Impl::SerializeValue (os, val) << ',';
+							else
+								BOT_ORM_Impl::SerializeValue (os, val);
+						}
+					});
 
-					std::string strKey = _FieldNames ()[curIndex++] +
-						"=" + BOT_ORM_Impl::SplitStr (strVals);
-
-					std::string strUpd;
-					while (!strVals.empty ())
-						strUpd += _FieldNames ()[curIndex++] + "=" +
-						BOT_ORM_Impl::SplitStr (strVals) + ",";
-					strUpd.pop_back ();
-
-					strUpdate += "update " + _tblName +
-						" set " + std::move (strUpd) +
-						" where " + std::move (strKey) + ";";
+					os << " where " + osKey.str () + ";";
 				}
-				strUpdate += "commit transaction;";
-				connector.Execute (strUpdate);
+				os << "commit transaction;";
+				connector.Execute (os.str ());
 			});
 		}
 
@@ -526,25 +457,31 @@ namespace BOT_ORM
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
-				BOT_ORM_Impl::ReaderVisitor visitor;
-				value.__Accept (visitor);
-
-				std::string strVals (visitor.serializedValues.str ());
-
-				// Only Set Key
-				auto strDel = _FieldNames ()[0] + "=" +
-					BOT_ORM_Impl::SplitStr (strVals);
+				std::stringstream os;
+				size_t index = 0;
+				auto tuple = value.__ValTuple ();
+				BOT_ORM_Impl::TupleVisitor (
+					tuple, [&os, &index] (auto &val)
+				{
+					// Only Set Key
+					if (index == 0)
+					{
+						os << ORMapper<C>::_FieldNames ()[0] << "=";
+						BOT_ORM_Impl::SerializeValue (os, val);
+						index++;
+					}
+				});
 
 				connector.Execute ("delete from " + _tblName +
-								   " where " + strDel + ";");
+								   " where " + os.str () + ";");
 			});
 		}
 
 		class ORQuery
 		{
 		public:
-			ORQuery (const C &queryHelper, ORMapper<C> *pMapper)
-				: _qObj (&queryHelper), _pMapper (pMapper)
+			ORQuery (C &queryHelper, ORMapper<C> *pMapper)
+				: _queryHelper (queryHelper), _pMapper (pMapper)
 			{}
 
 			// Where
@@ -582,14 +519,14 @@ namespace BOT_ORM
 			std::vector<C> ToVector ()
 			{
 				std::vector<C> ret;
-				_pMapper->_Select (ret, _GetSQL ());
+				_pMapper->_Select (_queryHelper, ret, _GetSQL ());
 				return std::move (ret);
 			}
 
 			std::list<C> ToList ()
 			{
 				std::list<C> ret;
-				_pMapper->_Select (ret, _GetSQL ());
+				_pMapper->_Select (_queryHelper, ret, _GetSQL ());
 				return std::move (ret);
 			}
 
@@ -606,32 +543,41 @@ namespace BOT_ORM
 			}
 
 		protected:
-			const C *_qObj;
+			C &_queryHelper;
 			ORMapper<C> *_pMapper;
 			std::string _sqlWhere;
 			std::string _sqlOrderBy, _sqlLimit;
 
 			std::string _GetFieldName (const void *property)
 			{
-				BOT_ORM_Impl::IndexVisitor visitor (property);
-				(*_qObj).__Accept (visitor);
+				bool isFound = false;
+				size_t index = 0;
+				auto tuple = _queryHelper.__ValTuple ();
+				BOT_ORM_Impl::TupleVisitor (
+					tuple, [&property, &isFound, &index] (auto &val)
+				{
+					if (!isFound && property == &val)
+						isFound = true;
+					else if (!isFound)
+						index++;
+				});
 
-				if (!visitor.isFound)
+				if (!isFound)
 					throw std::runtime_error ("No such Field in the Table");
-
-				return _pMapper->_FieldNames ()[visitor.index];
+				return _pMapper->ORMapper<C>::_FieldNames ()[index];
 			}
 
 			std::string _GetSQL () const
 			{
 				if (!_sqlWhere.empty ())
-					return " where (" + _sqlWhere + ")" + _sqlOrderBy + _sqlLimit;
+					return " where (" + _sqlWhere + ")" +
+					_sqlOrderBy + _sqlLimit;
 				else
 					return _sqlOrderBy + _sqlLimit;
 			}
 		};
 
-		ORQuery Query (const C &queryHelper)
+		ORQuery Query (C &queryHelper)
 		{
 			return ORQuery (queryHelper, this);
 		}
@@ -657,7 +603,7 @@ namespace BOT_ORM
 		}
 
 		template <typename Out>
-		bool _Select (Out &out,
+		bool _Select (C &queryHelper, Out &out,
 					  const std::string &sqlStr = "")
 		{
 			return _HandleException ([&] (
@@ -667,16 +613,18 @@ namespace BOT_ORM
 								   " " + sqlStr + ";",
 								   [&] (int argc, char **argv, char **)
 				{
-					std::string serialized;
-					for (int i = 0; i < argc; i++)
+					if (argc != ORMapper<C>::_FieldNames ().size ())
+						throw std::runtime_error (
+							"Inter ORM Error: Select argc != Field Count");
+
+					size_t index = 0;
+					auto tuple = queryHelper.__ValTuple ();
+					BOT_ORM_Impl::TupleVisitor (
+						tuple, [&argv, &index] (auto &val)
 					{
-						serialized += argv[i];
-						serialized += char (0);
-					}
-					C obj;
-					BOT_ORM_Impl::WriterVisitor visitor (serialized);
-					obj.__Accept (visitor);
-					out.push_back (std::move (obj));
+						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
+					});
+					out.push_back (queryHelper);
 				});
 			});
 		}

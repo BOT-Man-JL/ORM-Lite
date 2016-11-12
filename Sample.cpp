@@ -31,6 +31,9 @@ int main ()
 		{ 2, 0.6, "Jess" }
 	};
 
+	// Define a Query Helper Object
+	MyClass helper;
+
 	// Open a Connection with *test.db*
 	ORMapper<MyClass> mapper ("test.db");
 
@@ -49,7 +52,7 @@ int main ()
 	mapper.Delete (initObjs[2]);
 
 	// Select All to Vector
-	auto query0 = mapper.Query (MyClass ()).ToVector ();
+	auto query0 = mapper.Query (helper).ToVector ();
 	// query0 = [{ 0, 0.2, "John"},
 	//           { 1, 1.0, "Jack"}]
 
@@ -74,16 +77,13 @@ int main ()
 
 	/* #3 Composite Query */
 
-	// Define a Query Helper Object
-	MyClass _mc;
-
 	// Select by Query :-)
-	auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
+	auto query1 = mapper.Query (helper)    // Link 'helper' to its fields
 		.Where (
-			Field (_mc.name) == "July" &&
-			(Field (_mc.id) <= 90 && Field (_mc.id) >= 60)
+			Field (helper.name) == "July" &&
+			(Field (helper.id) <= 90 && Field (helper.id) >= 60)
 		)
-		.OrderBy (_mc.id, true)
+		.OrderBy (helper.id, true)
 		.Limit (3, 10)
 		.ToVector ();
 
@@ -96,8 +96,8 @@ int main ()
 	// [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
 	// Count by Query :-)
-	auto count = mapper.Query (_mc)    // Link '_mc' to its fields
-		.Where (Field (_mc.name) == "July")
+	auto count = mapper.Query (helper)    // Link 'helper' to its fields
+		.Where (Field (helper.name) == "July")
 		.Count ();
 
 	// Remarks:
@@ -105,8 +105,8 @@ int main ()
 	// count = 50
 
 	// Delete by Query :-)
-	mapper.Query (_mc)                  // Link '_mc' to its fields
-		.Where (_mc.name = "July")      // Trick ;-)
+	mapper.Query (helper)                  // Link 'helper' to its fields
+		.Where (helper.name = "July")      // Trick ;-)
 		.Delete ();
 
 	// Remarks:

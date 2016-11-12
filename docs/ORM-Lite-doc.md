@@ -1,4 +1,11 @@
-# ORM Lite
+﻿# ORM Lite
+
+## Requirement
+
+- **C++ 14** Support :wink:
+  - MSVC >= 14 (2015)
+  - gcc >= 5
+- **SQLite 3** (zipped in *src*)
 
 ## Include to Your Project
 
@@ -6,11 +13,6 @@
 #include "ORMLite.h"
 using namespace BOT_ORM;
 ```
-
-Remarks:
-- Remember to Build `sqlite3.c` in your Project;
-- And `sqlite3.c` and `sqlite3.h` have been zipped
-  (because of their large size :sweat_smile:)
 
 ## Inject Class
 
@@ -38,13 +40,13 @@ In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 Note that:
 - `ORMAP (...)` will **auto** Inject some **private members**
   , but **NO damage** to the Class :wink:
-- Hooked Class MUST have **Default Constructor**;
 - Currently Only Support
   - T such that `std::is_integral<T>::value == true`
   - T such that `std::is_floating_point<T>::value == true`
   - T such that `std::is_same<T, std::string>::value == true`
   - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
-- `std::string` Value MUST **NOT** contain `\0` (Impl Constraint);
+- MyClass MUST be `copy constructible`
+- `std::string` Value MUST **NOT** contain `\0` (SQLite3 Constraint);
 
 ## ORMapper
 
@@ -58,11 +60,15 @@ All operations on `MyClass` will be mapped into `dbName`;
 
 Return the latest Error Message;
 
-### bool CreateTbl ()
+### bool CreateTbl ([const Myclass &value])
 
 Create Table `MyClass` for class `MyClass`;
 
 Execute `CREATE TABLE MyClass (...);`
+
+Remarks:
+- Pass a value to Create Table
+  if `Myclass` has **NO** Default Constructor
 
 ### bool DropTbl ()
 
@@ -106,7 +112,7 @@ with the Same `KEY` with variable `value`;
 
 Execute `DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
 
-### ORQuery Query (const MyClass &queryHelper)
+### ORQuery Query (MyClass &queryHelper)
 
 Return new `ORQuery` object and Capturing `queryHelper`;
 
@@ -142,6 +148,10 @@ Generate `LIMIT` `count` `OFFSET` `offset`;
 Retrieve Select Result under **Constraints**;
 
 Execute `SELECT * FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
+
+Remarks:
+- Deserialize Value to `MyClass &queryHelper`;
+- Copy `queryHelper` to `vector` / `list`;
 
 ### long Count ()
 

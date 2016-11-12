@@ -1,7 +1,7 @@
 # ORM Lite
 
 **ORM Lite** is a C++ [_**Object Relation Mapping** (ORM)_](https://en.wikipedia.org/wiki/Object-relational_mapping) for **SQLite3**,
-written in C++ 11 style.
+written in Modern C++ style.
 
 ## Features
 
@@ -71,6 +71,9 @@ std::vector<MyClass> initObjs =
     { 2, 0.6, "Jess" }
 };
 
+// Define a Query Helper Object
+MyClass helper;
+
 // Open a Connection with *test.db*
 ORMapper<MyClass> mapper ("test.db");
 
@@ -86,7 +89,7 @@ mapper.Update (initObjs[1]);
 mapper.Delete (initObjs[2]);
 
 // Select All to Vector
-auto query0 = mapper.Query (MyClass ()).ToVector ();
+auto query0 = mapper.Query (helper).ToVector ();
 // query0 = [{ 0, 0.2, "John"},
 //           { 1, 1.0, "Jack"}]
 
@@ -116,16 +119,13 @@ mapper.Update (dataToSeed);
 #### Composite Query
 
 ``` C++
-// Define a Query Helper Object
-MyClass _mc;
-
 // Select by Query :-)
-auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
+auto query1 = mapper.Query (helper)    // Link 'helper' to its fields
     .Where (
-        Field (_mc.name) == "July" &&
-        (Field (_mc.id) <= 90 && Field (_mc.id) >= 60)
+        Field (helper.name) == "July" &&
+        (Field (helper.id) <= 90 && Field (helper.id) >= 60)
     )
-    .OrderBy (_mc.id, true)
+    .OrderBy (helper.id, true)
     .Limit (3, 10)
     .ToVector ();
 
@@ -138,8 +138,8 @@ auto query1 = mapper.Query (_mc)    // Link '_mc' to its fields
 // [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
 // Count by Query :-)
-auto count = mapper.Query (_mc)    // Link '_mc' to its fields
-    .Where (Field (_mc.name) == "July")
+auto count = mapper.Query (helper)    // Link 'helper' to its fields
+    .Where (Field (helper.name) == "July")
     .Count ();
 
 // Remarks:
@@ -147,8 +147,8 @@ auto count = mapper.Query (_mc)    // Link '_mc' to its fields
 // count = 50
 
 // Delete by Query :-)
-mapper.Query (_mc)                  // Link '_mc' to its fields
-    .Where (_mc.name = "July")      // Trick ;-)
+mapper.Query (helper)                  // Link 'helper' to its fields
+    .Where (helper.name = "July")      // Trick ;-)
     .Delete ();
 
 // Remarks:
@@ -157,10 +157,8 @@ mapper.Query (_mc)                  // Link '_mc' to its fields
 
 ## Implementation Details
 
-- Using **Visitor Pattern** to *Hook* into the wanted Class/Struct;
-- Using **Template** to Generate Visitors in *Compile Time*;
-- Using **Variadic Template** to Fit in *Various Types*
-  (Maybe refactor into `std::tuple` :confused:);
+- Using `std::tuple` ~~Visitor Pattern~~ to Visit the Object;
 - Using **Macro** `#define (...)` to Generate Codes;
 - Using **Serialization** and **Deserialization** to *exchange Data*;
 - Using `std::stringstream` to **(De)serialization** data;
+- Using **Self-Refrence** to Implement *Fluent Interface*
