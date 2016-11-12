@@ -7,7 +7,8 @@ written in Modern C++ style.
 
 - Easy to Use
 - Light Weight
-- High Performance
+- Compile-time Overhead
+- Fluent Interface
 
 ## Usage
 
@@ -159,6 +160,5 @@ mapper.Query (helper)                  // Link 'helper' to its fields
 
 - Using `std::tuple` ~~Visitor Pattern~~ to Visit the Object;
 - Using **Macro** `#define (...)` to Generate Codes;
-- Using **Serialization** and **Deserialization** to *exchange Data*;
 - Using `std::stringstream` to **(De)serialization** data;
 - Using **Self-Refrence** to Implement *Fluent Interface*

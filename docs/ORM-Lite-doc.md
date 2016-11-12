@@ -45,7 +45,8 @@ Note that:
   - T such that `std::is_floating_point<T>::value == true`
   - T such that `std::is_same<T, std::string>::value == true`
   - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
-- MyClass MUST be `copy constructible`
+- Field Names MUST **NOT** be SQL Keywords;
+- MyClass MUST be **Copy Constructible**;
 - `std::string` Value MUST **NOT** contain `\0` (SQLite3 Constraint);
 
 ## ORMapper

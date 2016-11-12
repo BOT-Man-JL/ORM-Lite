@@ -106,7 +106,7 @@ namespace BOT_ORM_Impl
 		return os << value;
 	}
 
-	template <>  // Assume not CV string
+	template <>
 	inline std::ostream &SerializeValue <std::string> (
 		std::ostream &os, const std::string &value)
 	{
@@ -121,7 +121,7 @@ namespace BOT_ORM_Impl
 		ostr >> property;
 	}
 
-	template <>  // Assume not CV string
+	template <>
 	inline void DeserializeValue <std::string>
 		(std::string &property, std::string value)
 	{
@@ -130,21 +130,25 @@ namespace BOT_ORM_Impl
 
 	// Helper - Get TypeString
 	template <typename T>
-	const char *TypeString (T &)
+	const char *TypeString (T &t)
 	{
-		// Remarks:
-		// Visual Studio not support SFINAE :-(
 		constexpr const char *typeStr =
-			std::is_integral<T>::value ? "integer" : (
-				std::is_floating_point<T>::value ? "real" : (
-					std::is_same<typename std::remove_cv<T>::type,
-					std::string>::value ? "text" : nullptr
-					)
-				);
+			(std::is_integral<T>::value &&
+			 !std::is_same<std::remove_cv_t<T>, char>::value &&
+			 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
+			 !std::is_same<std::remove_cv_t<T>, char16_t>::value &&
+			 !std::is_same<std::remove_cv_t<T>, char32_t>::value &&
+			 !std::is_same<std::remove_cv_t<T>, unsigned char>::value)
+			? "integer"
+			: (std::is_floating_point<T>::value)
+			? "real"
+			: (std::is_same<std::remove_cv_t<T>, std::string>::value)
+			? "text"
+			: nullptr;
 
-		static_assert (typeStr != nullptr,
-					   "Only Support Integral, Floating Point and"
-					   " std::string :-(");
+		static_assert (
+			typeStr != nullptr,
+			"Only Support Integral, Floating Point and std::string :-)");
 
 		return typeStr;
 	}
@@ -278,8 +282,9 @@ namespace BOT_ORM
 			return _errMsg;
 		}
 
-		typename std::enable_if<std::is_default_constructible<C>::value,
-			bool>::type CreateTbl ()
+		// Enabled only if Default Constructible :-)
+		std::enable_if_t<std::is_default_constructible<C>::value, bool>
+			CreateTbl ()
 		{
 			C value {};
 			return CreateTbl (value);
