@@ -158,7 +158,7 @@ mapper.Query (helper)                  // Link 'helper' to its fields
 
 ## Implementation Details
 
-- Using `std::tuple` ~~Visitor Pattern~~ to Visit the Object;
+- Using **Visitor Pattern** to Traverse the Entity;
 - Using **Macro** `#define (...)` to Generate Codes;
 - Using `std::stringstream` to **(De)serialization** data;
 - Using **Self-Refrence** to Implement *Fluent Interface*

@@ -14,7 +14,6 @@
 #include <cctype>
 #include <thread>
 #include <sstream>
-#include <tuple>
 #include <type_traits>
 
 #include "sqlite3.h"
@@ -24,10 +23,16 @@
 #define ORMAP(_MY_CLASS_, ...)                            \
 private:                                                  \
 friend class BOT_ORM::ORMapper<_MY_CLASS_>;               \
-inline decltype (auto) __ValTuple ()                      \
-{ return std::forward_as_tuple (__VA_ARGS__); }           \
-inline decltype (auto) __ValTuple () const                \
-{ return std::forward_as_tuple (__VA_ARGS__); }           \
+template <typename VISITOR, typename FN>                  \
+void __Accept (const VISITOR &visitor, FN fn)             \
+{                                                         \
+    visitor.Visit (fn, __VA_ARGS__);                      \
+}                                                         \
+template <typename VISITOR, typename FN>                  \
+void __Accept (const VISITOR &visitor, FN fn) const       \
+{                                                         \
+    visitor.Visit (fn, __VA_ARGS__);                      \
+}                                                         \
 constexpr static const char *__ClassName = #_MY_CLASS_;   \
 constexpr static const char *__FieldNames = #__VA_ARGS__; \
 
@@ -153,31 +158,30 @@ namespace BOT_ORM_Impl
 		return typeStr;
 	}
 
-	// Helper - Tuple Visitor
-	// Refrence:
-	// http://stackoverflow.com/questions/18155533
-
-	// Using a _SizeT to specify the Index :-), Cool
-	template < size_t > struct _SizeT {};
-
-	template < typename TupleType, typename ActionType >
-	inline void TupleVisitor (TupleType &tuple, ActionType action)
+	// Visitor
+	class FnVisitor
 	{
-		TupleVisitor_Impl (tuple, action,
-						   _SizeT<std::tuple_size<TupleType>::value> ());
-	}
+	public:
+		template <typename Fn, typename... Args>
+		inline void Visit (Fn fn, Args & ... args) const
+		{
+			_Visit (fn, args...);
+		}
 
-	template < typename TupleType, typename ActionType >
-	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
-								   _SizeT<0>) {}
+	protected:
+		template <typename Fn, typename T, typename... Args>
+		inline void _Visit (Fn fn, T &property, Args & ... args) const
+		{
+			_Visit (fn, property);
+			_Visit (fn, args...);
+		}
 
-	template < typename TupleType, typename ActionType, size_t N >
-	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
-								   _SizeT<N>)
-	{
-		TupleVisitor_Impl (tuple, action, _SizeT<N - 1> ());
-		action (std::get<N - 1> (tuple));
-	}
+		template <typename Fn, typename T>
+		inline void _Visit (Fn fn, T &property) const
+		{
+			fn (property);
+		}
+	};
 }
 
 namespace BOT_ORM
@@ -196,8 +200,7 @@ namespace BOT_ORM
 		Expr (const T &property,
 			  const std::string &relOp,
 			  const T &value)
-			: expr { std::make_pair (
-				&property, relOp) }
+			: expr { std::make_pair (&property, relOp) }
 		{
 			std::ostringstream os;
 			BOT_ORM_Impl::SerializeValue (os, value);
@@ -286,11 +289,11 @@ namespace BOT_ORM
 		std::enable_if_t<std::is_default_constructible<C>::value, bool>
 			CreateTbl ()
 		{
-			C value {};
-			return CreateTbl (value);
+			C entity {};
+			return CreateTbl (entity);
 		}
 
-		bool CreateTbl (const C &value)
+		bool CreateTbl (const C &entity)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
@@ -298,9 +301,8 @@ namespace BOT_ORM
 				const auto &fieldNames = ORMapper<C>::_FieldNames ();
 				size_t index = 0;
 				std::vector<std::string> strTypes (fieldNames.size ());
-				auto tuple = value.__ValTuple ();
-				BOT_ORM_Impl::TupleVisitor (
-					tuple, [&strTypes, &index] (auto &val)
+				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+								 [&strTypes, &index] (auto &val)
 				{
 					strTypes[index++] = BOT_ORM_Impl::TypeString (val);
 				});
@@ -325,16 +327,15 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Insert (const C &value)
+		bool Insert (const C &entity)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				std::ostringstream os;
 				size_t index = 0;
-				auto tuple = value.__ValTuple ();
-				BOT_ORM_Impl::TupleVisitor (
-					tuple, [&os, &index] (auto &val)
+				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+								 [&os, &index] (auto &val)
 				{
 					if (++index != ORMapper<C>::_FieldNames ().size ())
 						BOT_ORM_Impl::SerializeValue (os, val) << ',';
@@ -348,21 +349,20 @@ namespace BOT_ORM
 		}
 
 		template <typename In>
-		bool Insert (const In &values)
+		bool Insert (const In &entities)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				std::ostringstream os;
 				size_t count = 0;
-				for (const auto &value : values)
+				for (const auto &entity : entities)
 				{
 					os << "(";
 
 					size_t index = 0;
-					auto tuple = value.__ValTuple ();
-					BOT_ORM_Impl::TupleVisitor (
-						tuple, [&os, &index] (auto &val)
+					entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+									 [&os, &index] (auto &val)
 					{
 						if (++index != ORMapper<C>::_FieldNames ().size ())
 							BOT_ORM_Impl::SerializeValue (os, val) << ',';
@@ -370,7 +370,7 @@ namespace BOT_ORM
 							BOT_ORM_Impl::SerializeValue (os, val);
 					});
 
-					if (++count != values.size ())
+					if (++count != entities.size ())
 						os << "),";
 					else
 						os << ")";
@@ -381,7 +381,7 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Update (const C &value)
+		bool Update (const C &entity)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
@@ -390,9 +390,8 @@ namespace BOT_ORM
 
 				size_t index = 0;
 				std::stringstream os, osKey;
-				auto tuple = value.__ValTuple ();
-				BOT_ORM_Impl::TupleVisitor (
-					tuple, [&os, &osKey, &index, &fieldNames] (auto &val)
+				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+								 [&os, &osKey, &index, &fieldNames] (auto &val)
 				{
 					if (index == 0)
 					{
@@ -416,7 +415,7 @@ namespace BOT_ORM
 		}
 
 		template <typename In>
-		bool Update (const In &values)
+		bool Update (const In &entities)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
@@ -425,15 +424,15 @@ namespace BOT_ORM
 
 				std::stringstream os;
 				os << "begin transaction;";
-				for (const auto &value : values)
+				for (const auto &entity : entities)
 				{
 					os << "update " << _tblName << " set ";
 
 					size_t index = 0;
 					std::stringstream osKey;
-					auto tuple = value.__ValTuple ();
-					BOT_ORM_Impl::TupleVisitor (
-						tuple, [&os, &osKey, &index, &fieldNames] (auto &val)
+					entity.__Accept (
+						BOT_ORM_Impl::FnVisitor (),
+						[&os, &osKey, &index, &fieldNames] (auto &val)
 					{
 						if (index == 0)
 						{
@@ -457,16 +456,15 @@ namespace BOT_ORM
 			});
 		}
 
-		bool Delete (const C &value)
+		bool Delete (const C &entity)
 		{
 			return _HandleException ([&] (
 				BOT_ORM_Impl::SQLConnector &connector)
 			{
 				std::stringstream os;
 				size_t index = 0;
-				auto tuple = value.__ValTuple ();
-				BOT_ORM_Impl::TupleVisitor (
-					tuple, [&os, &index] (auto &val)
+				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+								 [&os, &index] (auto &val)
 				{
 					// Only Set Key
 					if (index == 0)
@@ -557,9 +555,9 @@ namespace BOT_ORM
 			{
 				bool isFound = false;
 				size_t index = 0;
-				auto tuple = _queryHelper.__ValTuple ();
-				BOT_ORM_Impl::TupleVisitor (
-					tuple, [&property, &isFound, &index] (auto &val)
+				_queryHelper.__Accept (
+					BOT_ORM_Impl::FnVisitor (),
+					[&property, &isFound, &index] (auto &val)
 				{
 					if (!isFound && property == &val)
 						isFound = true;
@@ -623,9 +621,9 @@ namespace BOT_ORM
 							"Inter ORM Error: Select argc != Field Count");
 
 					size_t index = 0;
-					auto tuple = queryHelper.__ValTuple ();
-					BOT_ORM_Impl::TupleVisitor (
-						tuple, [&argv, &index] (auto &val)
+					queryHelper.__Accept (
+						BOT_ORM_Impl::FnVisitor (),
+						[&argv, &index] (auto &val)
 					{
 						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 					});
