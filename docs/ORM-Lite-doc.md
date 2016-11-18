@@ -2,7 +2,7 @@
 
 ## Requirement
 
-- **C++ 14** Support :wink:
+- **C++ 14** Support
   - MSVC >= 14 (2015)
   - gcc >= 5
 - **SQLite 3** (zipped in *src*)
@@ -41,88 +41,70 @@ Note that:
 - `ORMAP (...)` will **auto** Inject some **private members**
   , but **NO damage** to the Class :wink:
 - Currently Only Support
-  - T such that `std::is_integral<T>::value == true`
+  - T such that `std::is_integral<T>::value == true` and Not **Char**
   - T such that `std::is_floating_point<T>::value == true`
   - T such that `std::is_same<T, std::string>::value == true`
   - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
 - Field Names MUST **NOT** be SQL Keywords;
-- MyClass MUST be **Copy Constructible**;
 - `std::string` Value MUST **NOT** contain `\0` (SQLite3 Constraint);
 
 ## ORMapper
 
-### ORMapper\<MyClass\> (const std::string &dbName)
+### ORMapper (const string &connectionString)
 
-Construct a **O/R Mapper** in file `dbName`;
+Construct a **O/R Mapper** to connect to `connectionString`;
 
-All operations on `MyClass` will be mapped into `dbName`;
-
-### const std::string &ErrMsg () const
-
-Return the latest Error Message;
-
-### bool CreateTbl ([const Myclass &value])
+### void CreateTbl (const MyClass &entity)
 
 Create Table `MyClass` for class `MyClass`;
 
 Execute `CREATE TABLE MyClass (...);`
 
-Remarks:
-- Pass a value to Create Table
-  if `Myclass` has **NO** Default Constructor
-
-### bool DropTbl ()
+### void DropTbl (const MyClass &)
 
 Drop Table `MyClass` from the DB File;
 
 Execute `DROP TABLE MyClass;`
 
-### bool Insert (const MyClass &value)
+### void Insert (const MyClass &entity)
 
-Insert `value` into Table `MyClass`;
+Insert `entity` into Table `MyClass`;
 
 Execute `INSERT INTO MyClass VALUES (...);`
 
-### bool Insert (const T\<MyClass\> &values)
+### void InsertRange (const Container\<MyClass\> &entities)
 
-Insert `values` into Table `MyClass`;
+Insert `entities` into Table `MyClass`;
 
-`values` must **SUPPORT** `forward_iterator`;
+`entities` must **SUPPORT** `forward_iterator`;
     
 Execute `INSERT INTO MyClass VALUES (...), (...) ...;`
 
-### bool Update (const MyClass &value)
+### void Update (const MyClass &entity)
 
-Update Entry `value` in Table `MyClass`
-with the Same `KEY` with variable `value`;
+Update Entity in Table `MyClass` with the Same `KEY` with `entity`;
 
-Execute `UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
+Execute `UPDATE MyClass SET (...) WHERE` `KEY` `=` `entity.id` `;`
 
-### bool Update (const T\<MyClass\> &values)
+### void UpdateRange (const Container\<MyClass\> &entities)
     
-Update Entries with the Same `KEY` with `values`;
+Update Entries with the Same `KEY` with `entities`;
 
-`values` must **SUPPORT** `forward_iterator`;
+`entities` must **SUPPORT** `forward_iterator`;
 
-Execute Multiple `UPDATE MyClass SET (...) WHERE` `KEY` `=` `value.id` `;`
+Execute Multiple `UPDATE MyClass SET (...) WHERE` `KEY` `=` `entity.id` `;`
 
-### bool Delete (const MyClass &value)
+### void Delete (const MyClass &entity)
 
-Delete Entry `value` in Table `MyClass`
-with the Same `KEY` with variable `value`;
+Delete Entry in Table `MyClass` with the Same `KEY` with `entity`;
 
-Execute `DELETE FROM MyClass WHERE` `KEY` `=` `value.id` `;`
+Execute `DELETE FROM MyClass WHERE` `KEY` `=` `entity.id` `;`
 
-### ORQuery Query (MyClass &queryHelper)
+### ORQuery\<MyClass\> Query (const MyClass &queryHelper)
 
 Return new `ORQuery` object and Capturing `queryHelper`;
 
 Details in `## ORQuery` Section;
-
-### Note that
-
-Only a **bool returning** Function Succeeded,
-it would return `true`; otherwise, return `false`;
 
 ## ORQuery
 
@@ -132,51 +114,65 @@ Generate `WHERE (` `expr` `)`;
 
 Details in `## Expr` Section;
 
-### ORQuery &OrderBy (const T &property, bool isDecreasing = false)
+### ORQuery &OrderBy (const T &property)
 
-Generate `ORDER BY` `field name of (property)` or `ORDER BY` `field name of (property)` `DESC` (if isDecrease);
+Generate `ORDER BY` `field_name_of<property>`;
 
-Remarks:
-- If `property` is not a member of `queryHelper`,
-  throw `std::runtime_error`;
+If `property` is not a member of `queryHelper`,
+throw `std::runtime_error`;
 
-### ORQuery &Limit (size_t count, size_t offset = 0)
+### ORQuery &OrderByDescending (const T &property)
 
-Generate `LIMIT` `count` `OFFSET` `offset`;
+Generate `ORDER BY` `field_name_of<property>` `DESC`;
 
-### std::vector\<MyClass\> ToVector () / std::list\<MyClass\> ToList ()
+If `property` is not a member of `queryHelper`,
+throw `std::runtime_error`;
 
-Retrieve Select Result under **Constraints**;
+### ORQuery &Take (size_t count)
+
+Generate `LIMIT` `count`;
+
+### ORQuery &Skip (size_t count)
+
+Generate `OFFSET` `count`;
+
+### vector\<MyClass\> ToVector () / list\<MyClass\> ToList ()
+
+Retrieve Select Result under **_WHERE_ Constraints**;
 
 Execute `SELECT * FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
 
 Remarks:
-- Deserialize Value to `MyClass &queryHelper`;
-- Copy `queryHelper` to `vector` / `list`;
+- `MyClass` **MUST** be **Copy Constructible**;
+- Deserialize Value to a copy of `queryHelper`;
+- Copy the copy to `std::vector` / `std::list`;
 
-### long Count ()
-
-Return:
-- Return Count under **_WHERE_ Constraints**;
-- -1 if **Query Error**;
-
-Execute `SELECT COUNT (*) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
-
-### bool Delete ()
+### void Delete ()
 
 Delete Entries under **_WHERE_ Constraints**;
 
 Execute `DELETE FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
 
-Return:
-- `true` if Succeeded;
-- `false` otherwise;
+### unsigned long long Count ()
+
+Return the `Count` under **_WHERE_ Constraints**;
+
+Execute `SELECT COUNT (*) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
+
+### T Sum / Avg / Max / Min (const T &property)
+
+Return the `Sum / Average / Max / Min` under **_WHERE_ Constraints**;
     
+Execute `SELECT SUM/AVG/MAX/MIN (field_name_of<property>) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;`
+
+If `property` is not a member of `queryHelper`,
+throw `std::runtime_error`;
+
 ## Expr
 
-### Expr (const T &property, const std::string &relOp = "=", T value = property)
+### Expr (const T &property, const string &relOp = "=", T value = property)
 
-Generate `field name of (property)` `relOp` `value`;
+Generate `field_name_of<property>` `relOp` `value`;
 
 Remarks:
 - `Expr (property)` is short for `Expr (property, "=", property)`
@@ -187,7 +183,7 @@ Remarks:
 
 Generate `(` `left` `&& / ||` `right` `)`;
 
-### struct Field_Expr\<T\> (const T &property) (*Helper Struct of Expr*)
+### Expr_Field\<T\> (const T &property) (*Helper Struct of Expr*)
 
 #### Expr operator *OP* (T value)
 
@@ -202,6 +198,11 @@ Return `Expr { property, OP_STR, value }; }`;
 |  < |    "<"   |
 | <= |   "<="   |
 
-### Field_Expr<T> Field (T &property)
+### Expr_Field<T> Field (T &property)
 
-Return `Field_Expr<T> { property }`;
+Return `Expr_Field<T> { property }`;
+
+## Error Handling
+
+All Functions will throw `std::runtime_error`
+with the **Error Message** if Failed at Query;

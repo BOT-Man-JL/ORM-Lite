@@ -22,7 +22,7 @@
 
 #define ORMAP(_MY_CLASS_, ...)                            \
 private:                                                  \
-friend class BOT_ORM::ORMapper<_MY_CLASS_>;               \
+friend class BOT_ORM::ORMapper;                           \
 template <typename VISITOR, typename FN>                  \
 void __Accept (const VISITOR &visitor, FN fn)             \
 {                                                         \
@@ -186,212 +186,152 @@ namespace BOT_ORM_Impl
 
 namespace BOT_ORM
 {
-	struct Expr
-	{
-		std::vector<std::pair<const void *, std::string>> expr;
-
-		template <typename T>
-		Expr (const T &property,
-			  const std::string &relOp = "=")
-			: Expr (property, relOp, property)
-		{}
-
-		template <typename T>
-		Expr (const T &property,
-			  const std::string &relOp,
-			  const T &value)
-			: expr { std::make_pair (&property, relOp) }
-		{
-			std::ostringstream os;
-			BOT_ORM_Impl::SerializeValue (os, value);
-			expr.front ().second.append (os.str ());
-		}
-
-		template <typename T>
-		struct Field_Expr
-		{
-			const T& _property;
-			Field_Expr (const T &property)
-				: _property (property)
-			{}
-
-			inline Expr operator == (T value)
-			{ return Expr { _property, "=", std::move (value) }; }
-			inline Expr operator != (T value)
-			{ return Expr { _property, "!=", std::move (value) }; }
-
-			inline Expr operator > (T value)
-			{ return Expr { _property, ">", std::move (value) }; }
-			inline Expr operator >= (T value)
-			{ return Expr { _property, ">=", std::move (value) }; }
-
-			inline Expr operator < (T value)
-			{ return Expr { _property, "<", std::move (value) }; }
-			inline Expr operator <= (T value)
-			{ return Expr { _property, "<=", std::move (value) }; }
-		};
-
-		inline Expr operator && (const Expr &right)
-		{
-			return And_Or (right, " and ");
-		}
-
-		inline Expr operator || (const Expr &right)
-		{
-			return And_Or (right, " or ");
-		}
-
-	private:
-		Expr And_Or (const Expr &right, std::string logOp)
-		{
-			constexpr void *ptr = nullptr;
-
-			expr.emplace (
-				expr.begin (),
-				std::make_pair (ptr, std::string ("("))
-			);
-			expr.emplace_back (
-				std::make_pair (ptr, std::move (logOp))
-			);
-			for (const auto exprPair : right.expr)
-				expr.emplace_back (exprPair);
-			expr.emplace_back (
-				std::make_pair (ptr, std::string (")"))
-			);
-
-			return *this;
-		}
-	};
-
-	template <typename T>
-	Expr::Field_Expr<T> Field (T &property)
-	{
-		return Expr::Field_Expr<T> { property };
-	}
-
-	template <typename C>
 	class ORMapper
 	{
 	public:
-		ORMapper (const std::string &dbName)
-			: _dbName (dbName), _tblName (C::__ClassName)
-		{
-			static_assert (std::is_copy_constructible<C>::value,
-						   "It must be Copy Constructible");
-		}
+		ORMapper (const std::string &connectionString)
+			: _connector (connectionString)
+		{}
 
-		inline const std::string &ErrMsg () const
+		template <typename C>
+		void CreateTbl (const C &entity)
 		{
-			return _errMsg;
-		}
+			const auto &fieldNames = ORMapper::_FieldNames<C> ();
+			std::vector<std::string> strTypes (fieldNames.size ());
+			size_t index = 0;
 
-		// Enabled only if Default Constructible :-)
-		std::enable_if_t<std::is_default_constructible<C>::value, bool>
-			CreateTbl ()
-		{
-			C entity {};
-			return CreateTbl (entity);
-		}
-
-		bool CreateTbl (const C &entity)
-		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+							 [&strTypes, &index] (auto &val)
 			{
-				const auto &fieldNames = ORMapper<C>::_FieldNames ();
-				size_t index = 0;
-				std::vector<std::string> strTypes (fieldNames.size ());
-				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-								 [&strTypes, &index] (auto &val)
-				{
-					strTypes[index++] = BOT_ORM_Impl::TypeString (val);
-				});
-
-				auto strFmt = fieldNames[0] + " " + strTypes[0] +
-					" primary key,";
-				for (size_t i = 1; i < fieldNames.size (); i++)
-					strFmt += fieldNames[i] + " " + strTypes[i] + ",";
-				strFmt.pop_back ();
-
-				connector.Execute ("create table " + _tblName +
-								   "(" + strFmt + ");");
+				strTypes[index++] = BOT_ORM_Impl::TypeString (val);
 			});
+
+			auto strFmt = fieldNames[0] + " " + strTypes[0] +
+				" primary key,";
+			for (size_t i = 1; i < fieldNames.size (); i++)
+				strFmt += fieldNames[i] + " " + strTypes[i] + ",";
+			strFmt.pop_back ();
+
+			_connector.Execute ("create table " +
+							   std::string (C::__ClassName) +
+							   "(" + strFmt + ");");
 		}
 
-		bool DropTbl ()
+		template <typename C>
+		void DropTbl (const C &)
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			_connector.Execute ("drop table " +
+							   std::string (C::__ClassName) +
+							   ";");
+		}
+
+		template <typename C>
+		void Insert (const C &entity)
+		{
+			std::ostringstream os;
+			size_t index = 0;
+			auto fieldCount = ORMapper::_FieldNames<C> ().size ();
+
+			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+							 [&os, &index, fieldCount] (auto &val)
 			{
-				connector.Execute ("drop table " + _tblName + ";");
+				if (++index != fieldCount)
+					BOT_ORM_Impl::SerializeValue (os, val) << ',';
+				else
+					BOT_ORM_Impl::SerializeValue (os, val);
 			});
+
+			_connector.Execute ("insert into " +
+							   std::string (C::__ClassName) +
+							   " values (" + os.str () + ");");
 		}
 
-		bool Insert (const C &entity)
+		template <typename In>
+		void InsertRange (const In &entities)
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			using C = typename In::value_type;
+
+			std::ostringstream os;
+			size_t count = 0;
+			auto fieldCount = ORMapper::_FieldNames<C> ().size ();
+
+			for (const auto &entity : entities)
 			{
-				std::ostringstream os;
+				os << "(";
+
 				size_t index = 0;
 				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-								 [&os, &index] (auto &val)
+								 [&os, &index, fieldCount] (auto &val)
 				{
-					if (++index != ORMapper<C>::_FieldNames ().size ())
+					if (++index != fieldCount)
 						BOT_ORM_Impl::SerializeValue (os, val) << ',';
 					else
 						BOT_ORM_Impl::SerializeValue (os, val);
 				});
 
-				connector.Execute ("insert into " + _tblName +
-								   " values (" + os.str () + ");");
+				if (++count != entities.size ())
+					os << "),";
+				else
+					os << ")";
+			}
+
+			_connector.Execute ("insert into " +
+							   std::string (C::__ClassName) +
+							   " values " + os.str () + ";");
+		}
+
+		template <typename C>
+		void Update (const C &entity)
+		{
+			std::stringstream os, osKey;
+			size_t index = 0;
+			const auto &fieldNames = ORMapper::_FieldNames<C> ();
+
+			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+							 [&os, &osKey, &index, &fieldNames] (auto &val)
+			{
+				if (index == 0)
+				{
+					osKey << fieldNames[index++] << "=";
+					BOT_ORM_Impl::SerializeValue (osKey, val);
+				}
+				else
+				{
+					os << fieldNames[index++] << "=";
+					if (index != fieldNames.size ())
+						BOT_ORM_Impl::SerializeValue (os, val) << ',';
+					else
+						BOT_ORM_Impl::SerializeValue (os, val);
+				}
 			});
+
+			_connector.Execute ("update " +
+							   std::string (C::__ClassName) +
+							   " set " + os.str () +
+							   " where " + osKey.str () + ";");
 		}
 
 		template <typename In>
-		bool Insert (const In &entities)
+		void UpdateRange (const In &entities)
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			using C = typename In::value_type;
+
+			std::stringstream os;
+			const auto &fieldNames = ORMapper::_FieldNames<C> ();
+
+			os << "begin transaction;";
+			for (const auto &entity : entities)
 			{
-				std::ostringstream os;
-				size_t count = 0;
-				for (const auto &entity : entities)
-				{
-					os << "(";
-
-					size_t index = 0;
-					entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-									 [&os, &index] (auto &val)
-					{
-						if (++index != ORMapper<C>::_FieldNames ().size ())
-							BOT_ORM_Impl::SerializeValue (os, val) << ',';
-						else
-							BOT_ORM_Impl::SerializeValue (os, val);
-					});
-
-					if (++count != entities.size ())
-						os << "),";
-					else
-						os << ")";
-				}
-
-				connector.Execute ("insert into " + _tblName +
-								   " values " + os.str () + ";");
-			});
-		}
-
-		bool Update (const C &entity)
-		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
-			{
-				const auto &fieldNames = ORMapper<C>::_FieldNames ();
+				os << "update "
+					<< C::__ClassName
+					<< " set ";
 
 				size_t index = 0;
-				std::stringstream os, osKey;
-				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-								 [&os, &osKey, &index, &fieldNames] (auto &val)
+				std::stringstream osKey;
+
+				entity.__Accept (
+					BOT_ORM_Impl::FnVisitor (),
+					[&os, &osKey, &index, &fieldNames] (auto &val)
 				{
 					if (index == 0)
 					{
@@ -408,87 +348,122 @@ namespace BOT_ORM
 					}
 				});
 
-				connector.Execute ("update " + _tblName +
-								   " set " + os.str () +
-								   " where " + osKey.str () + ";");
-			});
+				os << " where " + osKey.str () + ";";
+			}
+			os << "commit transaction;";
+			_connector.Execute (os.str ());
 		}
 
-		template <typename In>
-		bool Update (const In &entities)
+		template <typename C>
+		void Delete (const C &entity)
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			std::stringstream os;
+			size_t index = 0;
+
+			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
+							 [&os, &index] (auto &val)
 			{
-				const auto &fieldNames = ORMapper<C>::_FieldNames ();
-
-				std::stringstream os;
-				os << "begin transaction;";
-				for (const auto &entity : entities)
+				// Only Set Key
+				if (index == 0)
 				{
-					os << "update " << _tblName << " set ";
-
-					size_t index = 0;
-					std::stringstream osKey;
-					entity.__Accept (
-						BOT_ORM_Impl::FnVisitor (),
-						[&os, &osKey, &index, &fieldNames] (auto &val)
-					{
-						if (index == 0)
-						{
-							osKey << fieldNames[index++] << "=";
-							BOT_ORM_Impl::SerializeValue (osKey, val);
-						}
-						else
-						{
-							os << fieldNames[index++] << "=";
-							if (index != fieldNames.size ())
-								BOT_ORM_Impl::SerializeValue (os, val) << ',';
-							else
-								BOT_ORM_Impl::SerializeValue (os, val);
-						}
-					});
-
-					os << " where " + osKey.str () + ";";
+					os << ORMapper::_FieldNames<C> ()[0] << "=";
+					BOT_ORM_Impl::SerializeValue (os, val);
+					index++;
 				}
-				os << "commit transaction;";
-				connector.Execute (os.str ());
 			});
+
+			_connector.Execute ("delete from " +
+							   std::string (C::__ClassName) +
+							   " where " + os.str () + ";");
 		}
 
-		bool Delete (const C &entity)
+		struct Expr
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			std::vector<std::pair<const void *, std::string>> expr;
+
+			template <typename T>
+			Expr (const T &property,
+				  const std::string &relOp = "=")
+				: Expr (property, relOp, property)
+			{}
+
+			template <typename T>
+			Expr (const T &property,
+				  const std::string &relOp,
+				  const T &value)
+				: expr { std::make_pair (&property, relOp) }
 			{
-				std::stringstream os;
-				size_t index = 0;
-				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-								 [&os, &index] (auto &val)
-				{
-					// Only Set Key
-					if (index == 0)
-					{
-						os << ORMapper<C>::_FieldNames ()[0] << "=";
-						BOT_ORM_Impl::SerializeValue (os, val);
-						index++;
-					}
-				});
+				std::ostringstream os;
+				BOT_ORM_Impl::SerializeValue (os, value);
+				expr.front ().second.append (os.str ());
+			}
 
-				connector.Execute ("delete from " + _tblName +
-								   " where " + os.str () + ";");
-			});
-		}
+			template <typename T>
+			struct Expr_Field
+			{
+				const T& _property;
+				Expr_Field (const T &property)
+					: _property (property)
+				{}
 
+				inline Expr operator == (T value)
+				{ return Expr { _property, "=", std::move (value) }; }
+				inline Expr operator != (T value)
+				{ return Expr { _property, "!=", std::move (value) }; }
+
+				inline Expr operator > (T value)
+				{ return Expr { _property, ">", std::move (value) }; }
+				inline Expr operator >= (T value)
+				{ return Expr { _property, ">=", std::move (value) }; }
+
+				inline Expr operator < (T value)
+				{ return Expr { _property, "<", std::move (value) }; }
+				inline Expr operator <= (T value)
+				{ return Expr { _property, "<=", std::move (value) }; }
+			};
+
+			inline Expr operator && (const Expr &right)
+			{
+				return And_Or (right, " and ");
+			}
+
+			inline Expr operator || (const Expr &right)
+			{
+				return And_Or (right, " or ");
+			}
+
+		private:
+			Expr And_Or (const Expr &right, std::string logOp)
+			{
+				constexpr void *ptr = nullptr;
+
+				expr.emplace (
+					expr.begin (),
+					std::make_pair (ptr, std::string ("("))
+				);
+				expr.emplace_back (
+					std::make_pair (ptr, std::move (logOp))
+				);
+				for (const auto exprPair : right.expr)
+					expr.emplace_back (exprPair);
+				expr.emplace_back (
+					std::make_pair (ptr, std::string (")"))
+				);
+
+				return *this;
+			}
+		};
+
+		template <typename C>
 		class ORQuery
 		{
 		public:
-			ORQuery (C &queryHelper, ORMapper<C> *pMapper)
+			ORQuery (const C &queryHelper, ORMapper *pMapper)
 				: _queryHelper (queryHelper), _pMapper (pMapper)
 			{}
 
 			// Where
-			ORQuery &Where (const Expr &expr)
+			inline ORQuery &Where (const Expr &expr)
 			{
 				for (const auto exprStr : expr.expr)
 				{
@@ -501,26 +476,43 @@ namespace BOT_ORM
 
 			// Order By
 			template <typename T>
-			ORQuery &OrderBy (const T &property,
-							  bool isDecreasing = false)
+			inline ORQuery &OrderBy (const T &property)
 			{
-				_sqlOrderBy = " order by " + _GetFieldName (&property);
-				if (isDecreasing)
-					_sqlOrderBy += " desc";
+				_sqlOrderBy =
+					" order by " +
+					_GetFieldName (&property);
 				return *this;
 			}
 
-			// Limit
-			ORQuery &Limit (size_t count, size_t offset = 0)
+			template <typename T>
+			inline ORQuery &OrderByDescending (const T &property)
 			{
-				_sqlLimit = " limit " + std::to_string (count) +
-					" offset " + std::to_string (offset);
+				_sqlOrderBy =
+					" order by " +
+					_GetFieldName (&property) +
+					" desc";
+				return *this;
+			}
+
+			// Limit and Offset
+			inline ORQuery &Take (size_t count)
+			{
+				_sqlLimit = " limit " + std::to_string (count);
+				return *this;
+			}
+
+			inline ORQuery &Skip (size_t count)
+			{
+				_sqlOffset = " offset " + std::to_string (count);
 				return *this;
 			}
 
 			// Retrieve Select Result
 			std::vector<C> ToVector ()
 			{
+				static_assert (std::is_copy_constructible<C>::value,
+							   "It must be Copy Constructible");
+
 				std::vector<C> ret;
 				_pMapper->_Select (_queryHelper, ret, _GetSQL ());
 				return std::move (ret);
@@ -528,28 +520,86 @@ namespace BOT_ORM
 
 			std::list<C> ToList ()
 			{
+				static_assert (std::is_copy_constructible<C>::value,
+							   "It must be Copy Constructible");
+
 				std::list<C> ret;
 				_pMapper->_Select (_queryHelper, ret, _GetSQL ());
 				return std::move (ret);
 			}
 
-			// Count Result
-			inline long Count ()
+			// Delete Values
+			inline void Delete ()
 			{
-				return _pMapper->_Count (_GetSQL ());
+				_pMapper->_Delete (_queryHelper, _GetSQL ());
 			}
 
-			// Delete Values
-			inline bool Delete ()
+			// Aggregate
+			inline size_t Count ()
 			{
-				return _pMapper->_Delete (_GetSQL ());
+				return (size_t) std::stoull (
+					_pMapper->_Aggregate (_queryHelper, "count",
+										  "*", _GetSQL ())
+				);
+			}
+
+			template <typename T>
+			T Sum (const T &property)
+			{
+				T ret;
+				BOT_ORM_Impl::DeserializeValue (
+					ret,
+					_pMapper->_Aggregate (_queryHelper, "sum",
+										  _GetFieldName (&property),
+										  _GetSQL ())
+				);
+				return ret;
+			}
+
+			template <typename T>
+			T Avg (const T &property)
+			{
+				T ret;
+				BOT_ORM_Impl::DeserializeValue (
+					ret,
+					_pMapper->_Aggregate (_queryHelper, "avg",
+										  _GetFieldName (&property),
+										  _GetSQL ())
+				);
+				return ret;
+			}
+
+			template <typename T>
+			T Max (const T &property)
+			{
+				T ret;
+				BOT_ORM_Impl::DeserializeValue (
+					ret,
+					_pMapper->_Aggregate (_queryHelper, "max",
+										  _GetFieldName (&property),
+										  _GetSQL ())
+				);
+				return ret;
+			}
+
+			template <typename T>
+			T Min (const T &property)
+			{
+				T ret;
+				BOT_ORM_Impl::DeserializeValue (
+					ret,
+					_pMapper->_Aggregate (_queryHelper, "min",
+										  _GetFieldName (&property),
+										  _GetSQL ())
+				);
+				return ret;
 			}
 
 		protected:
-			C &_queryHelper;
-			ORMapper<C> *_pMapper;
+			const C &_queryHelper;
+			ORMapper *_pMapper;
 			std::string _sqlWhere;
-			std::string _sqlOrderBy, _sqlLimit;
+			std::string _sqlOrderBy, _sqlLimit, _sqlOffset;
 
 			std::string _GetFieldName (const void *property)
 			{
@@ -567,98 +617,82 @@ namespace BOT_ORM
 
 				if (!isFound)
 					throw std::runtime_error ("No such Field in the Table");
-				return _pMapper->ORMapper<C>::_FieldNames ()[index];
+				return _pMapper->ORMapper::_FieldNames<C> ()[index];
 			}
 
 			std::string _GetSQL () const
 			{
 				if (!_sqlWhere.empty ())
 					return " where (" + _sqlWhere + ")" +
-					_sqlOrderBy + _sqlLimit;
+					_sqlOrderBy + _sqlLimit + _sqlOffset;
 				else
-					return _sqlOrderBy + _sqlLimit;
+					return _sqlOrderBy + _sqlLimit + _sqlOffset;
 			}
 		};
 
-		ORQuery Query (C &queryHelper)
+		template <typename C>
+		ORQuery<C> Query (const C &queryHelper)
 		{
-			return ORQuery (queryHelper, this);
+			return ORQuery<C> (queryHelper, this);
 		}
 
 	private:
-		const std::string _dbName, _tblName;
-		std::string _errMsg;
+		BOT_ORM_Impl::SQLConnector _connector;
 
-		bool _HandleException (std::function <void (
-			BOT_ORM_Impl::SQLConnector &)> fn)
-		{
-			try
-			{
-				BOT_ORM_Impl::SQLConnector connector (_dbName);
-				fn (connector);
-				return true;
-			}
-			catch (const std::exception &ex)
-			{
-				_errMsg = ex.what ();
-				return false;
-			}
-		}
-
-		template <typename Out>
-		bool _Select (C &queryHelper, Out &out,
+		template <typename C, typename Out>
+		void _Select (C copyable, Out &out,
 					  const std::string &sqlStr = "")
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			auto fieldCount = ORMapper::_FieldNames<C> ().size ();
+
+			_connector.Execute ("select * from " +
+							   std::string (C::__ClassName) +
+							   " " + sqlStr + ";",
+							   [&] (int argc, char **argv, char **)
 			{
-				connector.Execute ("select * from " + _tblName +
-								   " " + sqlStr + ";",
-								   [&] (int argc, char **argv, char **)
+				if (argc != fieldCount)
+					throw std::runtime_error (
+						"Inter ORM Error: Select argc != Field Count");
+
+				size_t index = 0;
+				copyable.__Accept (
+					BOT_ORM_Impl::FnVisitor (),
+					[&argv, &index] (auto &val)
 				{
-					if (argc != ORMapper<C>::_FieldNames ().size ())
-						throw std::runtime_error (
-							"Inter ORM Error: Select argc != Field Count");
-
-					size_t index = 0;
-					queryHelper.__Accept (
-						BOT_ORM_Impl::FnVisitor (),
-						[&argv, &index] (auto &val)
-					{
-						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
-					});
-					out.push_back (queryHelper);
+					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 				});
+				out.push_back (copyable);
 			});
 		}
 
-		long _Count (const std::string &sqlStr = "")
+		template <typename C>
+		std::string _Aggregate (const C &queryHelper,
+								const std::string& func,
+								const std::string& field,
+								const std::string &sqlStr = "")
 		{
-			long ret = 0;
-			auto isOk = _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
+			std::string ret;
+
+			_connector.Execute ("select " + func +
+							   " (" + field + ") as agg from " +
+							   std::string (C::__ClassName) + " " + sqlStr,
+							   [&] (int, char **argv, char **)
 			{
-				connector.Execute ("select count (*) as num from " +
-								   _tblName + " " + sqlStr,
-								   [&] (int, char **argv, char **)
-				{
-					ret = std::stol (argv[0]);
-				});
+				ret = argv[0];
 			});
-			if (isOk) return ret;
-			else return -1;
+			return ret;
 		}
 
-		bool _Delete (const std::string &sqlStr)
+		template <typename C>
+		void _Delete (const C &queryHelper,
+					  const std::string &sqlStr)
 		{
-			return _HandleException ([&] (
-				BOT_ORM_Impl::SQLConnector &connector)
-			{
-				connector.Execute ("delete from " + _tblName +
-								   " " + sqlStr + ";");
-			});
+			_connector.Execute ("delete from " +
+							   std::string (C::__ClassName) +
+							   " " + sqlStr + ";");
 		}
 
+		template <typename C>
 		static const std::vector<std::string> &_FieldNames ()
 		{
 			auto _ExtractFieldName = [] ()
@@ -677,9 +711,8 @@ namespace BOT_ORM
 						tmpStr.clear ();
 						break;
 
-					case '_':
 					default:
-						if (isalnum (ch) || isalpha (ch))
+						if (isalnum (ch) || ch == '_')
 							tmpStr += ch;
 						break;
 					}
@@ -692,6 +725,12 @@ namespace BOT_ORM
 			return _fieldNames;
 		}
 	};
+
+	template <typename T>
+	ORMapper::Expr::Expr_Field<T> Field (T &property)
+	{
+		return ORMapper::Expr::Expr_Field<T> { property };
+	}
 }
 
 #endif // !BOT_ORM_H

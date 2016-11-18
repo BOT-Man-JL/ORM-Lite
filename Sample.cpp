@@ -9,8 +9,6 @@
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
 
-/* #0 Basic Usage */
-
 struct MyClass
 {
 	int id;
@@ -23,22 +21,20 @@ struct MyClass
 
 int main ()
 {
+	// Open a Connection with *test.db*
+	ORMapper mapper ("test.db");
+
+	// Create a table for "MyClass"
+	mapper.CreateTbl (MyClass {});
+
 	/* #1 Basic Usage */
+
 	std::vector<MyClass> initObjs =
 	{
 		{ 0, 0.2, "John" },
 		{ 1, 0.4, "Jack" },
 		{ 2, 0.6, "Jess" }
 	};
-
-	// Define a Query Helper Object
-	MyClass helper;
-
-	// Open a Connection with *test.db*
-	ORMapper<MyClass> mapper ("test.db");
-
-	// Create a table for "MyClass"
-	mapper.CreateTbl ();
 
 	// Insert Values into the table
 	for (const auto obj : initObjs)
@@ -52,14 +48,19 @@ int main ()
 	mapper.Delete (initObjs[2]);
 
 	// Select All to Vector
-	auto query0 = mapper.Query (helper).ToVector ();
-	// query0 = [{ 0, 0.2, "John"},
+	auto result1 = mapper.Query (MyClass {}).ToVector ();
+	// result1 = [{ 0, 0.2, "John"},
 	//           { 1, 1.0, "Jack"}]
 
-	// If 'Insert' Failed, Print the latest Error Message
-	if (!mapper.Insert (MyClass { 1, 0, "Joke" }))
-		auto err = mapper.ErrMsg ();
-	// err = "SQL error: UNIQUE constraint failed: MyClass.id"
+	// If Failed, throw an exception
+	try
+	{
+		mapper.Insert (MyClass { 1, 0, "Joke" });
+	}
+	catch (const std::exception &ex)
+	{
+		// "SQL error: UNIQUE constraint failed: MyClass.id"
+	}
 
 	/* #2 Batch Operations */
 
@@ -68,23 +69,27 @@ int main ()
 	std::vector<MyClass> dataToSeed;
 	for (int i = 50; i < 100; i++)
 		dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
-	mapper.Insert (dataToSeed);
+	mapper.InsertRange (dataToSeed);
 
 	// Update by Batch Update
 	for (size_t i = 0; i < 50; i++)
 		dataToSeed[i].score += 1;
-	mapper.Update (dataToSeed);
+	mapper.UpdateRange (dataToSeed);
 
 	/* #3 Composite Query */
 
+	// Define a Query Helper Object
+	MyClass helper;
+
 	// Select by Query :-)
-	auto query1 = mapper.Query (helper)    // Link 'helper' to its fields
+	auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
 		.Where (
 			Field (helper.name) == "July" &&
 			(Field (helper.id) <= 90 && Field (helper.id) >= 60)
 		)
-		.OrderBy (helper.id, true)
-		.Limit (3, 10)
+		.OrderByDescending (helper.id)
+		.Take (3)
+		.Skip (10)
 		.ToVector ();
 
 	// Remarks:
@@ -92,17 +97,22 @@ int main ()
 	//       WHERE (name='July' and (id<=90 and id>=60))
 	//       ORDER BY id DESC
 	//       LIMIT 3 OFFSET 10
-	// query1 =
+	// result2 =
 	// [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
-	// Count by Query :-)
-	auto count = mapper.Query (helper)    // Link 'helper' to its fields
-		.Where (Field (helper.name) == "July")
-		.Count ();
+	// Aggregate Function by Query :-)
+	auto query = mapper.Query (helper)     // Link 'helper' to its fields
+		.Where (Field (helper.name) == "July");
+
+	// Reuse Query Object with the same Condition
+	auto count = query.Count ();
+	auto avg = query.Avg (helper.score);
 
 	// Remarks:
-	// sql = SELECT COUNT (*) AS NUM FROM MyClass WHERE (name='July')
+	// sql = SELECT COUNT (*) AS AGG FROM MyClass WHERE (name='July')
 	// count = 50
+	// sql = SELECT AVG (score) AS AGG FROM MyClass WHERE (name='July')
+	// avg = 15.9
 
 	// Delete by Query :-)
 	mapper.Query (helper)                  // Link 'helper' to its fields
@@ -112,8 +122,10 @@ int main ()
 	// Remarks:
 	// sql = DELETE FROM MyClass WHERE (name='July')
 
+	// ==========
+
 	// Drop the table "MyClass"
-	mapper.DropTbl ();
+	mapper.DropTbl (MyClass {});
 
 	// Output to Console
 	auto printVec = [] (const std::vector<MyClass> vec)
@@ -123,9 +135,10 @@ int main ()
 			<< "\t" << item.name << std::endl;
 		std::cout << std::endl;
 	};
-	printVec (query0);
-	printVec (query1);
+	printVec (result1);
+	printVec (result2);
 	std::cout << count << std::endl;
+	std::cout << avg << std::endl;
 
 	std::cin.get ();
 	return 0;

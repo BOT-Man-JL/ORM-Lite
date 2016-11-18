@@ -1,4 +1,4 @@
-# ORM Lite
+﻿# ORM Lite
 
 **ORM Lite** is a C++ [_**Object Relation Mapping** (ORM)_](https://en.wikipedia.org/wiki/Object-relational_mapping) for **SQLite3**,
 written in Modern C++ style.
@@ -19,7 +19,7 @@ written in Modern C++ style.
 Before we start,
 Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
 
-``` C++
+``` cpp
 #include "ORMLite.h"
 using namespace BOT_ORM;
 
@@ -42,17 +42,17 @@ In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 
 _(Note that: **No Semicolon ';'** after the **ORMAP**)_ :wink:
 
-### Create or Drop a Table for this Class
+### Create or Drop a Table for the Class
 
-``` C++
+``` cpp
 // Open a Connection with *test.db*
-ORMapper<MyClass> mapper ("test.db");
+ORMapper mapper ("test.db");
 
 // Create a table for "MyClass"
-mapper.CreateTbl ();
+mapper.CreateTbl (MyClass {});
 
 // Drop the table "MyClass"
-mapper.DropTbl ();
+mapper.DropTbl (MyClass {});
 ```
 
 | id| score| name|
@@ -60,23 +60,17 @@ mapper.DropTbl ();
 |  1|   0.2| John|
 |...|   ...|  ...|
 
-### Working on *db* with *ORMapper*
+### Working on *Database* with *ORMapper*
 
 #### Basic Usage
 
-``` C++
+``` cpp
 std::vector<MyClass> initObjs =
 {
     { 0, 0.2, "John" },
     { 1, 0.4, "Jack" },
     { 2, 0.6, "Jess" }
 };
-
-// Define a Query Helper Object
-MyClass helper;
-
-// Open a Connection with *test.db*
-ORMapper<MyClass> mapper ("test.db");
 
 // Insert Values into the table
 for (const auto obj : initObjs)
@@ -90,44 +84,52 @@ mapper.Update (initObjs[1]);
 mapper.Delete (initObjs[2]);
 
 // Select All to Vector
-auto query0 = mapper.Query (helper).ToVector ();
-// query0 = [{ 0, 0.2, "John"},
+auto result1 = mapper.Query (MyClass {}).ToVector ();
+// result1 = [{ 0, 0.2, "John"},
 //           { 1, 1.0, "Jack"}]
 
-// If 'Insert' Failed, Print the latest Error Message
-if (!mapper.Insert (MyClass { 1, 0, "Joke" }))
-    auto err = mapper.ErrMsg ();
-// err = "SQL error: UNIQUE constraint failed: MyClass.id"
+// If Failed, throw an exception
+try
+{
+    mapper.Insert (MyClass { 1, 0, "Joke" });
+}
+catch (const std::exception &ex)
+{
+    // "SQL error: UNIQUE constraint failed: MyClass.id"
+}
 ```
 
 #### Batch Operations
 
-``` C++
+``` cpp
 // Insert by Batch Insert
 // Performance is much Better than Separated Insert :-)
 std::vector<MyClass> dataToSeed;
 for (int i = 50; i < 100; i++)
     dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
-mapper.Insert (dataToSeed);
+mapper.InsertRange (dataToSeed);
 
 // Update by Batch Update
-// Performance is little Better than Separated Update :-(
 for (size_t i = 0; i < 50; i++)
     dataToSeed[i].score += 1;
-mapper.Update (dataToSeed);
+mapper.UpdateRange (dataToSeed);
 ```
 
 #### Composite Query
 
-``` C++
+``` cpp
+// Define a Query Helper Object
+MyClass helper;
+
 // Select by Query :-)
-auto query1 = mapper.Query (helper)    // Link 'helper' to its fields
+auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
     .Where (
         Field (helper.name) == "July" &&
         (Field (helper.id) <= 90 && Field (helper.id) >= 60)
     )
-    .OrderBy (helper.id, true)
-    .Limit (3, 10)
+    .OrderByDescending (helper.id)
+    .Take (3)
+    .Skip (10)
     .ToVector ();
 
 // Remarks:
@@ -135,17 +137,22 @@ auto query1 = mapper.Query (helper)    // Link 'helper' to its fields
 //       WHERE (name='July' and (id<=90 and id>=60))
 //       ORDER BY id DESC
 //       LIMIT 3 OFFSET 10
-// query1 =
+// result2 =
 // [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
-// Count by Query :-)
-auto count = mapper.Query (helper)    // Link 'helper' to its fields
-    .Where (Field (helper.name) == "July")
-    .Count ();
+// Aggregate Function by Query :-)
+auto query = mapper.Query (helper)     // Link 'helper' to its fields
+    .Where (Field (helper.name) == "July");
+
+// Reuse Query Object with the same Condition
+auto count = query.Count ();
+auto avg = query.Avg (helper.score);
 
 // Remarks:
-// sql = SELECT COUNT (*) AS NUM FROM MyClass WHERE (name='July')
+// sql = SELECT COUNT (*) AS AGG FROM MyClass WHERE (name='July')
 // count = 50
+// sql = SELECT AVG (score) AS AGG FROM MyClass WHERE (name='July')
+// avg = 15.9
 
 // Delete by Query :-)
 mapper.Query (helper)                  // Link 'helper' to its fields
@@ -161,4 +168,7 @@ mapper.Query (helper)                  // Link 'helper' to its fields
 - Using **Visitor Pattern** to Traverse the Entity;
 - Using **Macro** `#define (...)` to Generate Codes;
 - Using `std::stringstream` to **(De)serialization** data;
-- Using **Self-Refrence** to Implement *Fluent Interface*
+- Using **Self Refrence** to Implement *Fluent Interface*
+
+Details of the Design in **Chinese** are posted on my
+[Blog](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Naive-Cpp-ORM) 😉
