@@ -306,6 +306,9 @@ namespace BOT_ORM
 			size_t index = 0;
 			const auto &fieldNames = ORMapper::_FieldNames<C> ();
 
+			os << "set ";
+			osKey << "where ";
+
 			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
 							 [&os, &osKey, &index, &fieldNames] (auto &val)
 			{
@@ -325,10 +328,7 @@ namespace BOT_ORM
 				return true;
 			});
 
-			_connector.Execute ("update " +
-								std::string (C::__ClassName) +
-								" set " + os.str () +
-								" where " + osKey.str () + ";");
+			_Update (entity, os.str (), osKey.str ());
 		}
 
 		template <typename In>
@@ -376,6 +376,7 @@ namespace BOT_ORM
 		void Delete (const C &entity)
 		{
 			std::stringstream os;
+			os << "where ";
 
 			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
 							 [&os] (auto &val)
@@ -385,9 +386,7 @@ namespace BOT_ORM
 				return false;
 			});
 
-			_connector.Execute ("delete from " +
-								std::string (C::__ClassName) +
-								" where " + os.str () + ";");
+			_Delete (entity, os.str ());
 		}
 
 		struct Expr
@@ -625,7 +624,7 @@ namespace BOT_ORM
 		protected:
 			const C &_queryHelper;
 			ORMapper *_pMapper;
-			
+
 			std::string _sqlWhere;
 			std::string _sqlOrderBy;
 			std::string _sqlLimit, _sqlOffset;
@@ -736,9 +735,9 @@ namespace BOT_ORM
 								" (" + field + ") as agg from " +
 								std::string (C::__ClassName) +
 								" " + sqlCond + ";",
-								[&] (int, char **argv, char **)
+								[&] (int argc, char **argv, char **)
 			{
-				ret = argv[0];
+				if (argv[0]) ret = argv[0];
 			});
 
 			if (ret.empty ())
