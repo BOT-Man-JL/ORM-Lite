@@ -172,14 +172,14 @@ namespace BOT_ORM_Impl
 		template <typename Fn, typename T, typename... Args>
 		inline void _Visit (Fn fn, T &property, Args & ... args) const
 		{
-			_Visit (fn, property);
-			_Visit (fn, args...);
+			if (_Visit (fn, property))
+				_Visit (fn, args...);
 		}
 
 		template <typename Fn, typename T>
-		inline void _Visit (Fn fn, T &property) const
+		inline bool _Visit (Fn fn, T &property) const
 		{
-			fn (property);
+			return fn (property);
 		}
 	};
 }
@@ -193,6 +193,22 @@ namespace BOT_ORM
 			: _connector (connectionString)
 		{}
 
+		template <typename Fn>
+		void Transaction (Fn fn)
+		{
+			try
+			{
+				_connector.Execute ("begin transaction;");
+				fn ();
+				_connector.Execute ("commit transaction;");
+			}
+			catch (...)
+			{
+				_connector.Execute ("rollback transaction;");
+				throw;
+			}
+		}
+
 		template <typename C>
 		void CreateTbl (const C &entity)
 		{
@@ -204,6 +220,7 @@ namespace BOT_ORM
 							 [&strTypes, &index] (auto &val)
 			{
 				strTypes[index++] = BOT_ORM_Impl::TypeString (val);
+				return true;
 			});
 
 			auto strFmt = fieldNames[0] + " " + strTypes[0] +
@@ -213,16 +230,16 @@ namespace BOT_ORM
 			strFmt.pop_back ();
 
 			_connector.Execute ("create table " +
-							   std::string (C::__ClassName) +
-							   "(" + strFmt + ");");
+								std::string (C::__ClassName) +
+								"(" + strFmt + ");");
 		}
 
 		template <typename C>
 		void DropTbl (const C &)
 		{
 			_connector.Execute ("drop table " +
-							   std::string (C::__ClassName) +
-							   ";");
+								std::string (C::__ClassName) +
+								";");
 		}
 
 		template <typename C>
@@ -239,11 +256,12 @@ namespace BOT_ORM
 					BOT_ORM_Impl::SerializeValue (os, val) << ',';
 				else
 					BOT_ORM_Impl::SerializeValue (os, val);
+				return true;
 			});
 
 			_connector.Execute ("insert into " +
-							   std::string (C::__ClassName) +
-							   " values (" + os.str () + ");");
+								std::string (C::__ClassName) +
+								" values (" + os.str () + ");");
 		}
 
 		template <typename In>
@@ -267,6 +285,7 @@ namespace BOT_ORM
 						BOT_ORM_Impl::SerializeValue (os, val) << ',';
 					else
 						BOT_ORM_Impl::SerializeValue (os, val);
+					return true;
 				});
 
 				if (++count != entities.size ())
@@ -276,8 +295,8 @@ namespace BOT_ORM
 			}
 
 			_connector.Execute ("insert into " +
-							   std::string (C::__ClassName) +
-							   " values " + os.str () + ";");
+								std::string (C::__ClassName) +
+								" values " + os.str () + ";");
 		}
 
 		template <typename C>
@@ -303,12 +322,13 @@ namespace BOT_ORM
 					else
 						BOT_ORM_Impl::SerializeValue (os, val);
 				}
+				return true;
 			});
 
 			_connector.Execute ("update " +
-							   std::string (C::__ClassName) +
-							   " set " + os.str () +
-							   " where " + osKey.str () + ";");
+								std::string (C::__ClassName) +
+								" set " + os.str () +
+								" where " + osKey.str () + ";");
 		}
 
 		template <typename In>
@@ -319,7 +339,6 @@ namespace BOT_ORM
 			std::stringstream os;
 			const auto &fieldNames = ORMapper::_FieldNames<C> ();
 
-			os << "begin transaction;";
 			for (const auto &entity : entities)
 			{
 				os << "update "
@@ -346,11 +365,10 @@ namespace BOT_ORM
 						else
 							BOT_ORM_Impl::SerializeValue (os, val);
 					}
+					return true;
 				});
-
 				os << " where " + osKey.str () + ";";
 			}
-			os << "commit transaction;";
 			_connector.Execute (os.str ());
 		}
 
@@ -358,23 +376,18 @@ namespace BOT_ORM
 		void Delete (const C &entity)
 		{
 			std::stringstream os;
-			size_t index = 0;
 
 			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-							 [&os, &index] (auto &val)
+							 [&os] (auto &val)
 			{
-				// Only Set Key
-				if (index == 0)
-				{
-					os << ORMapper::_FieldNames<C> ()[0] << "=";
-					BOT_ORM_Impl::SerializeValue (os, val);
-					index++;
-				}
+				os << ORMapper::_FieldNames<C> ()[0] << "=";
+				BOT_ORM_Impl::SerializeValue (os, val);
+				return false;
 			});
 
 			_connector.Execute ("delete from " +
-							   std::string (C::__ClassName) +
-							   " where " + os.str () + ";");
+								std::string (C::__ClassName) +
+								" where " + os.str () + ";");
 		}
 
 		struct Expr
@@ -603,21 +616,23 @@ namespace BOT_ORM
 
 			std::string _GetFieldName (const void *property)
 			{
-				bool isFound = false;
 				size_t index = 0;
-				_queryHelper.__Accept (
-					BOT_ORM_Impl::FnVisitor (),
-					[&property, &isFound, &index] (auto &val)
+
+				_queryHelper.__Accept (BOT_ORM_Impl::FnVisitor (),
+									   [&property, &index] (auto &val)
 				{
-					if (!isFound && property == &val)
-						isFound = true;
-					else if (!isFound)
-						index++;
+					if (property == &val)
+						return false;
+
+					index++;
+					return true;
 				});
 
-				if (!isFound)
+				const auto &fieldNames =
+					_pMapper->ORMapper::_FieldNames<C> ();
+				if (index == fieldNames.size ())
 					throw std::runtime_error ("No such Field in the Table");
-				return _pMapper->ORMapper::_FieldNames<C> ()[index];
+				return fieldNames[index];
 			}
 
 			std::string _GetSQL () const
@@ -646,9 +661,9 @@ namespace BOT_ORM
 			auto fieldCount = ORMapper::_FieldNames<C> ().size ();
 
 			_connector.Execute ("select * from " +
-							   std::string (C::__ClassName) +
-							   " " + sqlStr + ";",
-							   [&] (int argc, char **argv, char **)
+								std::string (C::__ClassName) +
+								" " + sqlStr + ";",
+								[&] (int argc, char **argv, char **)
 			{
 				if (argc != fieldCount)
 					throw std::runtime_error (
@@ -660,6 +675,7 @@ namespace BOT_ORM
 					[&argv, &index] (auto &val)
 				{
 					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
+					return true;
 				});
 				out.push_back (copyable);
 			});
@@ -674,9 +690,9 @@ namespace BOT_ORM
 			std::string ret;
 
 			_connector.Execute ("select " + func +
-							   " (" + field + ") as agg from " +
-							   std::string (C::__ClassName) + " " + sqlStr,
-							   [&] (int, char **argv, char **)
+								" (" + field + ") as agg from " +
+								std::string (C::__ClassName) + " " + sqlStr,
+								[&] (int, char **argv, char **)
 			{
 				ret = argv[0];
 			});
@@ -688,8 +704,8 @@ namespace BOT_ORM
 					  const std::string &sqlStr)
 		{
 			_connector.Execute ("delete from " +
-							   std::string (C::__ClassName) +
-							   " " + sqlStr + ";");
+								std::string (C::__ClassName) +
+								" " + sqlStr + ";");
 		}
 
 		template <typename C>

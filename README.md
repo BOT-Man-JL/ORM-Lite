@@ -83,20 +83,28 @@ mapper.Update (initObjs[1]);
 // Delete Entry by KEY (id)
 mapper.Delete (initObjs[2]);
 
-// Select All to Vector
-auto result1 = mapper.Query (MyClass {}).ToVector ();
-// result1 = [{ 0, 0.2, "John"},
-//           { 1, 1.0, "Jack"}]
-
-// If Failed, throw an exception
+// Transactional Statements
 try
 {
-    mapper.Insert (MyClass { 1, 0, "Joke" });
+    mapper.Transaction ([&] ()
+    {
+        mapper.Delete (initObjs[0]);
+        mapper.Insert (MyClass { 1, 0, "Joke" });
+    });
 }
 catch (const std::exception &ex)
 {
+    // If any statement Failed, throw an exception
     // "SQL error: UNIQUE constraint failed: MyClass.id"
+
+    // Remarks:
+    // mapper.Delete (initObjs[0]); will not applied :-)
 }
+
+// Select All to Vector
+auto result1 = mapper.Query (MyClass {}).ToVector ();
+// result1 = [{ 0, 0.2, "John"},
+//            { 1, 1.0, "Jack"}]
 ```
 
 #### Batch Operations
@@ -107,12 +115,18 @@ catch (const std::exception &ex)
 std::vector<MyClass> dataToSeed;
 for (int i = 50; i < 100; i++)
     dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
-mapper.InsertRange (dataToSeed);
+mapper.Transaction ([&] ()
+{
+    mapper.InsertRange (dataToSeed);
+});
 
 // Update by Batch Update
 for (size_t i = 0; i < 50; i++)
     dataToSeed[i].score += 1;
-mapper.UpdateRange (dataToSeed);
+mapper.Transaction ([&] ()
+{
+    mapper.UpdateRange (dataToSeed);
+});
 ```
 
 #### Composite Query
