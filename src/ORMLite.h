@@ -478,6 +478,7 @@ namespace BOT_ORM
 			// Where
 			inline ORQuery &Where (const Expr &expr)
 			{
+				_sqlWhere.clear ();
 				for (const auto exprStr : expr.expr)
 				{
 					if (exprStr.first != nullptr)
@@ -527,7 +528,7 @@ namespace BOT_ORM
 							   "It must be Copy Constructible");
 
 				std::vector<C> ret;
-				_pMapper->_Select (_queryHelper, ret, _GetSQL ());
+				_pMapper->_Select (_queryHelper, ret, _GetCondSql ());
 				return std::move (ret);
 			}
 
@@ -537,14 +538,27 @@ namespace BOT_ORM
 							   "It must be Copy Constructible");
 
 				std::list<C> ret;
-				_pMapper->_Select (_queryHelper, ret, _GetSQL ());
+				_pMapper->_Select (_queryHelper, ret, _GetCondSql ());
 				return std::move (ret);
+			}
+
+			// Update Values
+			template <typename... Args>
+			inline void Update (const Args & ... fields)
+			{
+				std::stringstream setSql;
+				setSql << "set ";
+				_Set (setSql, fields...);
+				_pMapper->_Update (_queryHelper,
+								   setSql.str (),
+								   _GetCondSql<true> ());
 			}
 
 			// Delete Values
 			inline void Delete ()
 			{
-				_pMapper->_Delete (_queryHelper, _GetSQL ());
+				_pMapper->_Delete (_queryHelper,
+								   _GetCondSql<true> ());
 			}
 
 			// Aggregate
@@ -552,7 +566,7 @@ namespace BOT_ORM
 			{
 				return (size_t) std::stoull (
 					_pMapper->_Aggregate (_queryHelper, "count",
-										  "*", _GetSQL ())
+										  "*", _GetCondSql ())
 				);
 			}
 
@@ -564,7 +578,7 @@ namespace BOT_ORM
 					ret,
 					_pMapper->_Aggregate (_queryHelper, "sum",
 										  _GetFieldName (&property),
-										  _GetSQL ())
+										  _GetCondSql ())
 				);
 				return ret;
 			}
@@ -577,7 +591,7 @@ namespace BOT_ORM
 					ret,
 					_pMapper->_Aggregate (_queryHelper, "avg",
 										  _GetFieldName (&property),
-										  _GetSQL ())
+										  _GetCondSql ())
 				);
 				return ret;
 			}
@@ -590,7 +604,7 @@ namespace BOT_ORM
 					ret,
 					_pMapper->_Aggregate (_queryHelper, "max",
 										  _GetFieldName (&property),
-										  _GetSQL ())
+										  _GetCondSql ())
 				);
 				return ret;
 			}
@@ -603,7 +617,7 @@ namespace BOT_ORM
 					ret,
 					_pMapper->_Aggregate (_queryHelper, "min",
 										  _GetFieldName (&property),
-										  _GetSQL ())
+										  _GetCondSql ())
 				);
 				return ret;
 			}
@@ -611,8 +625,10 @@ namespace BOT_ORM
 		protected:
 			const C &_queryHelper;
 			ORMapper *_pMapper;
+			
 			std::string _sqlWhere;
-			std::string _sqlOrderBy, _sqlLimit, _sqlOffset;
+			std::string _sqlOrderBy;
+			std::string _sqlLimit, _sqlOffset;
 
 			std::string _GetFieldName (const void *property)
 			{
@@ -635,13 +651,40 @@ namespace BOT_ORM
 				return fieldNames[index];
 			}
 
-			std::string _GetSQL () const
+			template <bool onlyWhere = false>
+			std::string _GetCondSql () const
 			{
+				if (onlyWhere)
+				{
+					if (!_sqlWhere.empty ())
+						return " where (" + _sqlWhere + ")";
+					else
+						return "";
+				}
+
 				if (!_sqlWhere.empty ())
 					return " where (" + _sqlWhere + ")" +
 					_sqlOrderBy + _sqlLimit + _sqlOffset;
 				else
 					return _sqlOrderBy + _sqlLimit + _sqlOffset;
+			}
+
+			template <typename T, typename... Args>
+			inline void _Set (std::ostream &os,
+							  const T &arg,
+							  const Args & ... args)
+			{
+				_Set (os, arg);
+				os << ",";
+				_Set (os, args...);
+			}
+
+			template <typename T>
+			inline void _Set (std::ostream &os,
+							  const T &arg)
+			{
+				os << _GetFieldName (&arg) << "=";
+				BOT_ORM_Impl::SerializeValue (os, arg);
 			}
 		};
 
@@ -656,13 +699,13 @@ namespace BOT_ORM
 
 		template <typename C, typename Out>
 		void _Select (C copyable, Out &out,
-					  const std::string &sqlStr = "")
+					  const std::string &sqlCond)
 		{
 			auto fieldCount = ORMapper::_FieldNames<C> ().size ();
 
 			_connector.Execute ("select * from " +
 								std::string (C::__ClassName) +
-								" " + sqlStr + ";",
+								" " + sqlCond + ";",
 								[&] (int argc, char **argv, char **)
 			{
 				if (argc != fieldCount)
@@ -682,30 +725,49 @@ namespace BOT_ORM
 		}
 
 		template <typename C>
-		std::string _Aggregate (const C &queryHelper,
-								const std::string& func,
-								const std::string& field,
-								const std::string &sqlStr = "")
+		std::string _Aggregate (const C &,
+								const std::string &func,
+								const std::string &field,
+								const std::string &sqlCond)
 		{
 			std::string ret;
 
 			_connector.Execute ("select " + func +
 								" (" + field + ") as agg from " +
-								std::string (C::__ClassName) + " " + sqlStr,
+								std::string (C::__ClassName) +
+								" " + sqlCond + ";",
 								[&] (int, char **argv, char **)
 			{
 				ret = argv[0];
 			});
+
+			if (ret.empty ())
+				throw std::runtime_error ("SQL error: Return null at"
+										  " 'select " + func +
+										  " (" + field + ") as agg from " +
+										  std::string (C::__ClassName) +
+										  " " + sqlCond + ";'");
 			return ret;
 		}
 
 		template <typename C>
-		void _Delete (const C &queryHelper,
-					  const std::string &sqlStr)
+		void _Update (const C &,
+					  const std::string &sqlSet,
+					  const std::string &sqlCond)
+		{
+			_connector.Execute ("update " +
+								std::string (C::__ClassName) +
+								" " + sqlSet +
+								" " + sqlCond + ";");
+		}
+
+		template <typename C>
+		void _Delete (const C &,
+					  const std::string &sqlCond)
 		{
 			_connector.Execute ("delete from " +
 								std::string (C::__ClassName) +
-								" " + sqlStr + ";");
+								" " + sqlCond + ";");
 		}
 
 		template <typename C>

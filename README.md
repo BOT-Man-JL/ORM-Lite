@@ -154,27 +154,30 @@ auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
 // result2 =
 // [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
 
-// Aggregate Function by Query :-)
+// Reusable Query Object :-)
 auto query = mapper.Query (helper)     // Link 'helper' to its fields
     .Where (Field (helper.name) == "July");
 
-// Reuse Query Object with the same Condition
+// Aggregate Function by Query :-)
 auto count = query.Count ();
-auto avg = query.Avg (helper.score);
 
 // Remarks:
-// sql = SELECT COUNT (*) AS AGG FROM MyClass WHERE (name='July')
+// sql = SELECT COUNT (*) FROM MyClass WHERE (name='July')
 // count = 50
-// sql = SELECT AVG (score) AS AGG FROM MyClass WHERE (name='July')
-// avg = 15.9
+
+// Update by Query :-)
+query.Update (helper.score = 10, helper.name = "Jully");
+
+// Remarks:
+// sql = UPDATE MyClass SET score=10,name='Jully' WHERE (name='July')
 
 // Delete by Query :-)
 mapper.Query (helper)                  // Link 'helper' to its fields
-    .Where (helper.name = "July")      // Trick ;-)
+    .Where (helper.name = "Jully")     // Trick ;-) (Detailed in Docs)
     .Delete ();
 
 // Remarks:
-// sql = DELETE FROM MyClass WHERE (name='July')
+// sql = DELETE FROM MyClass WHERE (name='Jully')
 ```
 
 ## Implementation Details

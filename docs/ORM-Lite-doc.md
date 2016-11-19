@@ -171,7 +171,7 @@ Generate `OFFSET` `count`;
 
 ### vector\<MyClass\> ToVector () / list\<MyClass\> ToList ()
 
-Retrieve Select Result under **_WHERE_ Constraints**;
+Retrieve Select Result under **_WHERE_ _ORDER BY_ _LIMIT_ Constraints**;
 
 ``` sql
 SELECT * FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
@@ -182,17 +182,25 @@ Remarks:
 - Deserialize Value to a copy of `queryHelper`;
 - Copy the copy to `std::vector` / `std::list`;
 
+### void Update (const Args & ... fields)
+
+Update `fields` under **_WHERE_ Constraints**;
+
+``` sql
+UPDATE MyClass SET ... WHERE ...;
+```
+
 ### void Delete ()
 
 Delete Entries under **_WHERE_ Constraints**;
 
 ``` sql
-DELETE FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
+DELETE FROM MyClass WHERE ...;
 ```
 
 ### unsigned long long Count ()
 
-Return the `Count` under **_WHERE_ Constraints**;
+Return the `Count` under **_WHERE_ _ORDER BY_ _LIMIT_ Constraints**;
 
 ``` sql
 SELECT COUNT (*) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
@@ -200,7 +208,8 @@ SELECT COUNT (*) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
 
 ### T Sum / Avg / Max / Min (const T &property)
 
-Return the `Sum / Average / Max / Min` under **_WHERE_ Constraints**;
+Return the `Sum / Average / Max / Min`
+under **_WHERE_ _ORDER BY_ _LIMIT_ Constraints**;
     
 ``` sql
 SELECT SUM (<property>) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
