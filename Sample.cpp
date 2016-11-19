@@ -15,8 +15,8 @@ struct MyClass
 	double score;
 	std::string name;
 
-	// Inject ORM-Lite into this Class
-	ORMAP (MyClass, id, name, score)
+	// Inject ORM-Lite into this Class :-)
+	ORMAP (MyClass, id, name, score);
 };
 
 int main ()

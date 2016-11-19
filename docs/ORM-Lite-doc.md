@@ -27,7 +27,7 @@ struct MyClass
     std::string name;
 
     // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, score, name)
+    ORMAP (MyClass, id, score, name);
 };
 ```
 

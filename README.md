@@ -30,7 +30,7 @@ struct MyClass
     std::string name;
 
     // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, score, name)
+    ORMAP (MyClass, id, score, name);
 };
 ```
 
@@ -39,8 +39,6 @@ In this Sample, `ORMAP (MyClass, id, score, name)` means that:
 - `int id`, `double score` and `std::string name` will be mapped
   into `INT id`, `REAL score` and `TEXT name` respectively;
 - The first item `id` will be set as the **Primary Key** of the Table;
-
-_(Note that: **No Semicolon ';'** after the **ORMAP**)_ :wink:
 
 ### Create or Drop a Table for the Class
 
