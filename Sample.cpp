@@ -15,8 +15,12 @@ struct MyClass
 	double score;
 	std::string name;
 
+	Nullable<int> age;
+	Nullable<double> salary;
+	Nullable<std::string> title;
+
 	// Inject ORM-Lite into this Class :-)
-	ORMAP (MyClass, id, name, score);
+	ORMAP (MyClass, id, score, name, age, salary, title);
 };
 
 int main ()
@@ -31,9 +35,9 @@ int main ()
 
 	std::vector<MyClass> initObjs =
 	{
-		{ 0, 0.2, "John" },
-		{ 1, 0.4, "Jack" },
-		{ 2, 0.6, "Jess" }
+		{ 0, 0.2, "John", 21, nullptr, nullptr },
+		{ 1, 0.4, "Jack", nullptr, 3.14, nullptr },
+		{ 2, 0.6, "Jess", nullptr, nullptr, std::string ("Dr.") }
 	};
 
 	// Insert Values into the table
@@ -41,7 +45,8 @@ int main ()
 		mapper.Insert (obj);
 
 	// Update Entry by KEY (id)
-	initObjs[1].score = 1.0;
+	initObjs[1].salary = nullptr;
+	initObjs[1].title = "St.";
 	mapper.Update (initObjs[1]);
 
 	// Delete Entry by KEY (id)
@@ -67,8 +72,8 @@ int main ()
 
 	// Select All to Vector
 	auto result1 = mapper.Query (MyClass {}).ToVector ();
-	// result1 = [{ 0, 0.2, "John"},
-	//            { 1, 1.0, "Jack"}]
+	// result1 = [{ 0, 0.2, "John", 21,   null, null  },
+	//            { 1, 0.4, "Jack", null, null, "St." }]
 
 	/* #2 Batch Operations */
 
@@ -112,7 +117,9 @@ int main ()
 	//       ORDER BY id DESC
 	//       LIMIT 3 OFFSET 10
 	// result2 =
-	// [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
+	// [{ 80, 17.0, "July", null, null, null },
+	//  { 79, 16.8, "July", null, null, null },
+	//  { 78, 16.6, "July", null, null, null }]
 
 	// Reusable Query Object :-)
 	auto query = mapper.Query (helper)     // Link 'helper' to its fields
@@ -147,11 +154,26 @@ int main ()
 	// Output to Console
 	auto printVec = [] (const std::vector<MyClass> vec)
 	{
+		auto printNullable = [] (std::ostream &os, const auto &val)
+			-> std::ostream &
+		{
+			if (val == nullptr)
+				return os << "null";
+			else
+				return os << val.Value ();
+		};
+
 		for (auto& item : vec)
+		{
 			std::cout << item.id << "\t" << item.score
-			<< "\t" << item.name << std::endl;
+				<< "\t" << item.name << "\t";
+			printNullable (std::cout, item.age) << "\t";
+			printNullable (std::cout, item.salary) << "\t";
+			printNullable (std::cout, item.title) << std::endl;
+		}
 		std::cout << std::endl;
 	};
+
 	printVec (result1);
 	printVec (result2);
 	std::cout << count << std::endl;

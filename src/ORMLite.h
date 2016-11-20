@@ -15,6 +15,7 @@
 #include <thread>
 #include <sstream>
 #include <type_traits>
+#include <cstddef>
 
 #include "sqlite3.h"
 
@@ -35,6 +36,102 @@ void __Accept (const VISITOR &visitor, FN fn) const       \
 }                                                         \
 constexpr static const char *__ClassName = #_MY_CLASS_;   \
 constexpr static const char *__FieldNames = #__VA_ARGS__; \
+
+// Nullable Template
+// http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646
+
+namespace BOT_ORM
+{
+	template <typename T>
+	class Nullable final
+	{
+		template <typename T2>
+		friend bool operator== (const Nullable<T2> &op1,
+								const Nullable<T2> &op2);
+		template <typename T2>
+		friend bool operator== (const Nullable<T2> &op,
+								const T2 &value);
+		template <typename T2>
+		friend bool operator== (const T2 &value,
+								const Nullable<T2> &op);
+		template <typename T2>
+		friend bool operator== (const Nullable<T2> &op,
+								nullptr_t);
+		template <typename T2>
+		friend bool operator== (nullptr_t,
+								const Nullable<T2> &op);
+	public:
+		// Default or Null Construction
+		Nullable ()
+			: m_hasValue (false), m_value (T ()) {}
+		Nullable (nullptr_t)
+			: Nullable () {}
+
+		// Null Assignment
+		const Nullable<T> & operator= (nullptr_t)
+		{
+			m_hasValue = false;
+			m_value = T ();
+			return *this;
+		}
+
+		// Value Construction
+		Nullable (const T &value)
+			: m_hasValue (true), m_value (value) {}
+
+		// Value Assignment
+		const Nullable<T> & operator= (const T &value)
+		{
+			m_hasValue = true;
+			m_value = value;
+			return *this;
+		}
+
+	private:
+		bool m_hasValue;
+		T m_value;
+
+	public:
+		const T &Value () const
+		{ return m_value; }
+	};
+
+	template <typename T2>
+	inline bool operator== (const Nullable<T2> &op1,
+							const Nullable<T2> &op2)
+	{
+		return op1.m_hasValue == op2.m_hasValue &&
+			(!op1.m_hasValue || op1.m_value == op2.m_value);
+	}
+
+	template <typename T2>
+	inline bool operator== (const Nullable<T2> &op,
+							const T2 &value)
+	{
+		return op.m_hasValue && op.m_value == value;
+	}
+
+	template <typename T2>
+	inline bool operator== (const T2 &value,
+							const Nullable<T2> &op)
+	{
+		return op.m_hasValue && op.m_value == value;
+	}
+
+	template <typename T2>
+	inline bool operator== (const Nullable<T2> &op,
+							nullptr_t)
+	{
+		return !op.m_hasValue;
+	}
+
+	template <typename T2>
+	inline bool operator== (nullptr_t,
+							const Nullable<T2> &op)
+	{
+		return !op.m_hasValue;
+	}
+}
 
 namespace BOT_ORM_Impl
 {
@@ -105,39 +202,97 @@ namespace BOT_ORM_Impl
 
 	// Helper - Serialize
 	template <typename T>
-	inline std::ostream &SerializeValue (std::ostream &os,
-										 const T &value)
+	inline std::ostream &SerializeValue (
+		std::ostream &os,
+		const T &value)
 	{
 		return os << value;
 	}
 
 	template <>
 	inline std::ostream &SerializeValue <std::string> (
-		std::ostream &os, const std::string &value)
+		std::ostream &os,
+		const std::string &value)
 	{
 		return os << "'" << value << "'";
 	}
 
+	template <typename T>
+	inline std::ostream &SerializeValue (
+		std::ostream &os,
+		const BOT_ORM::Nullable<T> &value)
+	{
+		if (value == nullptr)
+			return os << "null";
+		return SerializeValue (os, value.Value ());
+	}
+
 	// Helper - Deserialize
 	template <typename T>
-	inline void DeserializeValue (T &property, std::string value)
+	inline void DeserializeValue (
+		T &property,
+		const BOT_ORM::Nullable<std::string> &value)
 	{
-		std::stringstream ostr (value);
+		if (value == nullptr)
+			throw std::runtime_error ("Null to Deserialze");
+		std::stringstream ostr (value.Value ());
 		ostr >> property;
 	}
 
 	template <>
-	inline void DeserializeValue <std::string>
-		(std::string &property, std::string value)
+	inline void DeserializeValue <std::string> (
+		std::string &property,
+		const BOT_ORM::Nullable<std::string> &value)
 	{
-		property = std::move (value);
+		if (value == nullptr)
+			throw std::runtime_error ("Null to Deserialze");
+		property = std::move (value.Value ());
+	}
+
+	template <typename T>
+	inline void DeserializeValue (
+		BOT_ORM::Nullable<T> &property,
+		const BOT_ORM::Nullable<std::string> &value)
+	{
+		if (value == nullptr)
+			property = nullptr;
+		else
+		{
+			T val;
+			DeserializeValue (val, value);
+			property = val;
+		}
 	}
 
 	// Helper - Get TypeString
 	template <typename T>
-	const char *TypeString (T &t)
+	const char *TypeString (const T &)
 	{
-		constexpr const char *typeStr =
+		constexpr static const char *typeStr =
+			(std::is_integral<T>::value &&
+			 !std::is_same<std::remove_cv_t<T>, char>::value &&
+			 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
+			 !std::is_same<std::remove_cv_t<T>, char16_t>::value &&
+			 !std::is_same<std::remove_cv_t<T>, char32_t>::value &&
+			 !std::is_same<std::remove_cv_t<T>, unsigned char>::value)
+			? "integer not null"
+			: (std::is_floating_point<T>::value)
+			? "real not null"
+			: (std::is_same<std::remove_cv_t<T>, std::string>::value)
+			? "text not null"
+			: nullptr;
+
+		static_assert (
+			typeStr != nullptr,
+			"Only Support Integral, Floating Point and std::string :-)");
+
+		return typeStr;;
+	}
+
+	template <typename T>
+	const char *TypeString (const BOT_ORM::Nullable<T> &)
+	{
+		constexpr static const char *typeStr =
 			(std::is_integral<T>::value &&
 			 !std::is_same<std::remove_cv_t<T>, char>::value &&
 			 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
@@ -155,7 +310,7 @@ namespace BOT_ORM_Impl
 			typeStr != nullptr,
 			"Only Support Integral, Floating Point and std::string :-)");
 
-		return typeStr;
+		return typeStr;;
 	}
 
 	// Visitor
@@ -697,7 +852,7 @@ namespace BOT_ORM
 		BOT_ORM_Impl::SQLConnector _connector;
 
 		template <typename C, typename Out>
-		void _Select (C copyable, Out &out,
+		void _Select (C copy, Out &out,
 					  const std::string &sqlCond)
 		{
 			auto fieldCount = ORMapper::_FieldNames<C> ().size ();
@@ -712,14 +867,20 @@ namespace BOT_ORM
 						"Inter ORM Error: Select argc != Field Count");
 
 				size_t index = 0;
-				copyable.__Accept (
+				copy.__Accept (
 					BOT_ORM_Impl::FnVisitor (),
 					[&argv, &index] (auto &val)
 				{
-					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
+					if (argv[index])
+						BOT_ORM_Impl::DeserializeValue (
+							val, BOT_ORM::Nullable<std::string> (argv[index]));
+					else
+						BOT_ORM_Impl::DeserializeValue (
+							val, BOT_ORM::Nullable<std::string> (nullptr));
+					index++;
 					return true;
 				});
-				out.push_back (copyable);
+				out.emplace_back (std::move (copy));
 			});
 		}
 

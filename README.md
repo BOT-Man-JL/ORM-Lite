@@ -29,16 +29,25 @@ struct MyClass
     double score;
     std::string name;
 
-    // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, score, name);
+    Nullable<int> age;
+    Nullable<double> salary;
+    Nullable<std::string> title;
+
+    // Inject ORM-Lite into this Class :-)
+    ORMAP (MyClass, id, score, name, age, salary, title);
 };
 ```
 
-In this Sample, `ORMAP (MyClass, id, score, name)` means that:
+`Nullable<T>` helps us construct `Nullable` Value in C++,
+which is described in the [Document](docs/ORM-Lite-doc.md) 😁
+
+In this Sample, `ORMAP (MyClass, ...)` do that:
 - `Class MyClass` will be mapped into `TABLE MyClass`;
-- `int id`, `double score` and `std::string name` will be mapped
-  into `INT id`, `REAL score` and `TEXT name` respectively;
-- The first item `id` will be set as the **Primary Key** of the Table;
+- Not `Nullable` members will be mapped as `NOT NULL`;
+- `id, score, name, age, salary, title` will be mapped into 
+  `INT id NOT NULL`, `REAL score NOT NULL`, `TEXT name NOT NULL`,
+  `INT age`, `REAL salary` and `TEXT title` respectively;
+- The first entry `id` will be set as the **Primary Key** of the Table;
 
 ### Create or Drop a Table for the Class
 
@@ -53,10 +62,12 @@ mapper.CreateTbl (MyClass {});
 mapper.DropTbl (MyClass {});
 ```
 
-| id| score| name|
-|---|------|-----|
-|  1|   0.2| John|
-|...|   ...|  ...|
+| id| score| name|    age|  salary|  title|
+|---|------|-----|-------|--------|-------|
+|  0|   0.2| John|     21|  `null`| `null`|
+|  1|   0.4| Jack| `null`|    3.14| `null`|
+|  2|   0.6| Jess| `null`|  `null`|    Dr.|
+|...|   ...|  ...|    ...|     ...|    ...|
 
 ### Working on *Database* with *ORMapper*
 
@@ -75,7 +86,8 @@ for (const auto obj : initObjs)
     mapper.Insert (obj);
 
 // Update Entry by KEY (id)
-initObjs[1].score = 1.0;
+initObjs[1].salary = nullptr;
+initObjs[1].title = "St.";
 mapper.Update (initObjs[1]);
 
 // Delete Entry by KEY (id)
@@ -101,8 +113,8 @@ catch (const std::exception &ex)
 
 // Select All to Vector
 auto result1 = mapper.Query (MyClass {}).ToVector ();
-// result1 = [{ 0, 0.2, "John"},
-//            { 1, 1.0, "Jack"}]
+// result1 = [{ 0, 0.2, "John", 21,   null, null  },
+//            { 1, 0.4, "Jack", null, null, "St." }]
 ```
 
 #### Batch Operations
@@ -150,7 +162,9 @@ auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
 //       ORDER BY id DESC
 //       LIMIT 3 OFFSET 10
 // result2 =
-// [{ 80, 17.0, "July"}, { 79, 16.8, "July"}, { 78, 16.6, "July"}]
+// [{ 80, 17.0, "July", null, null, null },
+//  { 79, 16.8, "July", null, null, null },
+//  { 78, 16.6, "July", null, null, null }]
 
 // Reusable Query Object :-)
 auto query = mapper.Query (helper)     // Link 'helper' to its fields

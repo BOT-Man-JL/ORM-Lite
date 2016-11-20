@@ -9,38 +9,99 @@
 
 ## Include to Your Project
 
-``` C++
+``` cpp
 #include "ORMLite.h"
 using namespace BOT_ORM;
 ```
 
-## Inject Class
+Modules under `namespace BOT_ORM`:
 
-``` C++
-#include "ORMLite.h"
-using namespace BOT_ORM;
+- `BOT_ORM::Nullable`
+- `BOT_ORM::ORMapper`
+- `BOT_ORM::Field`
 
+## `Nullable`
+
+It keeps the Similar Semantic as `Nullable<T>` as `C#`; and
+[Reference Here 😉](http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
+
+### Construction & Assignment
+
+- Default Constructed / `nullptr` Constructed / `nullptr` Assigned 
+  object is `NULL` Valued;
+- Value Constructed / Value Assigned object is `NOT NULL` Valued
+- `Nullable` Objects are **Copyable** / **Movable**,
+  and the *Destination* Value has the *Same Value* as the *Source*
+
+``` cpp
+// Default or Null Construction
+Nullable ();
+Nullable (nullptr_t);
+
+// Null Assignment
+const Nullable<T> & operator= (nullptr_t);
+
+// Value Construction
+Nullable (const T &value);
+
+// Value Assignment
+const Nullable<T> & operator= (const T &value);
+```
+
+### Get Value
+
+Return the `Underlying Value` of the object,
+which is **Valid** only if it's `NOT NULL`;
+
+``` cpp
+const T &Value (); const
+```
+
+### Comparison
+
+Two Objects have the Same value only if their `Nullable` Construction:
+- Both are `NULL`;
+- Both are `NOT NULL` and have the Same `Underlying Value`;
+
+``` cpp
+bool operator==(const Nullable<T> &op1, const Nullable<T> &op2);
+bool operator==(const Nullable<T> &op1, T &op2);
+bool operator==(T &op1, const Nullable<T> &op2);
+bool operator==(const Nullable<T> &op1, nullptr_t);
+bool operator==(nullptr_t, const Nullable<T> &op2);
+```
+
+## Inject into Class
+
+``` cpp
 struct MyClass
 {
     int id;
     double score;
     std::string name;
 
-    // Inject ORM-Lite into this Class
-    ORMAP (MyClass, id, score, name);
+    Nullable<int> age;
+    Nullable<double> salary;
+    Nullable<std::string> title;
+
+    // Inject ORM-Lite into this Class :-)
+    ORMAP (MyClass, id, score, name, age, salary, title);
 };
 ```
 
-In this Sample, `ORMAP (MyClass, id, score, name)` means that:
+In this Sample, `ORMAP (MyClass, ...)` do that:
 - `Class MyClass` will be mapped into `TABLE MyClass`;
-- `int id`, `double score` and `std::string name` will be mapped
-  into `INT id`, `REAL score` and `TEXT name` respectively;
-- The first item `id` will be set as the **Primary Key** of the Table;
+- Not `Nullable` members will be mapped as `NOT NULL`;
+- `id, score, name, age, salary, title` will be mapped into 
+  `INT id NOT NULL`, `REAL score NOT NULL`, `TEXT name NOT NULL`,
+  `INT age`, `REAL salary` and `TEXT title` respectively;
+- The first entry `id` will be set as the **Primary Key** of the Table;
 
 Note that:
 - `ORMAP (...)` will **auto** Inject some **private members**;
 - Currently Only Support
-  - T such that `std::is_integral<T>::value == true` and Not **Char**
+  - T such that `std::is_integral<T>::value == true`
+    and **NOT** `char` or `*char_t`
   - T such that `std::is_floating_point<T>::value == true`
   - T such that `std::is_same<T, std::string>::value == true`
   - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
