@@ -70,28 +70,30 @@ int main ()
 		// mapper.Delete (initObjs[0]); will not applied :-)
 	}
 
-	// Select All to Vector
-	auto result1 = mapper.Query (MyClass {}).ToVector ();
-	// result1 = [{ 0, 0.2, "John", 21,   null, null  },
-	//            { 1, 0.4, "Jack", null, null, "St." }]
+	// Select All to List
+	auto result1 = mapper.Query (MyClass {}).ToList ();
+	//   result1 = [{ 0, 0.2, "John", 21,   null, null  },
+	//              { 1, 0.4, "Jack", null, null, "St." }]
 
 	/* #2 Batch Operations */
 
-	// Insert by Batch Insert
-	// Performance is much Better than Separated Insert :-)
 	std::vector<MyClass> dataToSeed;
 	for (int i = 50; i < 100; i++)
 		dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
-	mapper.Transaction ([&] ()
-	{
+
+	// Insert by Batch Insert
+	mapper.Transaction ([&] () {
 		mapper.InsertRange (dataToSeed);
 	});
 
-	// Update by Batch Update
-	for (size_t i = 0; i < 50; i++)
-		dataToSeed[i].score += 1;
-	mapper.Transaction ([&] ()
+	for (size_t i = 0; i < 20; i++)
 	{
+		dataToSeed[i + 30].age = 30 + (int) i;
+		dataToSeed[i + 20].title = "Mr. " + std::to_string (i);
+	}
+
+	// Update by Batch Update
+	mapper.Transaction ([&] () {
 		mapper.UpdateRange (dataToSeed);
 	});
 
@@ -104,22 +106,21 @@ int main ()
 	auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
 		.Where (
 			Field (helper.name) == "July" &&
-			(Field (helper.id) <= 90 && Field (helper.id) >= 60)
+			(Field (helper.age) >= 35 && Field (helper.title) != nullptr)
 		)
 		.OrderByDescending (helper.id)
 		.Take (3)
-		.Skip (10)
+		.Skip (1)
 		.ToVector ();
 
 	// Remarks:
 	// sql = SELECT * FROM MyClass
-	//       WHERE (name='July' and (id<=90 and id>=60))
+	//       WHERE ((name='July' AND (age>=35 AND title IS NOT NULL)))
 	//       ORDER BY id DESC
-	//       LIMIT 3 OFFSET 10
-	// result2 =
-	// [{ 80, 17.0, "July", null, null, null },
-	//  { 79, 16.8, "July", null, null, null },
-	//  { 78, 16.6, "July", null, null, null }]
+	//       LIMIT 3 OFFSET 1
+	// result2 = [{ 88, 17.6, "July", 38, null, "Mr. 18" },
+	//            { 87, 17.4, "July", 37, null, "Mr. 17" },
+	//            { 86, 17.2, "July", 36, null, "Mr. 16" }]
 
 	// Reusable Query Object :-)
 	auto query = mapper.Query (helper)     // Link 'helper' to its fields
@@ -152,7 +153,7 @@ int main ()
 	mapper.DropTbl (MyClass {});
 
 	// Output to Console
-	auto printVec = [] (const std::vector<MyClass> vec)
+	auto printResult = [] (const auto &vec)
 	{
 		auto printNullable = [] (std::ostream &os, const auto &val)
 			-> std::ostream &
@@ -174,8 +175,8 @@ int main ()
 		std::cout << std::endl;
 	};
 
-	printVec (result1);
-	printVec (result2);
+	printResult (result1);
+	printResult (result2);
 	std::cout << count << std::endl;
 
 	std::cin.get ();

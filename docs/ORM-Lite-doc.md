@@ -23,7 +23,7 @@ Modules under `namespace BOT_ORM`:
 ## `Nullable`
 
 It keeps the Similar Semantic as `Nullable<T>` as `C#`; and
-[Reference Here 😉](http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
+[Reference Here](http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
 
 ### Construction & Assignment
 
@@ -171,7 +171,7 @@ INSERT INTO MyClass VALUES (...), (...) ...;
 Update Entity in Table `MyClass` with the Same `KEY` with `entity`;
 
 ``` sql
-UPDATE MyClass SET (...) WHERE` `KEY` `=` `entity.id` `;
+UPDATE MyClass SET (...) WHERE KEY = <entity.id>;
 ```
 
 ### void UpdateRange (const Container\<MyClass\> &entities)
@@ -181,8 +181,8 @@ Update Entries with the Same `KEY` with `entities`;
 `entities` must **SUPPORT** `forward_iterator`;
 
 ``` sql
-UPDATE MyClass SET (...) WHERE` `KEY` `=` `entity.id` `;
-UPDATE MyClass SET (...) WHERE` `KEY` `=` `entity.id` `;
+UPDATE MyClass SET (...) WHERE KEY = <entity.id>;
+UPDATE MyClass SET (...) WHERE KEY = <entity.id>;
 ...
 ```
 
@@ -191,7 +191,7 @@ UPDATE MyClass SET (...) WHERE` `KEY` `=` `entity.id` `;
 Delete Entry in Table `MyClass` with the Same `KEY` with `entity`;
 
 ``` sql
-DELETE FROM MyClass WHERE` `KEY` `=` `entity.id` `;
+DELETE FROM MyClass WHERE KEY = <entity.id>;
 ```
 
 ### ORQuery\<MyClass\> Query (const MyClass &queryHelper)
@@ -204,31 +204,34 @@ Detailed in `## ORQuery` Section;
 
 ### ORQuery &Where (const Expr &expr)
 
-Generate `WHERE (` `expr` `)`;
+Generate `WHERE ( <expr> )`;
 
 Details in `## Expr` Section;
 
 ### ORQuery &OrderBy (const T &property)
 
-Generate `ORDER BY` `<property>`;
+Generate `ORDER BY <property>`;
 
 If `property` is not a member of `queryHelper`,
 throw `std::runtime_error`;
 
 ### ORQuery &OrderByDescending (const T &property)
 
-Generate `ORDER BY` `<property>` `DESC`;
+Generate `ORDER BY <property> DESC`;
 
 If `property` is not a member of `queryHelper`,
 throw `std::runtime_error`;
 
 ### ORQuery &Take (size_t count)
 
-Generate `LIMIT` `count`;
+Generate `LIMIT count`;
 
 ### ORQuery &Skip (size_t count)
 
-Generate `OFFSET` `count`;
+Generate `[LIMIT 0] OFFSET count`;
+
+Remarks:
+- If there is Not `Take` before `Skip`, it will call `Take (0)`;
 
 ### vector\<MyClass\> ToVector () / list\<MyClass\> ToList ()
 
@@ -284,9 +287,9 @@ throw `std::runtime_error`;
 
 ## Expr
 
-### Expr (const T &property, const string &relOp = "=", T value = property)
+### Expr (const T &property, const string &relOp = "=", T value = property) / Expr (const Nullable<T> &property, bool isNull)
 
-Generate `<property>` `relOp` `value`;
+Generate `<property> relOp <value>` or `<property> is [NOT] NULL`;
 
 Remarks:
 - `Expr (property)` is short for `Expr (property, "=", property)`
@@ -295,7 +298,7 @@ Remarks:
 
 ### Expr operator && / || (const Expr &left, const Expr &right)
 
-Generate `(` `left` `&& / ||` `right` `)`;
+Generate `( <left> && <right> )` or `( <left> || <right> )`;
 
 ### Expr_Field\<T\> (const T &property) (*Helper Struct of Expr*)
 

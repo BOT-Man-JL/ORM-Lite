@@ -345,8 +345,7 @@ namespace BOT_ORM
 	{
 	public:
 		ORMapper (const std::string &connectionString)
-			: _connector (connectionString)
-		{}
+			: _connector (connectionString) {}
 
 		template <typename Fn>
 		void Transaction (Fn fn)
@@ -566,17 +565,28 @@ namespace BOT_ORM
 			}
 
 			template <typename T>
+			Expr (const Nullable<T> &property,
+				  bool isNull)
+				: expr { std::make_pair (
+					&property, isNull ? " is null" : " is not null") }
+			{}
+
+			template <typename T>
 			struct Expr_Field
 			{
 				const T& _property;
 				Expr_Field (const T &property)
-					: _property (property)
-				{}
+					: _property (property) {}
 
 				inline Expr operator == (T value)
 				{ return Expr { _property, "=", std::move (value) }; }
 				inline Expr operator != (T value)
 				{ return Expr { _property, "!=", std::move (value) }; }
+
+				inline Expr operator == (nullptr_t)
+				{ return Expr { _property, true }; }
+				inline Expr operator != (nullptr_t)
+				{ return Expr { _property, false }; }
 
 				inline Expr operator > (T value)
 				{ return Expr { _property, ">", std::move (value) }; }
@@ -626,8 +636,7 @@ namespace BOT_ORM
 		{
 		public:
 			ORQuery (const C &queryHelper, ORMapper *pMapper)
-				: _queryHelper (queryHelper), _pMapper (pMapper)
-			{}
+				: _queryHelper (queryHelper), _pMapper (pMapper) {}
 
 			// Where
 			inline ORQuery &Where (const Expr &expr)
@@ -671,6 +680,9 @@ namespace BOT_ORM
 
 			inline ORQuery &Skip (size_t count)
 			{
+				// Error Syntax
+				if (_sqlLimit.empty ()) Take (0);
+
 				_sqlOffset = " offset " + std::to_string (count);
 				return *this;
 			}
