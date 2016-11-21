@@ -8,6 +8,7 @@
 
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
+using namespace BOT_ORM::Helper;
 
 struct MyClass
 {
@@ -23,6 +24,20 @@ struct MyClass
 	ORMAP (MyClass, id, score, name, age, salary, title);
 };
 
+struct MyClass2
+{
+	int id;
+	double score;
+	std::string name;
+
+	Nullable<int> age;
+	Nullable<double> salary;
+	Nullable<std::string> title;
+
+	// Inject ORM-Lite into this Class :-)
+	ORMAP (MyClass2, id, score, name, age, salary, title);
+};
+
 int main ()
 {
 	// Open a Connection with *test.db*
@@ -30,6 +45,7 @@ int main ()
 
 	// Create a table for "MyClass"
 	mapper.CreateTbl (MyClass {});
+	mapper.CreateTbl (MyClass2 {});
 
 	/* #1 Basic Usage */
 
@@ -99,16 +115,17 @@ int main ()
 
 	/* #3 Composite Query */
 
-	// Define a Query Helper Object
+	// Define a Query Helper Object and its Field Extractor
 	MyClass helper;
+	auto field = Field (helper);
 
 	// Select by Query :-)
-	auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
+	auto result2 = mapper.Query (MyClass {})
 		.Where (
-			Field (helper.name) == "July" &&
-			(Field (helper.age) >= 35 && Field (helper.title) != nullptr)
+			field (helper.name) == "July" &&
+			(field (helper.age) >= 35 && field (helper.title) != nullptr)
 		)
-		.OrderByDescending (helper.id)
+		.OrderByDescending (field (helper.id))
 		.Take (3)
 		.Skip (1)
 		.ToVector ();
@@ -123,34 +140,47 @@ int main ()
 	//            { 86, 17.2, "July", 36, null, "Mr. 16" }]
 
 	// Reusable Query Object :-)
-	auto query = mapper.Query (helper)     // Link 'helper' to its fields
-		.Where (Field (helper.name) == "July");
+	auto query = mapper.Query (MyClass {})
+		.Where (field (helper.name) == "July");
 
 	// Aggregate Function by Query :-)
-	auto count = query.Count ();
+	auto count = query.Aggregate (Count ());
+	auto avg = query.Aggregate (Avg (field (helper.score)));
 
 	// Remarks:
 	// sql = SELECT COUNT (*) FROM MyClass WHERE (name='July')
 	// count = 50
 
-	// Update by Query :-)
-	query.Update (helper.score = 10, helper.name = "Jully");
+	// Update by Condition :-)
+	mapper.Update (MyClass {},
+				   field (helper.name) == "July",
+				   field (helper.age) = 10,
+				   field (helper.name) = "Jully");
 
 	// Remarks:
 	// sql = UPDATE MyClass SET score=10,name='Jully' WHERE (name='July')
 
-	// Delete by Query :-)
-	mapper.Query (helper)                  // Link 'helper' to its fields
-		.Where (helper.name = "Jully")     // Trick ;-) (Detailed in Docs)
-		.Delete ();
+	// Delete by Condition :-)
+	mapper.Delete (MyClass {}, field (helper.name) == "Jully");
 
 	// Remarks:
 	// sql = DELETE FROM MyClass WHERE (name='Jully')
+
+	/* #4 Multi Table */
+
+	MyClass m1;
+	auto f1 = Field (m1);
+	MyClass2 m2;
+	auto f2 = Field (m2);
+
+	//mapper.Query (MyClass {})
+	//	.Join (MyClass2 {}, JoinTypes::Inner, f1 (m1.age) == f2 (m2.age));
 
 	// ==========
 
 	// Drop the table "MyClass"
 	mapper.DropTbl (MyClass {});
+	mapper.DropTbl (MyClass2 {});
 
 	// Output to Console
 	auto printResult = [] (const auto &vec)
@@ -178,6 +208,7 @@ int main ()
 	printResult (result1);
 	printResult (result2);
 	std::cout << count << std::endl;
+	std::cout << avg << std::endl;
 
 	std::cin.get ();
 	return 0;

@@ -12,6 +12,10 @@ written in Modern C++ style.
 
 ## Usage
 
+### Download [Latest Release Here](https://github.com/BOT-Man-JL/ORM-Lite/releases/latest)
+
+Note that there will be a NEW version for Multiple Table Operations 😉;
+
 ### [View Full Documents](docs/ORM-Lite-doc.md)
 
 ### Including *ORM Lite*

@@ -228,10 +228,10 @@ Generate `LIMIT count`;
 
 ### ORQuery &Skip (size_t count)
 
-Generate `[LIMIT 0] OFFSET count`;
+Generate `OFFSET count`;
 
 Remarks:
-- If there is Not `Take` before `Skip`, it will call `Take (0)`;
+- If there is Not `Take`, it will **FAILED**;
 
 ### vector\<MyClass\> ToVector () / list\<MyClass\> ToList ()
 
