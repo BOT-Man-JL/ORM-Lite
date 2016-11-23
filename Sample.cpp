@@ -8,34 +8,32 @@
 
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
-using namespace BOT_ORM::Helper;
+using namespace BOT_ORM::FieldHelper;
+using namespace BOT_ORM::AggregateHelper;
 
-struct MyClass
+struct UserModel
 {
-	int id;
-	double score;
-	std::string name;
+	int user_id;
+	std::string user_name;
+	double credit_count;
 
 	Nullable<int> age;
 	Nullable<double> salary;
 	Nullable<std::string> title;
 
 	// Inject ORM-Lite into this Class :-)
-	ORMAP (MyClass, id, score, name, age, salary, title);
+	ORMAP ("UserModel", user_id, user_name, credit_count, age, salary, title);
 };
 
-struct MyClass2
+struct OrderModel
 {
-	int id;
-	double score;
-	std::string name;
-
-	Nullable<int> age;
-	Nullable<double> salary;
-	Nullable<std::string> title;
+	int order_id;
+	int user_id;
+	std::string product_name;
+	Nullable<double> fee;
 
 	// Inject ORM-Lite into this Class :-)
-	ORMAP (MyClass2, id, score, name, age, salary, title);
+	ORMAP ("OrderModel", order_id, user_id, product_name, fee);
 };
 
 int main ()
@@ -43,17 +41,33 @@ int main ()
 	// Open a Connection with *test.db*
 	ORMapper mapper ("test.db");
 
-	// Create a table for "MyClass"
-	mapper.CreateTbl (MyClass {});
-	mapper.CreateTbl (MyClass2 {});
+	// Create tables
+	try
+	{
+		mapper.CreateTbl (UserModel {});
+	}
+	catch (...)
+	{
+		mapper.DropTbl (UserModel {});
+		mapper.CreateTbl (UserModel {});
+	}
+	try
+	{
+		mapper.CreateTbl (OrderModel {});
+	}
+	catch (...)
+	{
+		mapper.DropTbl (OrderModel {});
+		mapper.CreateTbl (OrderModel {});
+	}
 
 	/* #1 Basic Usage */
 
-	std::vector<MyClass> initObjs =
+	std::vector<UserModel> initObjs =
 	{
-		{ 0, 0.2, "John", 21, nullptr, nullptr },
-		{ 1, 0.4, "Jack", nullptr, 3.14, nullptr },
-		{ 2, 0.6, "Jess", nullptr, nullptr, std::string ("Dr.") }
+		{ 0, "John", 0.2, 21, nullptr, nullptr },
+		{ 1, "Jack", 0.4, nullptr, 3.14, nullptr },
+		{ 2, "Jess", 0.6, nullptr, nullptr, std::string ("Dr.") }
 	};
 
 	// Insert Values into the table
@@ -74,28 +88,29 @@ int main ()
 		mapper.Transaction ([&] ()
 		{
 			mapper.Delete (initObjs[0]);
-			mapper.Insert (MyClass { 1, 0, "Joke" });
+			mapper.Insert (UserModel { 1, "Joke", 0 });
 		});
 	}
 	catch (const std::exception &ex)
 	{
 		// If any statement Failed, throw an exception
-		// "SQL error: UNIQUE constraint failed: MyClass.id"
+		// "SQL error: UNIQUE constraint failed: UserModel.id"
 
 		// Remarks:
 		// mapper.Delete (initObjs[0]); will not applied :-)
 	}
 
 	// Select All to List
-	auto result1 = mapper.Query (MyClass {}).ToList ();
+	auto result1 = mapper.Query (UserModel {}).ToList ();
 	//   result1 = [{ 0, 0.2, "John", 21,   null, null  },
 	//              { 1, 0.4, "Jack", null, null, "St." }]
 
 	/* #2 Batch Operations */
 
-	std::vector<MyClass> dataToSeed;
+	std::vector<UserModel> dataToSeed;
 	for (int i = 50; i < 100; i++)
-		dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
+		dataToSeed.emplace_back (
+			UserModel { i, "July-" + std::to_string (i), i * 0.2 });
 
 	// Insert by Batch Insert
 	mapper.Transaction ([&] () {
@@ -116,22 +131,22 @@ int main ()
 	/* #3 Composite Query */
 
 	// Define a Query Helper Object and its Field Extractor
-	MyClass helper;
+	UserModel helper;
 	auto field = Field (helper);
 
 	// Select by Query :-)
-	auto result2 = mapper.Query (MyClass {})
+	auto result2 = mapper.Query (UserModel {})
 		.Where (
-			field (helper.name) == "July" &&
+			field (helper.user_name) & std::string ("July%") &&
 			(field (helper.age) >= 35 && field (helper.title) != nullptr)
 		)
-		.OrderByDescending (field (helper.id))
+		.OrderByDescending (field (helper.user_id))
 		.Take (3)
 		.Skip (1)
 		.ToVector ();
 
 	// Remarks:
-	// sql = SELECT * FROM MyClass
+	// sql = SELECT * FROM UserModel
 	//       WHERE ((name='July' AND (age>=35 AND title IS NOT NULL)))
 	//       ORDER BY id DESC
 	//       LIMIT 3 OFFSET 1
@@ -140,64 +155,84 @@ int main ()
 	//            { 86, 17.2, "July", 36, null, "Mr. 16" }]
 
 	// Reusable Query Object :-)
-	auto query = mapper.Query (MyClass {})
-		.Where (field (helper.name) == "July");
+	auto query = mapper.Query (UserModel {})
+		.Where (field (helper.user_name) & std::string ("July%"));
 
 	// Aggregate Function by Query :-)
 	auto count = query.Aggregate (Count ());
-	auto avg = query.Aggregate (Avg (field (helper.score)));
+	auto avg = query.Aggregate (Avg (field (helper.credit_count)));
 
 	// Remarks:
-	// sql = SELECT COUNT (*) FROM MyClass WHERE (name='July')
+	// sql = SELECT COUNT (*) FROM UserModel WHERE (name='July')
 	// count = 50
 
 	// Update by Condition :-)
-	mapper.Update (MyClass {},
-				   field (helper.name) == "July",
+	mapper.Update (UserModel {},
+				   field (helper.user_name) == std::string ("July"),
 				   field (helper.age) = 10,
-				   field (helper.name) = "Jully");
+				   field (helper.credit_count) = 1.0);
 
 	// Remarks:
-	// sql = UPDATE MyClass SET score=10,name='Jully' WHERE (name='July')
+	// sql = UPDATE UserModel SET score=10,credit_count=1.0 WHERE (name='July')
 
 	// Delete by Condition :-)
-	mapper.Delete (MyClass {}, field (helper.name) == "Jully");
+	mapper.Delete (UserModel {},
+				   field (helper.user_id) >= 90);
 
 	// Remarks:
-	// sql = DELETE FROM MyClass WHERE (name='Jully')
+	// sql = DELETE FROM UserModel WHERE (id>=90)
 
 	/* #4 Multi Table */
 
-	MyClass m1;
-	auto f1 = Field (m1);
-	MyClass2 m2;
-	auto f2 = Field (m2);
+	UserModel user;
+	auto userField = Field (user);
+	OrderModel order;
+	auto orderField = Field (order);
 
-	//mapper.Query (MyClass {})
-	//	.Join (MyClass2 {}, JoinTypes::Inner, f1 (m1.age) == f2 (m2.age));
+	mapper.Transaction ([&] ()
+	{
+		for (size_t i = 0; i < 50; i++)
+			mapper.Insert (
+				OrderModel { 0, (int) i / 2 + 50,
+				"Item " + std::to_string (i), i * 0.5 },
+				false);
+	});
+
+	auto joined = mapper.Query (UserModel {})
+		.Join (OrderModel {},
+				   userField (user.user_id) == orderField (order.user_id))
+		.Where (userField (user.user_id) >= 65);
+
+	auto sum = joined.Aggregate (Count ());
+
+	auto result3 = joined
+		.Select (userField (user.user_name),
+				 orderField (order.fee))
+		.ToList ();
 
 	// ==========
 
-	// Drop the table "MyClass"
-	mapper.DropTbl (MyClass {});
-	mapper.DropTbl (MyClass2 {});
+	// Drop tables
+	mapper.DropTbl (UserModel {});
+	mapper.DropTbl (OrderModel {});
 
-	// Output to Console
-	auto printResult = [] (const auto &vec)
+	// Output Nullable Field
+	auto printNullable = [] (std::ostream &os, const auto &val)
+		-> std::ostream &
 	{
-		auto printNullable = [] (std::ostream &os, const auto &val)
-			-> std::ostream &
-		{
-			if (val == nullptr)
-				return os << "null";
-			else
-				return os << val.Value ();
-		};
+		if (val == nullptr)
+			return os << "null";
+		else
+			return os << val.Value ();
+	};
 
-		for (auto& item : vec)
+	// Output UserModel Objects
+	auto printUserModeles = [&printNullable] (const auto &objs)
+	{
+		for (auto& item : objs)
 		{
-			std::cout << item.id << "\t" << item.score
-				<< "\t" << item.name << "\t";
+			std::cout << item.user_id << "\t" << item.credit_count
+				<< "\t" << item.user_name << "\t";
 			printNullable (std::cout, item.age) << "\t";
 			printNullable (std::cout, item.salary) << "\t";
 			printNullable (std::cout, item.title) << std::endl;
@@ -205,10 +240,29 @@ int main ()
 		std::cout << std::endl;
 	};
 
-	printResult (result1);
-	printResult (result2);
+	// Output Tuple Objects
+	auto printTuples = [&printNullable] (const auto &objs, size_t size)
+	{
+		for (const auto &entry : objs)
+		{
+			std::cout << "(";
+			size_t index = 0;
+			BOT_ORM_Impl::TupleVisitor (
+				entry, [&index, &size, &printNullable] (const auto &val)
+			{
+				printNullable (std::cout, val);
+				if (++index != size) std::cout << ",";
+			});
+			std::cout << ")\n";
+		}
+	};
+
+	printUserModeles (result1);
+	printUserModeles (result2);
+	printTuples (result3, std::tuple_size<decltype (result3)::value_type>::value);
 	std::cout << count << std::endl;
 	std::cout << avg << std::endl;
+	std::cout << sum << std::endl;
 
 	std::cin.get ();
 	return 0;

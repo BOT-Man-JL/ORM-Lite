@@ -11,6 +11,7 @@
 #include <vector>
 #include <list>
 #include <string>
+#include <tuple>
 #include <cctype>
 #include <thread>
 #include <sstream>
@@ -21,7 +22,7 @@
 
 // Public Macro
 
-#define ORMAP(_MY_CLASS_, ...)                            \
+#define ORMAP(_TABLE_NAME_, ...)                          \
 private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
 template <typename VISITOR, typename FN>                  \
@@ -34,13 +35,17 @@ void __Accept (const VISITOR &visitor, FN fn) const       \
 {                                                         \
     visitor.Visit (fn, __VA_ARGS__);                      \
 }                                                         \
+auto __Tuple () const                                     \
+{                                                         \
+    return std::make_tuple (__VA_ARGS__);                 \
+}                                                         \
 static const std::vector<std::string> &__FieldNames ()    \
 {                                                         \
     static const std::vector<std::string> _fieldNames {   \
         BOT_ORM_Impl::ExtractFieldName (#__VA_ARGS__) };  \
     return _fieldNames;                                   \
 }                                                         \
-constexpr static const char *__TableName =  #_MY_CLASS_;  \
+constexpr static const char *__TableName =  _TABLE_NAME_; \
 
 // Nullable Template
 // http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646
@@ -344,23 +349,23 @@ namespace BOT_ORM_Impl
 	};
 
 	// Using a _SizeT to specify the Index :-), Cool
-	template < size_t > struct _SizeT {};
+	template <size_t> struct _SizeT {};
 
 	// Tuple Visitor
 	// http://stackoverflow.com/questions/18155533/how-to-iterate-through-stdtuple
 
-	template < typename TupleType, typename ActionType >
+	template <typename TupleType, typename ActionType>
 	inline void TupleVisitor (TupleType &tuple, ActionType action)
 	{
 		TupleVisitor_Impl (tuple, action,
 						   _SizeT<std::tuple_size<TupleType>::value> ());
 	}
 
-	template < typename TupleType, typename ActionType >
+	template <typename TupleType, typename ActionType>
 	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
 								   _SizeT<0>) {}
 
-	template < typename TupleType, typename ActionType, size_t N >
+	template <typename TupleType, typename ActionType, size_t N>
 	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
 								   _SizeT<N>)
 	{
@@ -390,14 +395,6 @@ namespace BOT_ORM_Impl
 
 namespace BOT_ORM
 {
-	namespace Helper
-	{
-		enum class JoinTypes
-		{
-			Inner, Left, Right, Full
-		};
-	}
-
 	class ORMapper
 	{
 	public:
@@ -454,19 +451,21 @@ namespace BOT_ORM
 		}
 
 		template <typename C>
-		void Insert (const C &entity)
+		void Insert (const C &entity, bool withId = true)
 		{
 			std::ostringstream os;
 			size_t index = 0;
 			auto fieldCount = C::__FieldNames ().size ();
 
 			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-							 [&os, &index, fieldCount] (auto &val)
+							 [&os, &index, fieldCount, withId] (auto &val)
 			{
-				if (++index != fieldCount)
-					BOT_ORM_Impl::SerializeValue (os, val) << ',';
+				if (index == 0 && !withId)
+					os << "null";
 				else
 					BOT_ORM_Impl::SerializeValue (os, val);
+				if (++index != fieldCount)
+					os << ',';
 				return true;
 			});
 
@@ -476,7 +475,7 @@ namespace BOT_ORM
 		}
 
 		template <typename In>
-		void InsertRange (const In &entities)
+		void InsertRange (const In &entities, bool withId = true)
 		{
 			using C = typename In::value_type;
 
@@ -490,12 +489,14 @@ namespace BOT_ORM
 
 				size_t index = 0;
 				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-								 [&os, &index, fieldCount] (auto &val)
+								 [&os, &index, fieldCount, withId] (auto &val)
 				{
-					if (++index != fieldCount)
-						BOT_ORM_Impl::SerializeValue (os, val) << ',';
+					if (index == 0 && !withId)
+						os << "null";
 					else
 						BOT_ORM_Impl::SerializeValue (os, val);
+					if (++index != fieldCount)
+						os << ',';
 					return true;
 				});
 
@@ -607,9 +608,45 @@ namespace BOT_ORM
 
 		// Basic Utility: Expr, SetExpr
 
-		struct Expr
+		struct Field
 		{
-			std::string expr;
+			std::string fieldName;
+			const char *tableName;
+		};
+
+		class Expr
+		{
+		public:
+			Expr (const Field &field, std::string op_val)
+				: exprs
+			{ {
+				field.fieldName + std::move (op_val),
+				field.tableName
+			} }
+			{}
+
+			Expr (const Field &field1,
+				  std::string op,
+				  const Field &field2)
+				: exprs
+			{
+				{ field1.fieldName, field1.tableName },
+				{ std::move (op), nullptr},
+				{field2.fieldName, field2.tableName }
+			}
+			{}
+
+			std::string ToString (bool withField) const
+			{
+				std::stringstream out;
+				for (const auto &expr : exprs)
+				{
+					if (withField && expr.second != nullptr)
+						out << expr.second << ".";
+					out << expr.first;
+				}
+				return out.str ();
+			}
 
 			inline Expr operator && (const Expr &right) const
 			{ return And_Or (right, " and "); }
@@ -617,76 +654,54 @@ namespace BOT_ORM
 			{ return And_Or (right, " or "); }
 
 		protected:
+			std::list<std::pair<std::string, const char*>> exprs;
+
 			Expr And_Or (const Expr &right, std::string logOp) const
 			{
 				auto ret = *this;
-				ret.expr = "(" + ret.expr + std::move (logOp)
-					+ right.expr + ")";
+				auto rigthExprs = right.exprs;
+				ret.exprs.emplace_front ("(", nullptr);
+				ret.exprs.emplace_back (std::move (logOp), nullptr);
+				ret.exprs.splice (ret.exprs.cend (), std::move (rigthExprs));
+				ret.exprs.emplace_back (")", nullptr);
 				return std::move (ret);
 			}
 		};
 
 		struct SetExpr
 		{
+			SetExpr (const Field &field,
+					 std::string op_val)
+				: expr { field.fieldName + op_val }
+			{}
+
+			const std::string &ToString () const
+			{ return expr; }
+
+		protected:
 			std::string expr;
 		};
 
 		// Basic Utility: Field, NullableField
 
 		template <typename T>
-		struct Field
+		struct NormalField : public Field
 		{
-			std::string fieldName;
+			NormalField (std::string fieldName,
+						 const char *tableName)
+				: Field
+			{
+				std::move (fieldName),
+				std::move (tableName)
+			}
+			{}
 
 			inline SetExpr operator = (T value)
 			{
 				std::ostringstream os;
-				BOT_ORM_Impl::SerializeValue (os << fieldName << "=",
+				BOT_ORM_Impl::SerializeValue (os << "=",
 											  value);
-				return SetExpr { os.str () };
-			}
-
-			// With Value
-
-			inline Expr operator == (T value)
-			{ return ToExpr ("=", std::move (value)); }
-			inline Expr operator != (T value)
-			{ return ToExpr ("!=", std::move (value)); }
-
-			inline Expr operator > (T value)
-			{ return ToExpr (">", std::move (value)); }
-			inline Expr operator >= (T value)
-			{ return ToExpr (">=", std::move (value)); }
-
-			inline Expr operator < (T value)
-			{ return ToExpr ("<", std::move (value)); }
-			inline Expr operator <= (T value)
-			{ return ToExpr ("<=", std::move (value)); }
-
-			// With Field
-
-			inline Expr operator == (const Field &op)
-			{ return Expr { fieldName + "=" + op.fieldName }; }
-			inline Expr operator != (const Field &op)
-			{ return Expr { fieldName + "!=" + op.fieldName }; }
-
-			inline Expr operator > (const Field &op)
-			{ return Expr { fieldName + ">" + op.fieldName }; }
-			inline Expr operator >= (const Field &op)
-			{ return Expr { fieldName + ">=" + op.fieldName }; }
-
-			inline Expr operator < (const Field &op)
-			{ return Expr { fieldName + "<" + op.fieldName }; }
-			inline Expr operator <= (const Field &op)
-			{ return Expr { fieldName + "<=" + op.fieldName }; }
-
-		protected:
-			Expr ToExpr (std::string op, const T &value)
-			{
-				std::ostringstream os;
-				BOT_ORM_Impl::SerializeValue (os << fieldName << op,
-											  value);
-				return Expr { os.str () };
+				return SetExpr { *this, os.str () };
 			}
 
 		private:
@@ -700,60 +715,31 @@ namespace BOT_ORM
 		};
 
 		template <typename T>
-		struct NullableField : public Field<T>
+		struct NullableField : public NormalField<T>
 		{
-			NullableField (std::string fieldName)
-				: Field<T> { std::move (fieldName) } {}
-
-			inline SetExpr operator = (nullptr_t)
-			{ return SetExpr { Field<T>::fieldName + "=null" }; }
-			inline Expr operator == (nullptr_t)
-			{ return Expr { Field<T>::fieldName + " is null" }; }
-			inline Expr operator != (nullptr_t)
-			{ return Expr { Field<T>::fieldName + " is not null" }; }
+			NullableField (std::string fieldName,
+						   const char *tableName)
+				: NormalField<T>
+			{
+				std::move (fieldName),
+				std::move (tableName)
+			}
+			{}
 
 			inline SetExpr operator = (T value)
 			{
 				std::ostringstream os;
-				BOT_ORM_Impl::SerializeValue (
-					os << Field<T>::fieldName << "=",
-					value);
-				return SetExpr { os.str () };
+				BOT_ORM_Impl::SerializeValue (os << "=",
+											  value);
+				return SetExpr { *this, os.str () };
 			}
 
-			// With Value
-
-			inline Expr operator == (T value)
-			{ return Field<T>::ToExpr ("=", std::move (value)); }
-			inline Expr operator != (T value)
-			{ return Field<T>::ToExpr ("!=", std::move (value)); }
-
-			inline Expr operator > (T value)
-			{ return Field<T>::ToExpr (">", std::move (value)); }
-			inline Expr operator >= (T value)
-			{ return Field<T>::ToExpr (">=", std::move (value)); }
-
-			inline Expr operator < (T value)
-			{ return Field<T>::ToExpr ("<", std::move (value)); }
-			inline Expr operator <= (T value)
-			{ return Field<T>::ToExpr ("<=", std::move (value)); }
-
-			// With Field
-
-			inline Expr operator == (const Field<T> &op)
-			{ return Expr { Field<T>::fieldName + "=" + op.fieldName }; }
-			inline Expr operator != (const Field<T> &op)
-			{ return Expr { Field<T>::fieldName + "!=" + op.fieldName }; }
-
-			inline Expr operator > (const Field<T> &op)
-			{ return Expr { Field<T>::fieldName + ">" + op.fieldName }; }
-			inline Expr operator >= (const Field<T> &op)
-			{ return Expr { Field<T>::fieldName + ">=" + op.fieldName }; }
-
-			inline Expr operator < (const Field<T> &op)
-			{ return Expr { Field<T>::fieldName + "<" + op.fieldName }; }
-			inline Expr operator <= (const Field<T> &op)
-			{ return Expr { Field<T>::fieldName + "<=" + op.fieldName }; }
+			inline SetExpr operator = (nullptr_t)
+			{ return SetExpr { *this, "=null" }; }
+			inline Expr operator == (nullptr_t)
+			{ return Expr { *this, " is null" }; }
+			inline Expr operator != (nullptr_t)
+			{ return Expr { *this, " is not null" }; }
 		};
 
 		// Basic Utility: FieldExtractor
@@ -764,7 +750,7 @@ namespace BOT_ORM
 			const C &_queryHelper;
 
 			template <typename T>
-			std::string FieldName (const T &property)
+			std::string _FieldName (const T &property)
 			{
 				size_t index = 0;
 				_queryHelper.__Accept (BOT_ORM_Impl::FnVisitor (),
@@ -780,7 +766,6 @@ namespace BOT_ORM
 				if (index == fieldNames.size ())
 					throw std::runtime_error ("No such Field in the Table");
 				return fieldNames[index];
-				//return C::__TableName + ("." + fieldNames[index]);
 			}
 
 		public:
@@ -788,12 +773,12 @@ namespace BOT_ORM
 				: _queryHelper (queryHelper) {}
 
 			template <typename T>
-			inline Field<T> operator () (const T &property)
-			{ return Field<T> { FieldName (property) }; }
+			inline NormalField<T> operator () (const T &property)
+			{ return NormalField<T> { _FieldName (property), C::__TableName }; }
 
 			template <typename T>
 			inline NullableField<T> operator () (const Nullable<T> &property)
-			{ return NullableField<T> { FieldName (property) }; }
+			{ return NullableField<T> { _FieldName (property), C::__TableName }; }
 		};
 
 		// Update & Delete By Condition
@@ -804,7 +789,7 @@ namespace BOT_ORM
 		{
 			_connector.Execute ("delete from " +
 								std::string (C::__TableName) +
-								" where " + expr.expr + ";");
+								" where " + expr.ToString (false) + ";");
 		}
 
 		template <typename C, typename... Args>
@@ -818,14 +803,14 @@ namespace BOT_ORM
 			BOT_ORM_Impl::FnVisitor {}.Visit (
 				[&setSql, &count] (const SetExpr &setExpr)
 			{
-				setSql << setExpr.expr;
+				setSql << setExpr.ToString ();
 				if (--count != 0) setSql << ",";
 				return true;
 			}, setExprs...);
 			_connector.Execute ("update " +
 								std::string (C::__TableName) +
 								" " + setSql.str () +
-								" where " + expr.expr + ";");
+								" where " + expr.ToString (false) + ";");
 		}
 
 		// Query Utility: AggregateFunc
@@ -842,32 +827,45 @@ namespace BOT_ORM
 		class Queryable
 		{
 		public:
-			Queryable (const QueryResult &queryHelper,
-					   std::string querySource,
-					   ORMapper *pMapper) :
-				_queryHelper (queryHelper),
-				_querySource (std::move (querySource)),
-				_pMapper (pMapper)
+			Queryable (ORMapper *pMapper,
+					   QueryResult queryHelper,
+					   std::string queryFrom,
+					   std::string queryTarget = "*",
+					   std::string sqlWhere = "",
+					   std::string sqlOrderBy = "",
+					   std::string sqlLimit = "",
+					   std::string sqlOffset = "") :
+				_pMapper (pMapper),
+				_queryHelper (std::move (queryHelper)),
+				_sqlFrom (std::move (queryFrom)),
+				_sqlTarget (std::move (queryTarget)),
+				_sqlWhere (std::move (sqlWhere)),
+				_sqlOrderBy (std::move (sqlOrderBy)),
+				_sqlLimit (std::move (sqlLimit)),
+				_sqlOffset (std::move (sqlOffset))
 			{}
+
+			// Result Type
+			typedef typename QueryResult result_type;
 
 			// Where
 			inline Queryable &Where (const Expr &expr)
 			{
-				_sqlWhere = " where (" + expr.expr + ")";
+				_sqlWhere = " where (" + expr.ToString (true) + ")";
 				return *this;
 			}
 
 			// Order By
-			template <typename T>
-			inline Queryable &OrderBy (const Field<T> &field)
+			inline Queryable &OrderBy (const Field &field)
 			{
-				_sqlOrderBy = " order by " + field.fieldName;
+				_sqlOrderBy = " order by " +
+					(field.tableName + ("." + field.fieldName));
 				return *this;
 			}
-			template <typename T>
-			inline Queryable &OrderByDescending (const Field<T> &field)
+			inline Queryable &OrderByDescending (const Field &field)
 			{
-				_sqlOrderBy = " order by " + field.fieldName + " desc";
+				_sqlOrderBy = " order by " +
+					(field.tableName + ("." + field.fieldName)) + " desc";
 				return *this;
 			}
 
@@ -883,34 +881,47 @@ namespace BOT_ORM
 				return *this;
 			}
 
-			// Todo
-
 			// Join
-			//template <typename C>
-			//auto Join (const C &queryHelper2,
-			//		   Helper::JoinTypes joinType,
-			//		   const Expr &expr)
-			//{
-			//	auto conj = std::make_tuple (_queryHelper, queryHelper2);
-			//	return Queryable<decltype (conj)>
-			//	{
-			//		conj, _JoinStr (joinType) + _GetFromSql () +
-			//			" on " + expr.expr, _pMapper };
-			//}
-
-			// Retrieve Select Result
-			std::vector<QueryResult> ToVector ()
+			template <typename C>
+			auto Join (const C &queryHelper2,
+					   const Expr &onExpr)
 			{
-				std::vector<QueryResult> ret;
-				_pMapper->_Select (_queryHelper, ret, _GetFromSql ());
-				return std::move (ret);
+				return _Transform (
+					_sqlTarget,
+					_sqlFrom + " join " +
+					std::string (C::__TableName) +
+					" on " + onExpr.ToString (true),
+					_ToTuple (_queryHelper, queryHelper2));
 			}
 
-			std::list<QueryResult> ToList ()
+			template <typename C>
+			auto LeftJoin (const C &queryHelper2,
+						   const Expr &onExpr)
 			{
-				std::list<QueryResult> ret;
-				_pMapper->_Select (_queryHelper, ret, _GetFromSql ());
-				return std::move (ret);
+				return _Transform (
+					_sqlTarget,
+					_sqlFrom + " left join " +
+					std::string (C::__TableName) +
+					" on " + onExpr.ToString (true),
+					_ToTuple (_queryHelper, queryHelper2));
+			}
+
+			template <typename T>
+			auto GroupBy (const NormalField<T> &field)
+			{
+				// Todo
+				// Having
+			}
+
+			// Select
+			template <typename... Args>
+			auto Select (const Args & ... args)
+			{
+				return _Transform (
+					_GetTargetSql (args...),
+					_sqlFrom,
+					_SelectToTuple (args...)
+				);
 			}
 
 			// Aggregate
@@ -924,48 +935,168 @@ namespace BOT_ORM
 				return std::move (ret);
 			}
 
+			// Retrieve Select Result
+			std::vector<QueryResult> ToVector ()
+			{
+				std::vector<QueryResult> ret;
+				_pMapper->_Select (_queryHelper, ret, _sqlTarget, _GetFromSql ());
+				return std::move (ret);
+			}
+
+			std::list<QueryResult> ToList ()
+			{
+				std::list<QueryResult> ret;
+				_pMapper->_Select (_queryHelper, ret, _sqlTarget, _GetFromSql ());
+				return std::move (ret);
+			}
+
 		protected:
 			ORMapper *_pMapper;
-			const QueryResult &_queryHelper;
+			QueryResult _queryHelper;
 
-			std::string _querySource;
+			std::string _sqlFrom;
+			std::string _sqlTarget;
+
 			std::string _sqlWhere;
 			std::string _sqlOrderBy;
 			std::string _sqlLimit, _sqlOffset;
 
+			// Return "from ..." for Query
 			inline std::string _GetFromSql () const
 			{
-				return _querySource + _sqlWhere +
+				return _sqlFrom + _sqlWhere +
 					_sqlOrderBy + _sqlLimit + _sqlOffset;
 			}
 
-			// Todo
+			// Return a new Queryable Object
+			template <typename... Args>
+			auto _Transform (std::string target,
+							 std::string from,
+							 std::tuple<Args...> newQueryHelper)
+			{
+				return Queryable<decltype (newQueryHelper)>
+				{
+					_pMapper,
+						std::move (newQueryHelper),
+						"(" + std::move (from) + ")",
+						std::move (target),
+						_sqlWhere, _sqlOrderBy,
+						_sqlLimit, _sqlOffset
+				};
+			}
 
-			//inline static std::string _JoinStr (
-			//	Helper::JoinTypes joinType)
-			//{
-			//	switch (joinType)
-			//	{
-			//	case JoinTypes::Inner:
-			//		return "inner join ";
-			//	case JoinTypes::Left:
-			//		return "left join ";
-			//	case JoinTypes::Right:
-			//		return "right join ";
-			//	case JoinTypes::Full:
-			//		return "full join ";
-			//	default:
-			//		throw std::runtime_error ("No Such type...");
-			//	}
-			//}
+			// Return Select Target String
+			template <typename T>
+			static inline std::string _GetTargetSql (const NormalField<T> &field)
+			{
+				return field.tableName + ("." + field.fieldName);
+			}
+			template <typename T>
+			static inline std::string _GetTargetSql (const NullableField<T> &field)
+			{
+				return field.tableName + ("." + field.fieldName);
+			}
+			template <typename T>
+			static inline std::string _GetTargetSql (const AggregateFunc<T> &agg)
+			{
+				return agg.function;
+			}
+			template <typename Arg, typename... Args>
+			static inline std::string _GetTargetSql (const Arg &arg,
+													 const Args & ... args)
+			{
+				return _GetTargetSql (arg) + "," + _GetTargetSql (args...);
+			}
+
+			// Return Select Target Tuple
+			template <typename T>
+			static inline auto _SelectToTuple (const NormalField<T> &field)
+			{
+				return std::make_tuple (Nullable<T> {});
+			}
+			template <typename T>
+			static inline auto _SelectToTuple (const NullableField<T> &field)
+			{
+				return std::make_tuple (Nullable<T> {});
+			}
+			template <typename T>
+			static inline auto _SelectToTuple (const AggregateFunc<T> &agg)
+			{
+				return std::make_tuple (Nullable<T> {});
+			}
+			template <typename Arg, typename... Args>
+			static inline auto _SelectToTuple (const Arg &arg,
+											   const Args & ... args)
+			{
+				return std::tuple_cat (_SelectToTuple (arg),
+									   _SelectToTuple (args...));
+			}
+
+			// To Nullable
+			// Get Nullable Value Wrappers for non-nullable Types
+			template <typename T>
+			static inline auto _ToNullable (const T &val)
+			{
+				return Nullable<T> (val);
+			}
+			template <typename T>
+			static inline auto _ToNullable (const Nullable<T> &val)
+			{
+				return val;
+			}
+
+			// Tuple Nullable-Cat
+			// Covert Tuple to Tuple with all Nullable Fields
+			template <typename TupleType>
+			static inline auto _ToNullableTuple (TupleType &tuple,
+												 BOT_ORM_Impl::_SizeT<1>)
+			{
+				return std::make_tuple (_ToNullable (std::get<0> (tuple)));
+			}
+			template <typename TupleType, size_t N>
+			static inline auto _ToNullableTuple (TupleType &tuple,
+												 BOT_ORM_Impl::_SizeT<N>)
+			{
+				return std::tuple_cat (
+					_ToNullableTuple (tuple, BOT_ORM_Impl::_SizeT<N - 1> {}),
+					std::make_tuple (_ToNullable (std::get<N - 1> (tuple)))
+				);
+			}
+
+			// Flaten Arguments into Tuple
+			template <typename C>
+			static inline auto _ToTuple (const C &arg)
+			{
+				return _ToNullableTuple (
+					arg.__Tuple (),
+					BOT_ORM_Impl::_SizeT<
+					std::tuple_size<decltype (arg.__Tuple ())
+					>::value> {}
+				);
+			}
+			template <typename... Args>
+			static inline auto _ToTuple (const std::tuple<Args...>& t)
+			{
+				// _ToNullableTuple is not necessary
+				return t;
+			}
+			template <typename Arg, typename... Args>
+			static inline auto _ToTuple (const Arg &arg,
+										 const Args & ... args)
+			{
+				return std::tuple_cat (_ToTuple (arg),
+									   _ToTuple (args...));
+			}
 		};
 
 		template <typename C>
-		Queryable<C> Query (const C &queryHelper)
+		Queryable<C> Query (C queryHelper)
 		{
-			return Queryable<C> (queryHelper,
-								 std::string (C::__TableName),
-								 this);
+			static_assert (std::is_copy_constructible<C>::value,
+						   "It must be Copy Constructible");
+
+			return Queryable<C> (this, std::move (queryHelper),
+								 std::string (C::__TableName));
 		}
 
 	private:
@@ -973,12 +1104,11 @@ namespace BOT_ORM
 
 		template <typename C, typename Out>
 		void _Select (C copy, Out &out,
+					  const std::string &sqlTarget,
 					  const std::string &sqlFrom)
 		{
-			static_assert (std::is_copy_constructible<C>::value,
-						   "It must be Copy Constructible");
-
-			_connector.Execute ("select * from " + sqlFrom + ";",
+			_connector.Execute ("select " + sqlTarget +
+								" from " + sqlFrom + ";",
 								[&] (int, char **argv, char **)
 			{
 				size_t index = 0;
@@ -995,15 +1125,42 @@ namespace BOT_ORM
 					index++;
 					return true;
 				});
-				out.emplace_back (std::move (copy));
+				out.push_back (copy);
 			});
 		}
 
-		std::string _Select (const std::string &func,
+		template <typename Out, typename... Args>
+		void _Select (std::tuple<Args...> copy, Out &out,
+					  const std::string &sqlTarget,
+					  const std::string &sqlFrom)
+		{
+			_connector.Execute ("select " + sqlTarget +
+								" from " + sqlFrom + ";",
+								[&] (int argc, char **argv, char **)
+			{
+				size_t index = 0;
+				BOT_ORM_Impl::TupleVisitor (
+					copy, [&argv, &index] (auto &val)
+				{
+					if (argv[index])
+						BOT_ORM_Impl::DeserializeValue (
+							val, BOT_ORM::Nullable<std::string> (argv[index]));
+					else
+						BOT_ORM_Impl::DeserializeValue (
+							val, BOT_ORM::Nullable<std::string> (nullptr));
+					index++;
+					return true;
+				});
+				out.push_back (copy);
+			});
+		}
+
+		std::string _Select (const std::string &sqlTarget,
 							 const std::string &sqlFrom)
 		{
 			std::string ret;
-			_connector.Execute ("select " + func + " from " + sqlFrom + ";",
+			_connector.Execute ("select " + sqlTarget +
+								" from " + sqlFrom + ";",
 								[&] (int argc, char **argv, char **)
 			{
 				if (argv[0]) ret = argv[0];
@@ -1015,53 +1172,139 @@ namespace BOT_ORM
 			return ret;
 		}
 	};
+}
 
-	namespace Helper
+namespace BOT_ORM_Impl
+{
+	template <typename T>
+	BOT_ORM::ORMapper::Expr ToExpr (
+		const BOT_ORM::ORMapper::NormalField<T> &field,
+		const char *op, const T &value)
 	{
+		std::ostringstream os;
+		SerializeValue (os << op, value);
+		return BOT_ORM::ORMapper::Expr { field, os.str () };
+	}
+}
+
+namespace BOT_ORM
+{
+	namespace FieldHelper
+	{
+		using Expr = ORMapper::Expr;
+		using Field_t = ORMapper::Field;
+
+		inline Expr operator == (const Field_t &op1, const Field_t &op2)
+		{ return Expr { op1 , "=", op2 }; }
+		inline Expr operator != (const Field_t &op1, const Field_t &op2)
+		{ return Expr { op1, "!=", op2 }; }
+
+		inline Expr operator > (const Field_t &op1, const Field_t &op2)
+		{ return Expr { op1 , ">", op2 }; }
+		inline Expr operator >= (const Field_t &op1, const Field_t &op2)
+		{ return Expr { op1, ">=", op2 }; }
+
+		inline Expr operator < (const Field_t &op1, const Field_t &op2)
+		{ return Expr { op1 , "<", op2 }; }
+		inline Expr operator <= (const Field_t &op1, const Field_t &op2)
+		{ return Expr { op1, "<=", op2 }; }
+
+		template <typename T>
+		inline Expr operator == (const ORMapper::NormalField<T> &field,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (field, "=", std::move (value));
+		}
+		template <typename T>
+		inline Expr operator != (const ORMapper::NormalField<T> &field,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (field, "!=", std::move (value));
+		}
+
+		template <typename T>
+		inline Expr operator > (const ORMapper::NormalField<T> &field,
+								T value)
+		{
+			return BOT_ORM_Impl::ToExpr (field, ">", std::move (value));
+		}
+		template <typename T>
+		inline Expr operator >= (const ORMapper::NormalField<T> &field,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (field, ">=", std::move (value));
+		}
+
+		template <typename T>
+		inline Expr operator < (const ORMapper::NormalField<T> &field,
+								T value)
+		{
+			return BOT_ORM_Impl::ToExpr (field, "<", std::move (value));
+		}
+		template <typename T>
+		inline Expr operator <= (const ORMapper::NormalField<T> &field,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (field, "<=", std::move (value));
+		}
+
+		inline Expr operator & (
+			const ORMapper::NormalField<std::string> &field,
+			std::string likePattern)
+		{
+			return BOT_ORM_Impl::ToExpr (field, " like ",
+										 std::move (likePattern));
+		}
+		inline Expr operator | (
+			const ORMapper::NormalField<std::string> &field,
+			std::string likePattern)
+		{
+			return BOT_ORM_Impl::ToExpr (field, " not like ",
+										 std::move (likePattern));
+		}
+
 		template <typename C>
 		inline ORMapper::FieldExtractor<C> Field (const C &queryHelper)
 		{
 			return ORMapper::FieldExtractor<C> { queryHelper };
 		}
+	}
 
-		template <typename C>
-		inline auto All (const C &)
-		{
-			return ORMapper::AggregateFunc<C> { "*" };
-		}
+	namespace AggregateHelper
+	{
 		inline auto Count ()
 		{
 			return ORMapper::AggregateFunc<size_t> { "count (*)" };
 		}
 		template <typename T>
-		inline auto Count (const ORMapper::Field<T> &field)
+		inline auto Count (const ORMapper::NormalField<T> &field)
 		{
 			return ORMapper::AggregateFunc<size_t> { "count (" +
-				field.fieldName + ")" };
+				(field.tableName + ("." + field.fieldName)) + ")" };
 		}
 		template <typename T>
-		inline auto Sum (const ORMapper::Field<T> &field)
+		inline auto Sum (const ORMapper::NormalField<T> &field)
 		{
 			return ORMapper::AggregateFunc<T> { "sum (" +
-				field.fieldName + ")" };
+				(field.tableName + ("." + field.fieldName)) + ")" };
 		}
 		template <typename T>
-		inline auto Avg (const ORMapper::Field<T> &field)
+		inline auto Avg (const ORMapper::NormalField<T> &field)
 		{
 			return ORMapper::AggregateFunc<T> { "avg (" +
-				field.fieldName + ")" };
+				(field.tableName + ("." + field.fieldName)) + ")" };
 		}
 		template <typename T>
-		inline auto Max (const ORMapper::Field<T> &field)
+		inline auto Max (const ORMapper::NormalField<T> &field)
 		{
 			return ORMapper::AggregateFunc<T> { "max (" +
-				field.fieldName + ")" };
+				(field.tableName + ("." + field.fieldName)) + ")" };
 		}
 		template <typename T>
-		inline auto Min (const ORMapper::Field<T> &field)
+		inline auto Min (const ORMapper::NormalField<T> &field)
 		{
 			return ORMapper::AggregateFunc<T> { "min (" +
-				field.fieldName + ")" };
+				(field.tableName + ("." + field.fieldName)) + ")" };
 		}
 	}
 }
