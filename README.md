@@ -12,10 +12,6 @@ written in Modern C++ style.
 
 ## Usage
 
-### Download [Latest Release Here](https://github.com/BOT-Man-JL/ORM-Lite/releases/latest)
-
-Note that there will be a NEW version for Multiple Table Operations 😉;
-
 ### [View Full Documents](docs/ORM-Lite-doc.md)
 
 ### Including *ORM Lite*
@@ -27,30 +23,30 @@ Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
 #include "ORMLite.h"
 using namespace BOT_ORM;
 
-struct MyClass
+struct UserModel
 {
-    int id;
-    double score;
-    std::string name;
+    int user_id;
+    std::string user_name;
+    double credit_count;
 
     Nullable<int> age;
     Nullable<double> salary;
     Nullable<std::string> title;
 
     // Inject ORM-Lite into this Class :-)
-    ORMAP (MyClass, id, score, name, age, salary, title);
+    ORMAP ("UserModel", user_id, user_name, credit_count,
+           age, salary, title);
 };
 ```
 
 `Nullable<T>` helps us construct `Nullable` Value in C++,
 which is described in the [Document](docs/ORM-Lite-doc.md) 😁
 
-In this Sample, `ORMAP (MyClass, ...)` do that:
-- `Class MyClass` will be mapped into `TABLE MyClass`;
-- Not `Nullable` members will be mapped as `NOT NULL`;
-- `id, score, name, age, salary, title` will be mapped into 
-  `INT id NOT NULL`, `REAL score NOT NULL`, `TEXT name NOT NULL`,
-  `INT age`, `REAL salary` and `TEXT title` respectively;
+In this Sample, `ORMAP ("UserModel", ...)` do that:
+- `Class UserModel` will be mapped into `TABLE UserModel`;
+- NOT `Nullable` members will be mapped as `NOT NULL`;
+- `int, double, std::string` will be mapped into
+  `INT, REAL, TEXT` respectively;
 - The first entry `id` will be set as the **Primary Key** of the Table;
 
 ### Create or Drop a Table for the Class
@@ -59,11 +55,11 @@ In this Sample, `ORMAP (MyClass, ...)` do that:
 // Open a Connection with *test.db*
 ORMapper mapper ("test.db");
 
-// Create a table for "MyClass"
-mapper.CreateTbl (MyClass {});
+// Create a table for "UserModel"
+mapper.CreateTbl (UserModel {});
 
-// Drop the table "MyClass"
-mapper.DropTbl (MyClass {});
+// Drop the table "UserModel"
+mapper.DropTbl (UserModel {});
 ```
 
 | id| score| name|    age|  salary|  title|
@@ -78,23 +74,23 @@ mapper.DropTbl (MyClass {});
 #### Basic Usage
 
 ``` cpp
-std::vector<MyClass> initObjs =
+std::vector<UserModel> initObjs =
 {
-    { 0, 0.2, "John" },
-    { 1, 0.4, "Jack" },
-    { 2, 0.6, "Jess" }
+    { 0, "John", 0.2, 21, nullptr, nullptr },
+    { 1, "Jack", 0.4, nullptr, 3.14, nullptr },
+    { 2, "Jess", 0.6, nullptr, nullptr, std::string ("Dr.") }
 };
 
 // Insert Values into the table
-for (const auto obj : initObjs)
+for (const auto &obj : initObjs)
     mapper.Insert (obj);
 
-// Update Entry by KEY (id)
+// Update Entry by Primary Key
 initObjs[1].salary = nullptr;
 initObjs[1].title = "St.";
 mapper.Update (initObjs[1]);
 
-// Delete Entry by KEY (id)
+// Delete Entry by Primary Key
 mapper.Delete (initObjs[2]);
 
 // Transactional Statements
@@ -103,20 +99,20 @@ try
     mapper.Transaction ([&] ()
     {
         mapper.Delete (initObjs[0]);
-        mapper.Insert (MyClass { 1, 0, "Joke" });
+        mapper.Insert (UserModel { 1, "Joke", 0 });
     });
 }
 catch (const std::exception &ex)
 {
     // If any statement Failed, throw an exception
-    // "SQL error: UNIQUE constraint failed: MyClass.id"
+    // "SQL error: UNIQUE constraint failed: UserModel.id"
 
     // Remarks:
     // mapper.Delete (initObjs[0]); will not applied :-)
 }
 
 // Select All to List
-auto result1 = mapper.Query (MyClass {}).ToList ();
+auto result1 = mapper.Query (UserModel {}).ToList ();
 //   result1 = [{ 0, 0.2, "John", 21,   null, null  },
 //              { 1, 0.4, "Jack", null, null, "St." }]
 ```
@@ -124,9 +120,10 @@ auto result1 = mapper.Query (MyClass {}).ToList ();
 #### Batch Operations
 
 ``` cpp
-std::vector<MyClass> dataToSeed;
+std::vector<UserModel> dataToSeed;
 for (int i = 50; i < 100; i++)
-    dataToSeed.emplace_back (MyClass { i, i * 0.2, "July" });
+    dataToSeed.emplace_back (
+        UserModel { i, "July_" + std::to_string (i), i * 0.2 });
 
 // Insert by Batch Insert
 mapper.Transaction ([&] () {
@@ -135,7 +132,7 @@ mapper.Transaction ([&] () {
 
 for (size_t i = 0; i < 20; i++)
 {
-    dataToSeed[i + 30].age = 30 + (int) i;
+    dataToSeed[i + 30].age = 30 + (int) i / 2;
     dataToSeed[i + 20].title = "Mr. " + std::to_string (i);
 }
 
@@ -148,61 +145,149 @@ mapper.Transaction ([&] () {
 #### Composite Query
 
 ``` cpp
-// Define a Query Helper Object
-MyClass helper;
+// Define a Query Helper Object and its Field Extractor
+UserModel helper;
+auto field = Field (helper);
 
 // Select by Query :-)
-auto result2 = mapper.Query (helper)   // Link 'helper' to its fields
+auto result2 = mapper.Query (UserModel {})
     .Where (
-        Field (helper.name) == "July" &&
-        (Field (helper.age) >= 35 && Field (helper.title) != nullptr)
+        field (helper.user_name) & std::string ("July%") &&
+        (field (helper.age) >= 32 &&
+         field (helper.title) != nullptr)
     )
-    .OrderByDescending (helper.id)
+    .OrderByDescending (field (helper.age))
+    .OrderBy (field (helper.user_id))
     .Take (3)
     .Skip (1)
     .ToVector ();
 
 // Remarks:
-// sql = SELECT * FROM MyClass
-//       WHERE ((name='July' AND (age>=35 AND title IS NOT NULL)))
-//       ORDER BY id DESC
+// sql = SELECT * FROM UserModel
+//       WHERE (name LIKE 'July%' AND
+//              (age>=32 AND title IS NOT NULL))
+//       ORDER BY age DESC
+//       ORDER BY id
 //       LIMIT 3 OFFSET 1
-// result2 = [{ 88, 17.6, "July", 38, null, "Mr. 18" },
-//            { 87, 17.4, "July", 37, null, "Mr. 17" },
-//            { 86, 17.2, "July", 36, null, "Mr. 16" }]
+// result2 = [{ 89, 17.8, "July_89", 34, null, "Mr. 19" },
+//            { 86, 17.2, "July_86", 33, null, "Mr. 16" },
+//            { 87, 17.4, "July_87", 33, null, "Mr. 17" }]
 
-// Reusable Query Object :-)
-auto query = mapper.Query (helper)     // Link 'helper' to its fields
-    .Where (Field (helper.name) == "July");
-
-// Aggregate Function by Query :-)
-auto count = query.Count ();
+// Calculate Aggregate Function by Query :-)
+auto avg = mapper.Query (UserModel {})
+    .Where (field (helper.user_name) & std::string ("July%"))
+    .Aggregate (Avg (field (helper.credit_count)));
 
 // Remarks:
-// sql = SELECT COUNT (*) FROM MyClass WHERE (name='July')
-// count = 50
+// sql = SELECT AVG (credit_count) FROM UserModel
+//       WHERE (name LIKE 'July')
+// avg = 14.9
 
-// Update by Query :-)
-query.Update (helper.score = 10, helper.name = "Jully");
-
-// Remarks:
-// sql = UPDATE MyClass SET score=10,name='Jully' WHERE (name='July')
-
-// Delete by Query :-)
-mapper.Query (helper)                  // Link 'helper' to its fields
-    .Where (helper.name = "Jully")     // Trick ;-) (Detailed in Docs)
-    .Delete ();
+auto count = mapper.Query (UserModel {})
+    .Where (field (helper.user_name) | std::string ("July%"))
+    .Aggregate (Count ());
 
 // Remarks:
-// sql = DELETE FROM MyClass WHERE (name='Jully')
+// sql = SELECT COUNT (*) FROM UserModel
+//       WHERE (name NOT LIKE 'July')
+// count = 2
+
+// Update by Condition :-)
+mapper.Update (UserModel {},
+               field (helper.user_name) == std::string ("July"),
+               field (helper.age) = 10,
+               field (helper.credit_count) = 1.0);
+
+// Remarks:
+// sql = UPDATE UserModel SET age=10,credit_count=1.0
+//       WHERE (name='July')
+
+// Delete by Condition :-)
+mapper.Delete (UserModel {},
+               field (helper.user_id) >= 90);
+
+// Remarks:
+// sql = DELETE FROM UserModel WHERE (id>=90)
+```
+
+#### Multi-Table Query
+
+``` cpp
+// Define more Query Helper Objects and their Field Extractor
+UserModel user;
+SellerModel seller;
+OrderModel order;
+field = Field (user, seller, order);
+
+// Insert Values into the table
+// mapper.Insert (..., false) means Insert without Primary Key
+for (size_t i = 0; i < 50; i++)
+    mapper.Insert (
+        OrderModel { 0,
+        (int) i / 2 + 50,
+        (int) i / 4 + 50,
+        "Item " + std::to_string (i),
+        i * 0.5 }, false);
+
+// Join Tables for Query
+auto joinedQuery = mapper.Query (UserModel {})
+    .Join (OrderModel {},
+           field (user.user_id) ==
+           field (order.user_id))
+    .LeftJoin (SellerModel {},
+               field (seller.seller_id) ==
+               field (order.seller_id))
+    .Where (field (user.user_id) >= 65);
+
+// Get Result to List
+// There is Join Called, so the Result is nullable-tuples
+auto result3 = joinedQuery.ToList ();
+
+// Remarks:
+// sql = SELECT * FROM UserModel
+//       JOIN OrderModel
+//       ON UserModel.user_id=OrderModel.user_id
+//       LEFT JOIN SellerModel
+//       ON SellerModel.seller_id=OrderModel.seller_id
+//       WHERE (UserModel.user_id>=65)
+// result3 = [(65, "July_65", 13, null, null, null,
+//             31, 65, 57, "Item 30", 15,
+//             null, null, null),
+//            (65, "July_65", 13, null, null, null,
+//             32, 65, 57, "Item 31", 15.5,
+//             null, null, null),
+//            ... ]
+
+// Group & Having ~
+// There is Select Called, so the Result is nullable-tuples
+auto result4 = joinedQuery
+    .Select (field (order.user_id),
+             field (user.user_name),
+             Avg (field (order.fee)))
+    .GroupBy (field (user.user_name))
+    .Having (Sum (field (order.fee)) >= 40.5)
+    .Take (2)
+    .ToList ();
+
+// Remarks:
+// sql = SELECT OrderModel.user_id,
+//              UserModel.user_name,
+//              AVG (OrderModel.fee)
+//       FROM UserModel
+//            JOIN OrderModel
+//            ON UserModel.user_id=OrderModel.user_id
+//            LEFT JOIN SellerModel
+//            ON SellerModel.seller_id=OrderModel.seller_id
+//       WHERE (UserModel.user_id>=65)
+//       GROUP BY UserModel.user_name
+//       HAVING SUM (OrderModel.fee)>=40.5
+// result4 = [(70, July_70, 20.25),
+//            (71, July_71, 21.25)]
 ```
 
 ## Implementation Details
 
-- Using **Visitor Pattern** to Traverse the Entity;
-- Using **Macro** `#define (...)` to Generate Codes;
-- Using `std::stringstream` to **(De)serialization** data;
-- Using **Self Refrence** to Implement *Fluent Interface*
-
 Details of the Design in **Chinese** are posted on my
-[Blog](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Naive-Cpp-ORM) 😉
+[Blog](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Naive-Cpp-ORM);
+
+There will be a new Post detailing the New Design soon ~ 😉

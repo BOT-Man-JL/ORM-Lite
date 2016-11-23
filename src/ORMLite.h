@@ -867,19 +867,22 @@ namespace BOT_ORM
 			}
 
 			// Order By
-			template <typename... Args>
-			inline Queryable &OrderBy (const Args & ... args)
+			template <typename T>
+			inline Queryable &OrderBy (const NormalField<T> &field)
 			{
-				_sqlOrderBy = " order by " +
-					_GetFieldSql (args...);
+				if (_sqlOrderBy.empty ())
+					_sqlOrderBy = " order by " + _GetFieldSql (field);
+				else
+					_sqlOrderBy += "," + _GetFieldSql (field);
 				return *this;
 			}
-			template <typename... Args>
-			inline Queryable &OrderByDescending (const Args & ... args)
+			template <typename T>
+			inline Queryable &OrderByDescending (const NormalField<T> &field)
 			{
-				_sqlOrderBy = " order by " +
-					_GetFieldSql (args...) +
-					" desc";
+				if (_sqlOrderBy.empty ())
+					_sqlOrderBy = " order by " + _GetFieldSql (field) + " desc";
+				else
+					_sqlOrderBy += "," + _GetFieldSql (field) + " desc";
 				return *this;
 			}
 

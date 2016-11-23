@@ -76,26 +76,28 @@ bool operator==(nullptr_t, const Nullable<T> &op2);
 ``` cpp
 struct MyClass
 {
-    int id;
-    double score;
-    std::string name;
+    int field1;
+    double field2;
+    std::string field3;
 
-    Nullable<int> age;
-    Nullable<double> salary;
-    Nullable<std::string> title;
+    Nullable<int> field4;
+    Nullable<double> field5;
+    Nullable<std::string> field6;
 
     // Inject ORM-Lite into this Class :-)
-    ORMAP (MyClass, id, score, name, age, salary, title);
+    ORMAP ("TableName", field1, field2, field3,
+           field4, field5, field6);
 };
 ```
 
-In this Sample, `ORMAP (MyClass, ...)` do that:
-- `Class MyClass` will be mapped into `TABLE MyClass`;
+In this Sample, `ORMAP ("TableName", ...)` do that:
+- Class `MyClass` will be mapped into Table `TableName`;
 - Not `Nullable` members will be mapped as `NOT NULL`;
-- `id, score, name, age, salary, title` will be mapped into 
-  `INT id NOT NULL`, `REAL score NOT NULL`, `TEXT name NOT NULL`,
-  `INT age`, `REAL salary` and `TEXT title` respectively;
-- The first entry `id` will be set as the **Primary Key** of the Table;
+- `field1, field2, field3, field4, field5, field6` will be mapped
+  into `INT field1 NOT NULL`, `REAL field2 NOT NULL`,
+  `TEXT field3 NOT NULL`, `INT field4`, `REAL field5`
+  and `TEXT field6` respectively;
+- The first entry `field1` will be set as the **Primary Key** of the Table;
 
 Note that:
 - `ORMAP (...)` will **auto** Inject some **private members**;

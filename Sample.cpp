@@ -12,50 +12,52 @@ using namespace BOT_ORM;
 using namespace BOT_ORM::FieldHelper;
 using namespace BOT_ORM::AggregateHelper;
 
-template<class T>
-void PrintNullable (const BOT_ORM::Nullable<T> &val)
+namespace PrintHelper
 {
-	if (val == nullptr)
-		std::cout << "null";
-	else
-		std::cout << val.Value ();
-}
-
-// Helper function to print a tuple of any size
-template<class Tuple, std::size_t N>
-struct TuplePrinter
-{
-	static void print (const Tuple& t)
+	template<class T>
+	void PrintNullable (const BOT_ORM::Nullable<T> &val)
 	{
-		TuplePrinter<Tuple, N - 1>::print (t);
-		std::cout << ", ";
-		PrintNullable (std::get<N - 1> (t));
+		if (val == nullptr)
+			std::cout << "null";
+		else
+			std::cout << val.Value ();
 	}
-};
 
-template<class Tuple>
-struct TuplePrinter<Tuple, 1>
-{
-	static void print (const Tuple& t)
+	template<class Tuple, std::size_t N>
+	struct TuplePrinter
 	{
-		PrintNullable (std::get<0> (t));
+		static void print (const Tuple& t)
+		{
+			TuplePrinter<Tuple, N - 1>::print (t);
+			std::cout << ", ";
+			PrintNullable (std::get<N - 1> (t));
+		}
+	};
+
+	template<class Tuple>
+	struct TuplePrinter<Tuple, 1>
+	{
+		static void print (const Tuple& t)
+		{
+			PrintNullable (std::get<0> (t));
+		}
+	};
+
+	template<class... Args>
+	void PrintTuple (const std::tuple<Args...>& t)
+	{
+		std::cout << "(";
+		TuplePrinter<decltype(t), sizeof...(Args)>::print (t);
+		std::cout << ")\n";
 	}
-};
 
-template<class... Args>
-void PrintTuple (const std::tuple<Args...>& t)
-{
-	std::cout << "(";
-	TuplePrinter<decltype(t), sizeof...(Args)>::print (t);
-	std::cout << ")\n";
-}
-
-template<class Container>
-void PrintTuples (const Container &vals)
-{
-	for (const auto &val : vals)
-		PrintTuple (val);
-	std::cout << std::endl;
+	template<class Container>
+	void PrintTuples (const Container &vals)
+	{
+		for (const auto &val : vals)
+			PrintTuple (val);
+		std::cout << std::endl;
+	}
 }
 
 struct UserModel
@@ -99,7 +101,7 @@ int main ()
 	// Open a Connection with *test.db*
 	ORMapper mapper ("test.db");
 
-	// Create tables
+	// Create Brand New Tables
 	auto initTable = [&mapper] (const auto &model)
 	{
 		try
@@ -116,6 +118,8 @@ int main ()
 	initTable (SellerModel {});
 	initTable (OrderModel {});
 
+	// ==========
+
 	/* #1 Basic Usage */
 
 	std::vector<UserModel> initObjs =
@@ -126,15 +130,15 @@ int main ()
 	};
 
 	// Insert Values into the table
-	for (const auto obj : initObjs)
+	for (const auto &obj : initObjs)
 		mapper.Insert (obj);
 
-	// Update Entry by KEY (id)
+	// Update Entry by Primary Key
 	initObjs[1].salary = nullptr;
 	initObjs[1].title = "St.";
 	mapper.Update (initObjs[1]);
 
-	// Delete Entry by KEY (id)
+	// Delete Entry by Primary Key
 	mapper.Delete (initObjs[2]);
 
 	// Transactional Statements
@@ -174,7 +178,7 @@ int main ()
 
 	for (size_t i = 0; i < 20; i++)
 	{
-		dataToSeed[i + 30].age = 30 + (int) i;
+		dataToSeed[i + 30].age = 30 + (int) i / 2;
 		dataToSeed[i + 20].title = "Mr. " + std::to_string (i);
 	}
 
@@ -188,42 +192,49 @@ int main ()
 	// Define a Query Helper Object and its Field Extractor
 	UserModel helper;
 	auto field = Field (helper);
-	field (helper.user_name);
 
 	// Select by Query :-)
 	auto result2 = mapper.Query (UserModel {})
 		.Where (
 			field (helper.user_name) & std::string ("July%") &&
-			(field (helper.age) >= 35 && field (helper.title) != nullptr)
+			(field (helper.age) >= 32 &&
+			 field (helper.title) != nullptr)
 		)
-		.OrderByDescending (field (helper.age), field (helper.user_id))
+		.OrderByDescending (field (helper.age))
+		.OrderBy (field (helper.user_id))
 		.Take (3)
 		.Skip (1)
 		.ToVector ();
 
 	// Remarks:
 	// sql = SELECT * FROM UserModel
-	//       WHERE ((name='July' AND (age>=35 AND title IS NOT NULL)))
-	//       ORDER BY id DESC
+	//       WHERE (name LIKE 'July%' AND
+	//              (age>=32 AND title IS NOT NULL))
+	//       ORDER BY age DESC
+	//       ORDER BY id
 	//       LIMIT 3 OFFSET 1
-	// result2 = [{ 88, 17.6, "July", 38, null, "Mr. 18" },
-	//            { 87, 17.4, "July", 37, null, "Mr. 17" },
-	//            { 86, 17.2, "July", 36, null, "Mr. 16" }]
+	// result2 = [{ 89, 17.8, "July_89", 34, null, "Mr. 19" },
+	//            { 86, 17.2, "July_86", 33, null, "Mr. 16" },
+	//            { 87, 17.4, "July_87", 33, null, "Mr. 17" }]
 
-	// Aggregate Function by Query :-)
+	// Calculate Aggregate Function by Query :-)
 	auto avg = mapper.Query (UserModel {})
 		.Where (field (helper.user_name) & std::string ("July%"))
 		.Aggregate (Avg (field (helper.credit_count)));
 
-	// Aggregate Function by Query :-)
+	// Remarks:
+	// sql = SELECT AVG (credit_count) FROM UserModel
+	//       WHERE (name LIKE 'July')
+	// avg = 14.9
+
 	auto count = mapper.Query (UserModel {})
 		.Where (field (helper.user_name) | std::string ("July%"))
 		.Aggregate (Count ());
 
 	// Remarks:
 	// sql = SELECT COUNT (*) FROM UserModel
-	//       WHERE (name='July')
-	// count = 50
+	//       WHERE (name NOT LIKE 'July')
+	// count = 2
 
 	// Update by Condition :-)
 	mapper.Update (UserModel {},
@@ -232,7 +243,7 @@ int main ()
 				   field (helper.credit_count) = 1.0);
 
 	// Remarks:
-	// sql = UPDATE UserModel SET score=10,credit_count=1.0
+	// sql = UPDATE UserModel SET age=10,credit_count=1.0
 	//       WHERE (name='July')
 
 	// Delete by Condition :-)
@@ -242,41 +253,78 @@ int main ()
 	// Remarks:
 	// sql = DELETE FROM UserModel WHERE (id>=90)
 
-	/* #4 Multi Table */
+	/* #4 Multi-Table Query */
 
+	// Define more Query Helper Objects and their Field Extractor
 	UserModel user;
 	SellerModel seller;
 	OrderModel order;
 	field = Field (user, seller, order);
 
-	mapper.Transaction ([&] ()
-	{
-		for (size_t i = 0; i < 50; i++)
-			mapper.Insert (
-				OrderModel { 0,
-				(int) i / 2 + 50,
-				(int) i / 4 + 50,
-				"Item " + std::to_string (i),
-				i * 0.5 },
-				false);
-	});
+	// Insert Values into the table
+	// mapper.Insert (..., false) means Insert without Primary Key
+	for (size_t i = 0; i < 50; i++)
+		mapper.Insert (
+			OrderModel { 0,
+			(int) i / 2 + 50,
+			(int) i / 4 + 50,
+			"Item " + std::to_string (i),
+			i * 0.5 }, false);
 
+	// Join Tables for Query
 	auto joinedQuery = mapper.Query (UserModel {})
 		.Join (OrderModel {},
-			   field (user.user_id) == field (order.user_id))
+			   field (user.user_id) ==
+			   field (order.user_id))
 		.LeftJoin (SellerModel {},
-				   field (seller.seller_id) == field (order.seller_id))
+				   field (seller.seller_id) ==
+				   field (order.seller_id))
 		.Where (field (user.user_id) >= 65);
 
+	// Get Result to List
+	// There is Join Called, so the Result is nullable-tuples
 	auto result3 = joinedQuery.ToList ();
 
+	// Remarks:
+	// sql = SELECT * FROM UserModel
+	//       JOIN OrderModel
+	//       ON UserModel.user_id=OrderModel.user_id
+	//       LEFT JOIN SellerModel
+	//       ON SellerModel.seller_id=OrderModel.seller_id
+	//       WHERE (UserModel.user_id>=65)
+	// result3 = [(65, "July_65", 13, null, null, null,
+	//             31, 65, 57, "Item 30", 15,
+	//             null, null, null),
+	//            (65, "July_65", 13, null, null, null,
+	//             32, 65, 57, "Item 31", 15.5,
+	//             null, null, null),
+	//            ... ]
+
+	// Group & Having ~
+	// There is Select Called, so the Result is nullable-tuples
 	auto result4 = joinedQuery
 		.Select (field (order.user_id),
 				 field (user.user_name),
 				 Avg (field (order.fee)))
 		.GroupBy (field (user.user_name))
 		.Having (Sum (field (order.fee)) >= 40.5)
+		.Take (2)
 		.ToList ();
+
+	// Remarks:
+	// sql = SELECT OrderModel.user_id,
+	//              UserModel.user_name,
+	//              AVG (OrderModel.fee)
+	//       FROM UserModel
+	//            JOIN OrderModel
+	//            ON UserModel.user_id=OrderModel.user_id
+	//            LEFT JOIN SellerModel
+	//            ON SellerModel.seller_id=OrderModel.seller_id
+	//       WHERE (UserModel.user_id>=65)
+	//       GROUP BY UserModel.user_name
+	//       HAVING SUM (OrderModel.fee)>=40.5
+	// result4 = [(70, July_70, 20.25),
+	//            (71, July_71, 21.25)]
 
 	// ==========
 
@@ -287,11 +335,11 @@ int main ()
 		{
 			std::cout << item.user_id << "\t" << item.credit_count
 				<< "\t" << item.user_name << "\t";
-			PrintNullable (item.age);
+			PrintHelper::PrintNullable (item.age);
 			std::cout << "\t";
-			PrintNullable (item.salary);
+			PrintHelper::PrintNullable (item.salary);
 			std::cout << "\t";
-			PrintNullable (item.title);
+			PrintHelper::PrintNullable (item.title);
 			std::cout << "\n";
 		}
 		std::cout << std::endl;
@@ -302,14 +350,14 @@ int main ()
 
 	// Sec 2
 	printUserModeles (result2);
-	PrintNullable (count);
+	PrintHelper::PrintNullable (count);
 	std::cout << "\n";
-	PrintNullable (avg);
+	PrintHelper::PrintNullable (avg);
 	std::cout << "\n" << std::endl;
 
 	// Sec 3
-	PrintTuples (result3);
-	PrintTuples (result4);
+	PrintHelper::PrintTuples (result3);
+	PrintHelper::PrintTuples (result4);
 
 	std::cin.get ();
 	return 0;
