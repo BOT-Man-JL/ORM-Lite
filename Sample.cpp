@@ -25,15 +25,26 @@ struct UserModel
 	ORMAP ("UserModel", user_id, user_name, credit_count, age, salary, title);
 };
 
+struct SellerModel
+{
+	int seller_id;
+	std::string seller_name;
+	double credit_count;
+
+	// Inject ORM-Lite into this Class :-)
+	ORMAP ("SellerModel", seller_id, seller_name, credit_count);
+};
+
 struct OrderModel
 {
 	int order_id;
 	int user_id;
+	int seller_id;
 	std::string product_name;
 	Nullable<double> fee;
 
 	// Inject ORM-Lite into this Class :-)
-	ORMAP ("OrderModel", order_id, user_id, product_name, fee);
+	ORMAP ("OrderModel", order_id, user_id, seller_id, product_name, fee);
 };
 
 int main ()
@@ -50,6 +61,15 @@ int main ()
 	{
 		mapper.DropTbl (UserModel {});
 		mapper.CreateTbl (UserModel {});
+	}
+	try
+	{
+		mapper.CreateTbl (SellerModel {});
+	}
+	catch (...)
+	{
+		mapper.DropTbl (SellerModel {});
+		mapper.CreateTbl (SellerModel {});
 	}
 	try
 	{
@@ -163,7 +183,8 @@ int main ()
 	auto avg = query.Aggregate (Avg (field (helper.credit_count)));
 
 	// Remarks:
-	// sql = SELECT COUNT (*) FROM UserModel WHERE (name='July')
+	// sql = SELECT COUNT (*) FROM UserModel
+	//       WHERE (name='July')
 	// count = 50
 
 	// Update by Condition :-)
@@ -173,7 +194,8 @@ int main ()
 				   field (helper.credit_count) = 1.0);
 
 	// Remarks:
-	// sql = UPDATE UserModel SET score=10,credit_count=1.0 WHERE (name='July')
+	// sql = UPDATE UserModel SET score=10,credit_count=1.0
+	//       WHERE (name='July')
 
 	// Delete by Condition :-)
 	mapper.Delete (UserModel {},
@@ -186,6 +208,8 @@ int main ()
 
 	UserModel user;
 	auto userField = Field (user);
+	SellerModel seller;
+	auto sellerField = Field (seller);
 	OrderModel order;
 	auto orderField = Field (order);
 
@@ -193,21 +217,26 @@ int main ()
 	{
 		for (size_t i = 0; i < 50; i++)
 			mapper.Insert (
-				OrderModel { 0, (int) i / 2 + 50,
+				OrderModel { 0,
+				(int) i / 2 + 50,
+				(int) i / 4 + 50,
 				"Item " + std::to_string (i), i * 0.5 },
 				false);
 	});
 
 	auto joined = mapper.Query (UserModel {})
 		.Join (OrderModel {},
-				   userField (user.user_id) == orderField (order.user_id))
+			   userField (user.user_id) == orderField (order.user_id))
+		.LeftJoin (SellerModel {},
+			   sellerField (seller.seller_id) == orderField (order.seller_id))
 		.Where (userField (user.user_id) >= 65);
 
 	auto sum = joined.Aggregate (Count ());
 
 	auto result3 = joined
 		.Select (userField (user.user_name),
-				 orderField (order.fee))
+				 Sum (orderField (order.fee)))
+		.GroupBy (userField (user.user_name))
 		.ToList ();
 
 	// ==========
@@ -241,9 +270,9 @@ int main ()
 	};
 
 	// Output Tuple Objects
-	auto printTuples = [&printNullable] (const auto &objs, size_t size)
+	auto printTuples = [&printNullable] (auto &objs, size_t size)
 	{
-		for (const auto &entry : objs)
+		for (auto &entry : objs)
 		{
 			std::cout << "(";
 			size_t index = 0;
@@ -255,14 +284,22 @@ int main ()
 			});
 			std::cout << ")\n";
 		}
+		std::cout << std::endl;
 	};
 
+	// Sec 1
 	printUserModeles (result1);
+
+	// Sec 2
 	printUserModeles (result2);
-	printTuples (result3, std::tuple_size<decltype (result3)::value_type>::value);
-	std::cout << count << std::endl;
-	std::cout << avg << std::endl;
-	std::cout << sum << std::endl;
+	printNullable (std::cout, count) << std::endl;
+	printNullable (std::cout, avg) << std::endl;
+	std::cout << std::endl;
+
+	// Sec 3
+	printTuples (result3,
+				 std::tuple_size<decltype (result3)::value_type>::value);
+	printNullable (std::cout, sum) << std::endl;
 
 	std::cin.get ();
 	return 0;
