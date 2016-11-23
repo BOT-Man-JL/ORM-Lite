@@ -14,6 +14,8 @@ written in Modern C++ style.
 
 ### [View Full Documents](docs/ORM-Lite-doc.md)
 
+This Document is under update... (Will be Updated soon 😅)
+
 ### Including *ORM Lite*
 
 Before we start,
