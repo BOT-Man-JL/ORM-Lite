@@ -5,11 +5,58 @@
 
 #include <string>
 #include <iostream>
+#include <tuple>
 
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::FieldHelper;
 using namespace BOT_ORM::AggregateHelper;
+
+template<class T>
+void PrintNullable (const BOT_ORM::Nullable<T> &val)
+{
+	if (val == nullptr)
+		std::cout << "null";
+	else
+		std::cout << val.Value ();
+}
+
+// Helper function to print a tuple of any size
+template<class Tuple, std::size_t N>
+struct TuplePrinter
+{
+	static void print (const Tuple& t)
+	{
+		TuplePrinter<Tuple, N - 1>::print (t);
+		std::cout << ", ";
+		PrintNullable (std::get<N - 1> (t));
+	}
+};
+
+template<class Tuple>
+struct TuplePrinter<Tuple, 1>
+{
+	static void print (const Tuple& t)
+	{
+		PrintNullable (std::get<0> (t));
+	}
+};
+
+template<class... Args>
+void PrintTuple (const std::tuple<Args...>& t)
+{
+	std::cout << "(";
+	TuplePrinter<decltype(t), sizeof...(Args)>::print (t);
+	std::cout << ")\n";
+}
+
+template<class Container>
+void PrintTuples (const Container &vals)
+{
+	for (const auto &val : vals)
+		PrintTuple (val);
+	std::cout << std::endl;
+}
 
 struct UserModel
 {
@@ -118,7 +165,7 @@ int main ()
 	std::vector<UserModel> dataToSeed;
 	for (int i = 50; i < 100; i++)
 		dataToSeed.emplace_back (
-			UserModel { i, "July-" + std::to_string (i), i * 0.2 });
+			UserModel { i, "July_" + std::to_string (i), i * 0.2 });
 
 	// Insert by Batch Insert
 	mapper.Transaction ([&] () {
@@ -200,7 +247,7 @@ int main ()
 	UserModel user;
 	SellerModel seller;
 	OrderModel order;
-	auto get_field = Field (user, seller, order);
+	field = Field (user, seller, order);
 
 	mapper.Transaction ([&] ()
 	{
@@ -209,69 +256,43 @@ int main ()
 				OrderModel { 0,
 				(int) i / 2 + 50,
 				(int) i / 4 + 50,
-				"Item " + std::to_string (i), i * 0.5 },
+				"Item " + std::to_string (i),
+				i * 0.5 },
 				false);
 	});
 
 	auto joinedQuery = mapper.Query (UserModel {})
 		.Join (OrderModel {},
-			   get_field (user.user_id) ==
-			   get_field (order.user_id))
+			   field (user.user_id) == field (order.user_id))
 		.LeftJoin (SellerModel {},
-				   get_field (seller.seller_id) ==
-				   get_field (order.seller_id))
-		.Where (get_field (user.user_id) >= 65);
+				   field (seller.seller_id) == field (order.seller_id))
+		.Where (field (user.user_id) >= 65);
 
 	auto result3 = joinedQuery.ToList ();
 
 	auto result4 = joinedQuery
-		.Select (get_field (order.user_id),
-				 get_field (user.user_name),
-				 Avg (get_field (order.fee)))
-		.GroupBy (get_field (user.user_name))
-		.Having (Sum (get_field (order.fee)) >= 40.5)
+		.Select (field (order.user_id),
+				 field (user.user_name),
+				 Avg (field (order.fee)))
+		.GroupBy (field (user.user_name))
+		.Having (Sum (field (order.fee)) >= 40.5)
 		.ToList ();
 
 	// ==========
 
-	// Output Nullable Field
-	auto printNullable = [] (std::ostream &os, const auto &val)
-		-> std::ostream &
-	{
-		if (val == nullptr)
-			return os << "null";
-		else
-			return os << val.Value ();
-	};
-
 	// Output UserModel Objects
-	auto printUserModeles = [&printNullable] (const auto &objs)
+	auto printUserModeles = [] (const auto &objs)
 	{
 		for (auto& item : objs)
 		{
 			std::cout << item.user_id << "\t" << item.credit_count
 				<< "\t" << item.user_name << "\t";
-			printNullable (std::cout, item.age) << "\t";
-			printNullable (std::cout, item.salary) << "\t";
-			printNullable (std::cout, item.title) << std::endl;
-		}
-		std::cout << std::endl;
-	};
-
-	// Output Tuple Objects
-	auto printTuples = [&printNullable] (auto &objs, size_t size)
-	{
-		for (auto &entry : objs)
-		{
-			std::cout << "(";
-			size_t index = 0;
-			BOT_ORM_Impl::TupleVisitor (
-				entry, [&index, &size, &printNullable] (const auto &val)
-			{
-				printNullable (std::cout, val);
-				if (++index != size) std::cout << ", ";
-			});
-			std::cout << ")\n";
+			PrintNullable (item.age);
+			std::cout << "\t";
+			PrintNullable (item.salary);
+			std::cout << "\t";
+			PrintNullable (item.title);
+			std::cout << "\n";
 		}
 		std::cout << std::endl;
 	};
@@ -281,15 +302,14 @@ int main ()
 
 	// Sec 2
 	printUserModeles (result2);
-	printNullable (std::cout, count) << std::endl;
-	printNullable (std::cout, avg) << std::endl;
-	std::cout << std::endl;
+	PrintNullable (count);
+	std::cout << "\n";
+	PrintNullable (avg);
+	std::cout << "\n" << std::endl;
 
 	// Sec 3
-	printTuples (result3,
-				 std::tuple_size<decltype (result3)::value_type>::value);
-	printTuples (result4,
-				 std::tuple_size<decltype (result4)::value_type>::value);
+	PrintTuples (result3);
+	PrintTuples (result4);
 
 	std::cin.get ();
 	return 0;

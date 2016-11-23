@@ -12,6 +12,7 @@
 #include <list>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <cctype>
 #include <thread>
 #include <sstream>
@@ -25,15 +26,15 @@
 #define ORMAP(_TABLE_NAME_, ...)                          \
 private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
-template <typename VISITOR, typename FN>                  \
-void __Accept (const VISITOR &visitor, FN fn)             \
+template <typename FN>                                    \
+void __Accept (FN fn)                                     \
 {                                                         \
-    visitor.Visit (fn, __VA_ARGS__);                      \
+    BOT_ORM_Impl::FnVisitor::Visit (fn, __VA_ARGS__);     \
 }                                                         \
-template <typename VISITOR, typename FN>                  \
-void __Accept (const VISITOR &visitor, FN fn) const       \
+template <typename FN>                                    \
+void __Accept (FN fn) const                               \
 {                                                         \
-    visitor.Visit (fn, __VA_ARGS__);                      \
+    BOT_ORM_Impl::FnVisitor::Visit (fn, __VA_ARGS__);     \
 }                                                         \
 auto __Tuple () const                                     \
 {                                                         \
@@ -316,72 +317,32 @@ namespace BOT_ORM_Impl
 		return typeStr;;
 	}
 
-	// Fn Visitor
+	// Injection Helper - Fn Visitor
 	class FnVisitor
 	{
 	public:
 		template <typename Fn, typename... Args>
-		inline void Visit (Fn fn, Args & ... args) const
+		static inline void Visit (Fn fn, Args & ... args)
 		{
 			_Visit (fn, args...);
 		}
 
 	protected:
 		template <typename Fn, typename T, typename... Args>
-		inline void _Visit (Fn fn, T &property, Args & ... args) const
+		static inline void _Visit (Fn fn, T &property, Args & ... args)
 		{
 			if (_Visit (fn, property))
 				_Visit (fn, args...);
 		}
 
 		template <typename Fn, typename T>
-		inline bool _Visit (Fn fn, T &property) const
+		static inline bool _Visit (Fn fn, T &property)
 		{
 			return fn (property);
 		}
 	};
 
-	template <size_t> struct _SizeT {};
-
-	template <typename ActionType, typename... Args>
-	inline void TupleVisitor (std::tuple<Args...> &tuple,
-							  ActionType action)
-	{
-		TupleVisitor_Impl (tuple, action, _SizeT<sizeof... (Args)> ());
-	}
-
-	template <typename TupleType, typename ActionType>
-	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
-								   _SizeT<0>) {}
-
-	template <typename TupleType, typename ActionType, size_t N>
-	inline void TupleVisitor_Impl (TupleType &tuple, ActionType action,
-								   _SizeT<N>)
-	{
-		TupleVisitor_Impl (tuple, action, _SizeT<N - 1> ());
-		action (std::get<N - 1> (tuple));
-	}
-
-	template <typename ActionType, typename... Args>
-	inline void cTupleVisitor (const std::tuple<Args...> &tuple,
-							   ActionType action)
-	{
-		cTupleVisitor_Impl (tuple, action, _SizeT<sizeof... (Args)> ());
-	}
-
-	template <typename TupleType, typename ActionType>
-	inline void cTupleVisitor_Impl (const TupleType &tuple, ActionType action,
-									_SizeT<0>) {}
-
-	template <typename TupleType, typename ActionType, size_t N>
-	inline void cTupleVisitor_Impl (const TupleType &tuple, ActionType action,
-									_SizeT<N>)
-	{
-		cTupleVisitor_Impl (tuple, action, _SizeT<N - 1> ());
-		action (std::get<N - 1> (tuple));
-	}
-
-	// Helper - Extract Field Names
+	// Injection Helper - Extract Field Names
 	std::vector<std::string> ExtractFieldName (std::string input)
 	{
 		std::vector<std::string> ret;
@@ -432,8 +393,7 @@ namespace BOT_ORM
 			std::vector<std::string> strTypes (fieldNames.size ());
 			size_t index = 0;
 
-			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-							 [&strTypes, &index] (auto &val)
+			entity.__Accept ([&strTypes, &index] (auto &val)
 			{
 				strTypes[index++] = BOT_ORM_Impl::TypeString (val);
 				return true;
@@ -465,8 +425,7 @@ namespace BOT_ORM
 			size_t index = 0;
 			auto fieldCount = C::__FieldNames ().size ();
 
-			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-							 [&os, &index, fieldCount, withId] (auto &val)
+			entity.__Accept ([&os, &index, fieldCount, withId] (auto &val)
 			{
 				if (index == 0 && !withId)
 					os << "null";
@@ -497,7 +456,6 @@ namespace BOT_ORM
 
 				size_t index = 0;
 				entity.__Accept (
-					BOT_ORM_Impl::FnVisitor (),
 					[&os, &index, fieldCount, withId] (auto &val)
 				{
 					if (index == 0 && !withId)
@@ -531,7 +489,6 @@ namespace BOT_ORM
 			osKey << "where ";
 
 			entity.__Accept (
-				BOT_ORM_Impl::FnVisitor (),
 				[&os, &osKey, &index, &fieldNames] (auto &val)
 			{
 				if (index == 0)
@@ -574,7 +531,6 @@ namespace BOT_ORM
 				std::stringstream osKey;
 
 				entity.__Accept (
-					BOT_ORM_Impl::FnVisitor (),
 					[&os, &osKey, &index, &fieldNames] (auto &val)
 				{
 					if (index == 0)
@@ -604,8 +560,7 @@ namespace BOT_ORM
 			std::stringstream os;
 			os << "where ";
 
-			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-							 [&os] (auto &val)
+			entity.__Accept ([&os] (auto &val)
 			{
 				os << C::__FieldNames ()[0] << "=";
 				BOT_ORM_Impl::SerializeValue (os, val);
@@ -756,58 +711,41 @@ namespace BOT_ORM
 
 		// Basic Utility: FieldExtractor
 
-		template <typename... Args>
 		class FieldExtractor
 		{
-			const std::tuple<const Args & ...> _queryHelper;
+			using pair_type = std::pair<std::string, const char *>;
 
-			template <typename T>
-			std::pair<std::string, const char *> Get (const T &property)
+		public:
+			template <typename... Args>
+			FieldExtractor (const Args & ... args)
 			{
-				std::pair<std::string, const char *> ret {
-					std::string {}, nullptr };
-				BOT_ORM_Impl::cTupleVisitor (
-					_queryHelper, [&ret, &property] (auto &helper)
+				BOT_ORM_Impl::FnVisitor::Visit ([this] (auto &helper)
 				{
-					if (ret.second)
-						return;
-
-					size_t index = 0;
-					helper.__Accept (BOT_ORM_Impl::FnVisitor (),
-									 [&property, &index] (auto &val)
-					{
-						if ((const void *) &property == (const void *) &val)
-							return false;
-						index++;
-						return true;
-					});
-
 					const auto &fieldNames =
 						std::remove_reference_t<
 						std::remove_cv_t<decltype (helper)>
 						>::__FieldNames ();
-					if (index != fieldNames.size ())
-					{
-						ret.first = fieldNames[index];
-						ret.second =
-							std::remove_reference_t<
-							std::remove_cv_t<decltype (helper)>
-							>::__TableName;
-					}
-				});
-				if (!ret.second)
-					throw std::runtime_error ("No Such Field...");
-				return std::move (ret);
-			}
+					constexpr auto tableName =
+						std::remove_reference_t<
+						std::remove_cv_t<decltype (helper)>
+						>::__TableName;
 
-		public:
-			FieldExtractor (const Args & ... args)
-				: _queryHelper (std::forward_as_tuple (args...)) {}
+					size_t index = 0;
+					helper.__Accept (
+						[this, &index, &fieldNames, &tableName] (auto &val)
+					{
+						_map.emplace ((const void *) &val, pair_type {
+							fieldNames[index++], tableName });
+						return true;
+					});
+					return true;
+				}, args...);
+			}
 
 			template <typename T>
 			inline NormalField<T> operator () (const T &property)
 			{
-				auto result = Get (property);
+				const auto &result = Get (property);
 				return NormalField<T> {
 					std::move (result.first), result.second };
 			}
@@ -815,9 +753,25 @@ namespace BOT_ORM
 			template <typename T>
 			inline NullableField<T> operator () (const Nullable<T> &property)
 			{
-				auto result = Get (property);
+				const auto &result = Get (property);
 				return NullableField<T> {
 					std::move (result.first), result.second };
+			}
+
+		private:
+			std::unordered_map<const void *, pair_type> _map;
+
+			template <typename T>
+			const pair_type &Get (const T &property)
+			{
+				try
+				{
+					return _map.at ((const void *) &property);
+				}
+				catch (...)
+				{
+					throw std::runtime_error ("No Such Field...");
+				}
 			}
 		};
 
@@ -840,7 +794,7 @@ namespace BOT_ORM
 			std::stringstream setSql;
 			setSql << "set ";
 			auto count = sizeof... (Args);
-			BOT_ORM_Impl::FnVisitor {}.Visit (
+			BOT_ORM_Impl::FnVisitor::Visit (
 				[&setSql, &count] (const SetExpr &setExpr)
 			{
 				setSql << setExpr.ToString ();
@@ -1053,8 +1007,7 @@ namespace BOT_ORM
 								   [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
-					copy.__Accept (BOT_ORM_Impl::FnVisitor (),
-								   [&argv, &index] (auto &val)
+					copy.__Accept ([&argv, &index] (auto &val)
 					{
 						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 						return true;
@@ -1072,8 +1025,8 @@ namespace BOT_ORM
 								   [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
-					BOT_ORM_Impl::TupleVisitor (copy,
-												[&argv, &index] (auto &val)
+					_TupleHelper<QueryResult, sizeof... (Args)>::Visit (
+						copy, [&argv, &index] (auto &val)
 					{
 						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 						return true;
@@ -1151,22 +1104,36 @@ namespace BOT_ORM
 			// Tuple Nullable-Cat
 			// Covert Tuple to Tuple with all Nullable Fields
 			template <typename TupleType, size_t N>
-			struct _ToNullableTuple
+			struct _TupleHelper
 			{
-				static inline auto fn (const TupleType &tuple)
+				static inline auto ToNullable (const TupleType &tuple)
 				{
 					return std::tuple_cat (
-						_ToNullableTuple<TupleType, N - 1>::fn (tuple),
+						_TupleHelper<TupleType, N - 1>::ToNullable (tuple),
 						std::make_tuple (_ToNullable (std::get<N - 1> (tuple)))
 					);
 				}
+
+				template <typename Fn>
+				static inline void Visit (TupleType &tuple, Fn fn)
+				{
+					_TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
+					fn (std::get<N - 1> (tuple));
+				}
 			};
 			template <typename TupleType>
-			struct _ToNullableTuple <TupleType, 1>
+			struct _TupleHelper <TupleType, 1>
 			{
-				static inline auto fn (const TupleType &tuple)
+				static inline auto ToNullable (const TupleType &tuple)
 				{
-					return std::make_tuple (_ToNullable (std::get<0> (tuple)));
+					return std::make_tuple (
+						_ToNullable (std::get<0> (tuple)));
+				}
+
+				template <typename Fn>
+				static inline void Visit (TupleType &tuple, Fn fn)
+				{
+					fn (std::get<0> (tuple));
 				}
 			};
 
@@ -1176,12 +1143,13 @@ namespace BOT_ORM
 			{
 				using TupleType = decltype (arg.__Tuple ());
 				constexpr size_t size = std::tuple_size<TupleType>::value;
-				return _ToNullableTuple<TupleType, size>::fn (arg.__Tuple ());
+				return _TupleHelper<TupleType, size>::ToNullable (
+					arg.__Tuple ());
 			}
 			template <typename... Args>
 			static inline auto _ToTuple (const std::tuple<Args...>& t)
 			{
-				// _ToNullableTuple is not necessary
+				// _TupleHelper is not necessary
 				return t;
 			}
 			template <typename Arg, typename... Args>
@@ -1320,10 +1288,9 @@ namespace BOT_ORM
 		}
 
 		template <typename... Args>
-		inline ORMapper::FieldExtractor<Args...> Field (
-			const Args & ... args)
+		inline ORMapper::FieldExtractor Field (const Args & ... args)
 		{
-			return ORMapper::FieldExtractor<Args...> { args... };
+			return ORMapper::FieldExtractor { args... };
 		}
 	}
 
