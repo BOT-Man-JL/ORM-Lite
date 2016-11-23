@@ -239,26 +239,32 @@ namespace BOT_ORM_Impl
 
 	// Helper - Deserialize
 	template <typename T>
-	inline void DeserializeValue (T &property, std::string value)
+	inline void DeserializeValue (
+		T &property, const char *value)
 	{
-		std::stringstream ostr (std::move (value));
+		std::stringstream ostr (value);
 		ostr >> property;
 	}
 
 	template <>
 	inline void DeserializeValue <std::string> (
-		std::string &property, std::string value)
+		std::string &property, const char *value)
 	{
-		property = std::move (value);
+		property = value;
 	}
 
 	template <typename T>
 	inline void DeserializeValue (
-		BOT_ORM::Nullable<T> &property, std::string value)
+		BOT_ORM::Nullable<T> &property, const char *value)
 	{
-		T val;
-		DeserializeValue (val, std::move (value));
-		property = val;
+		if (value)
+		{
+			T val;
+			DeserializeValue (val, value);
+			property = val;
+		}
+		else
+			property = nullptr;
 	}
 
 	// Helper - Get TypeString
@@ -335,11 +341,11 @@ namespace BOT_ORM_Impl
 		}
 	};
 
-	// Using a _SizeT to specify the Index :-), Cool
 	template <size_t> struct _SizeT {};
 
 	template <typename ActionType, typename... Args>
-	inline void TupleVisitor (std::tuple<Args...> &tuple, ActionType action)
+	inline void TupleVisitor (std::tuple<Args...> &tuple,
+							  ActionType action)
 	{
 		TupleVisitor_Impl (tuple, action, _SizeT<sizeof... (Args)> ());
 	}
@@ -353,6 +359,25 @@ namespace BOT_ORM_Impl
 								   _SizeT<N>)
 	{
 		TupleVisitor_Impl (tuple, action, _SizeT<N - 1> ());
+		action (std::get<N - 1> (tuple));
+	}
+
+	template <typename ActionType, typename... Args>
+	inline void cTupleVisitor (const std::tuple<Args...> &tuple,
+							   ActionType action)
+	{
+		cTupleVisitor_Impl (tuple, action, _SizeT<sizeof... (Args)> ());
+	}
+
+	template <typename TupleType, typename ActionType>
+	inline void cTupleVisitor_Impl (const TupleType &tuple, ActionType action,
+									_SizeT<0>) {}
+
+	template <typename TupleType, typename ActionType, size_t N>
+	inline void cTupleVisitor_Impl (const TupleType &tuple, ActionType action,
+									_SizeT<N>)
+	{
+		cTupleVisitor_Impl (tuple, action, _SizeT<N - 1> ());
 		action (std::get<N - 1> (tuple));
 	}
 
@@ -471,8 +496,9 @@ namespace BOT_ORM
 				os << "(";
 
 				size_t index = 0;
-				entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-								 [&os, &index, fieldCount, withId] (auto &val)
+				entity.__Accept (
+					BOT_ORM_Impl::FnVisitor (),
+					[&os, &index, fieldCount, withId] (auto &val)
 				{
 					if (index == 0 && !withId)
 						os << "null";
@@ -504,8 +530,9 @@ namespace BOT_ORM
 			os << "set ";
 			osKey << "where ";
 
-			entity.__Accept (BOT_ORM_Impl::FnVisitor (),
-							 [&os, &osKey, &index, &fieldNames] (auto &val)
+			entity.__Accept (
+				BOT_ORM_Impl::FnVisitor (),
+				[&os, &osKey, &index, &fieldNames] (auto &val)
 			{
 				if (index == 0)
 				{
@@ -559,7 +586,8 @@ namespace BOT_ORM
 					{
 						os << fieldNames[index++] << "=";
 						if (index != fieldNames.size ())
-							BOT_ORM_Impl::SerializeValue (os, val) << ',';
+							BOT_ORM_Impl::SerializeValue (os, val)
+							<< ',';
 						else
 							BOT_ORM_Impl::SerializeValue (os, val);
 					}
@@ -645,7 +673,8 @@ namespace BOT_ORM
 				auto rigthExprs = right.exprs;
 				ret.exprs.emplace_front ("(", nullptr);
 				ret.exprs.emplace_back (std::move (logOp), nullptr);
-				ret.exprs.splice (ret.exprs.cend (), std::move (rigthExprs));
+				ret.exprs.splice (ret.exprs.cend (),
+								  std::move (rigthExprs));
 				ret.exprs.emplace_back (")", nullptr);
 				return std::move (ret);
 			}
@@ -727,48 +756,68 @@ namespace BOT_ORM
 
 		// Basic Utility: FieldExtractor
 
-		template <typename C>
+		template <typename... Args>
 		class FieldExtractor
 		{
-			const C &_queryHelper;
+			const std::tuple<const Args & ...> _queryHelper;
 
 			template <typename T>
-			std::string _FieldName (const T &property)
+			std::pair<std::string, const char *> Get (const T &property)
 			{
-				size_t index = 0;
-				_queryHelper.__Accept (BOT_ORM_Impl::FnVisitor (),
-									   [&property, &index] (auto &val)
+				std::pair<std::string, const char *> ret {
+					std::string {}, nullptr };
+				BOT_ORM_Impl::cTupleVisitor (
+					_queryHelper, [&ret, &property] (auto &helper)
 				{
-					if ((const void *) &property == (const void *) &val)
-						return false;
-					index++;
-					return true;
-				});
+					if (ret.second)
+						return;
 
-				const auto &fieldNames = C::__FieldNames ();
-				if (index == fieldNames.size ())
-					throw std::runtime_error ("No such Field in the Table");
-				return fieldNames[index];
+					size_t index = 0;
+					helper.__Accept (BOT_ORM_Impl::FnVisitor (),
+									 [&property, &index] (auto &val)
+					{
+						if ((const void *) &property == (const void *) &val)
+							return false;
+						index++;
+						return true;
+					});
+
+					const auto &fieldNames =
+						std::remove_reference_t<
+						std::remove_cv_t<decltype (helper)>
+						>::__FieldNames ();
+					if (index != fieldNames.size ())
+					{
+						ret.first = fieldNames[index];
+						ret.second =
+							std::remove_reference_t<
+							std::remove_cv_t<decltype (helper)>
+							>::__TableName;
+					}
+				});
+				if (!ret.second)
+					throw std::runtime_error ("No Such Field...");
+				return std::move (ret);
 			}
 
 		public:
-			FieldExtractor (const C &queryHelper)
-				: _queryHelper (queryHelper) {}
+			FieldExtractor (const Args & ... args)
+				: _queryHelper (std::forward_as_tuple (args...)) {}
 
 			template <typename T>
 			inline NormalField<T> operator () (const T &property)
 			{
+				auto result = Get (property);
 				return NormalField<T> {
-					_FieldName (property), C::__TableName
-				};
+					std::move (result.first), result.second };
 			}
 
 			template <typename T>
 			inline NullableField<T> operator () (const Nullable<T> &property)
 			{
+				auto result = Get (property);
 				return NullableField<T> {
-					_FieldName (property), C::__TableName
-				};
+					std::move (result.first), result.second };
 			}
 		};
 
@@ -895,21 +944,20 @@ namespace BOT_ORM
 			// Join
 			template <typename C>
 			inline auto Join (const C &queryHelper2,
-							  const Expr &onExpr)
+							  const Expr &onExpr) const
 			{
-				return _Transform (
+				return _NewQuery (
 					_sqlTarget,
 					_sqlFrom + " join " +
 					std::string (C::__TableName) +
 					" on " + onExpr.ToString (true),
 					_ToTuple (_queryHelper, queryHelper2));
 			}
-
 			template <typename C>
 			inline auto LeftJoin (const C &queryHelper2,
-								  const Expr &onExpr)
+								  const Expr &onExpr) const
 			{
-				return _Transform (
+				return _NewQuery (
 					_sqlTarget,
 					_sqlFrom + " left join " +
 					std::string (C::__TableName) +
@@ -919,9 +967,9 @@ namespace BOT_ORM
 
 			// Select
 			template <typename... Args>
-			inline auto Select (const Args & ... args)
+			inline auto Select (const Args & ... args) const
 			{
-				return _Transform (
+				return _NewQuery (
 					_GetFieldSql (args...),
 					_sqlFrom,
 					_SelectToTuple (args...)
@@ -930,28 +978,26 @@ namespace BOT_ORM
 
 			// Aggregate
 			template <typename T>
-			Nullable<T> Aggregate (const AggregateFunc<T> &agg)
+			Nullable<T> Aggregate (const AggregateFunc<T> &agg) const
 			{
 				Nullable<T> ret;
 				_pMapper->_Select (
 					agg.function, _GetFromSql (),
 					[&] (int argc, char **argv, char **)
 				{
-					if (argv[0])
-						BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
+					BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
 				});
 				return std::move (ret);
 			}
 
 			// Retrieve Select Result
-			std::vector<QueryResult> ToVector ()
+			std::vector<QueryResult> ToVector () const
 			{
 				std::vector<QueryResult> ret;
 				_Select (_queryHelper, ret);
 				return std::move (ret);
 			}
-
-			std::list<QueryResult> ToList ()
+			std::list<QueryResult> ToList () const
 			{
 				std::list<QueryResult> ret;
 				_Select (_queryHelper, ret);
@@ -983,9 +1029,9 @@ namespace BOT_ORM
 
 			// Return a new Queryable Object
 			template <typename... Args>
-			auto _Transform (std::string target,
-							 std::string from,
-							 std::tuple<Args...> newQueryHelper)
+			auto _NewQuery (std::string target,
+							std::string from,
+							std::tuple<Args...> newQueryHelper) const
 			{
 				return Queryable<decltype (newQueryHelper)>
 				{
@@ -998,48 +1044,47 @@ namespace BOT_ORM
 				};
 			}
 
-			// Overloaded Select Function
+			// Select for Normal Objects
 			template <typename C, typename Out>
-			void _Select (C copy, Out &out)
+			void _Select (const C &, Out &out) const
 			{
-				_pMapper->_Select (
-					_sqlTarget, _GetFromSql (),
-					[&] (int, char **argv, char **)
+				auto copy = _queryHelper;
+				_pMapper->_Select (_sqlTarget, _GetFromSql (),
+								   [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
 					copy.__Accept (BOT_ORM_Impl::FnVisitor (),
 								   [&argv, &index] (auto &val)
 					{
-						if (argv[index])
-							BOT_ORM_Impl::DeserializeValue (val, argv[index]);
-						index++;
+						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 						return true;
 					});
 					out.push_back (copy);
 				});
 			}
 
+			// Select for Tuples
 			template <typename Out, typename... Args>
-			void _Select (std::tuple<Args...> copy, Out &out)
+			void _Select (const std::tuple<Args...> &, Out &out) const
 			{
-				_pMapper->_Select (
-					_sqlTarget, _GetFromSql (),
-					[&] (int, char **argv, char **)
+				auto copy = _queryHelper;
+				_pMapper->_Select (_sqlTarget, _GetFromSql (),
+								   [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
 					BOT_ORM_Impl::TupleVisitor (copy,
 												[&argv, &index] (auto &val)
 					{
-						if (argv[index])
-							BOT_ORM_Impl::DeserializeValue (val, argv[index]);
-						index++;
+						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 						return true;
 					});
 					out.push_back (copy);
 				});
 			}
 
-			// Return Select Field Strings
+			// Static Helper Functions
+
+			// Return Field Strings for OrderBy and Select
 			template <typename T>
 			static inline std::string _GetFieldSql (
 				const NormalField<T> &field)
@@ -1184,6 +1229,18 @@ namespace BOT_ORM_Impl
 		SerializeValue (os << op, value);
 		return BOT_ORM::ORMapper::Expr { field, os.str () };
 	}
+
+	template <typename T>
+	BOT_ORM::ORMapper::Expr ToExpr (
+		const BOT_ORM::ORMapper::AggregateFunc<T> &agg,
+		const char *op, const T &value)
+	{
+		std::ostringstream os;
+		SerializeValue (os << op, value);
+		return BOT_ORM::ORMapper::Expr {
+			BOT_ORM::ORMapper::Field { agg.function, nullptr },
+			os.str () };
+	}
 }
 
 namespace BOT_ORM
@@ -1262,10 +1319,11 @@ namespace BOT_ORM
 										 std::move (likePattern));
 		}
 
-		template <typename C>
-		inline ORMapper::FieldExtractor<C> Field (const C &queryHelper)
+		template <typename... Args>
+		inline ORMapper::FieldExtractor<Args...> Field (
+			const Args & ... args)
 		{
-			return ORMapper::FieldExtractor<C> { queryHelper };
+			return ORMapper::FieldExtractor<Args...> { args... };
 		}
 	}
 
@@ -1304,6 +1362,48 @@ namespace BOT_ORM
 		{
 			return ORMapper::AggregateFunc<T> { "min (" +
 				(field.tableName + ("." + field.fieldName)) + ")" };
+		}
+
+		// Operators
+		using Expr = ORMapper::Expr;
+
+		template <typename T>
+		inline Expr operator == (const ORMapper::AggregateFunc<T> &agg,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (agg, "=", std::move (value));
+		}
+		template <typename T>
+		inline Expr operator != (const ORMapper::AggregateFunc<T> &agg,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (agg, "!=", std::move (value));
+		}
+
+		template <typename T>
+		inline Expr operator > (const ORMapper::AggregateFunc<T> &agg,
+								T value)
+		{
+			return BOT_ORM_Impl::ToExpr (agg, ">", std::move (value));
+		}
+		template <typename T>
+		inline Expr operator >= (const ORMapper::AggregateFunc<T> &agg,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (agg, ">=", std::move (value));
+		}
+
+		template <typename T>
+		inline Expr operator < (const ORMapper::AggregateFunc<T> &agg,
+								T value)
+		{
+			return BOT_ORM_Impl::ToExpr (agg, "<", std::move (value));
+		}
+		template <typename T>
+		inline Expr operator <= (const ORMapper::AggregateFunc<T> &agg,
+								 T value)
+		{
+			return BOT_ORM_Impl::ToExpr (agg, "<=", std::move (value));
 		}
 	}
 }

@@ -53,33 +53,21 @@ int main ()
 	ORMapper mapper ("test.db");
 
 	// Create tables
-	try
+	auto initTable = [&mapper] (const auto &model)
 	{
-		mapper.CreateTbl (UserModel {});
-	}
-	catch (...)
-	{
-		mapper.DropTbl (UserModel {});
-		mapper.CreateTbl (UserModel {});
-	}
-	try
-	{
-		mapper.CreateTbl (SellerModel {});
-	}
-	catch (...)
-	{
-		mapper.DropTbl (SellerModel {});
-		mapper.CreateTbl (SellerModel {});
-	}
-	try
-	{
-		mapper.CreateTbl (OrderModel {});
-	}
-	catch (...)
-	{
-		mapper.DropTbl (OrderModel {});
-		mapper.CreateTbl (OrderModel {});
-	}
+		try
+		{
+			mapper.CreateTbl (model);
+		}
+		catch (...)
+		{
+			mapper.DropTbl (model);
+			mapper.CreateTbl (model);
+		}
+	};
+	initTable (UserModel {});
+	initTable (SellerModel {});
+	initTable (OrderModel {});
 
 	/* #1 Basic Usage */
 
@@ -153,6 +141,7 @@ int main ()
 	// Define a Query Helper Object and its Field Extractor
 	UserModel helper;
 	auto field = Field (helper);
+	field (helper.user_name);
 
 	// Select by Query :-)
 	auto result2 = mapper.Query (UserModel {})
@@ -160,7 +149,7 @@ int main ()
 			field (helper.user_name) & std::string ("July%") &&
 			(field (helper.age) >= 35 && field (helper.title) != nullptr)
 		)
-		.OrderByDescending (field (helper.user_id))
+		.OrderByDescending (field (helper.age), field (helper.user_id))
 		.Take (3)
 		.Skip (1)
 		.ToVector ();
@@ -174,13 +163,15 @@ int main ()
 	//            { 87, 17.4, "July", 37, null, "Mr. 17" },
 	//            { 86, 17.2, "July", 36, null, "Mr. 16" }]
 
-	// Reusable Query Object :-)
-	auto query = mapper.Query (UserModel {})
-		.Where (field (helper.user_name) & std::string ("July%"));
+	// Aggregate Function by Query :-)
+	auto avg = mapper.Query (UserModel {})
+		.Where (field (helper.user_name) & std::string ("July%"))
+		.Aggregate (Avg (field (helper.credit_count)));
 
 	// Aggregate Function by Query :-)
-	auto count = query.Aggregate (Count ());
-	auto avg = query.Aggregate (Avg (field (helper.credit_count)));
+	auto count = mapper.Query (UserModel {})
+		.Where (field (helper.user_name) | std::string ("July%"))
+		.Aggregate (Count ());
 
 	// Remarks:
 	// sql = SELECT COUNT (*) FROM UserModel
@@ -207,11 +198,9 @@ int main ()
 	/* #4 Multi Table */
 
 	UserModel user;
-	auto userField = Field (user);
 	SellerModel seller;
-	auto sellerField = Field (seller);
 	OrderModel order;
-	auto orderField = Field (order);
+	auto get_field = Field (user, seller, order);
 
 	mapper.Transaction ([&] ()
 	{
@@ -224,26 +213,26 @@ int main ()
 				false);
 	});
 
-	auto joined = mapper.Query (UserModel {})
+	auto joinedQuery = mapper.Query (UserModel {})
 		.Join (OrderModel {},
-			   userField (user.user_id) == orderField (order.user_id))
+			   get_field (user.user_id) ==
+			   get_field (order.user_id))
 		.LeftJoin (SellerModel {},
-			   sellerField (seller.seller_id) == orderField (order.seller_id))
-		.Where (userField (user.user_id) >= 65);
+				   get_field (seller.seller_id) ==
+				   get_field (order.seller_id))
+		.Where (get_field (user.user_id) >= 65);
 
-	auto sum = joined.Aggregate (Count ());
+	auto result3 = joinedQuery.ToList ();
 
-	auto result3 = joined
-		.Select (userField (user.user_name),
-				 Sum (orderField (order.fee)))
-		.GroupBy (userField (user.user_name))
+	auto result4 = joinedQuery
+		.Select (get_field (order.user_id),
+				 get_field (user.user_name),
+				 Avg (get_field (order.fee)))
+		.GroupBy (get_field (user.user_name))
+		.Having (Sum (get_field (order.fee)) >= 40.5)
 		.ToList ();
 
 	// ==========
-
-	// Drop tables
-	mapper.DropTbl (UserModel {});
-	mapper.DropTbl (OrderModel {});
 
 	// Output Nullable Field
 	auto printNullable = [] (std::ostream &os, const auto &val)
@@ -280,7 +269,7 @@ int main ()
 				entry, [&index, &size, &printNullable] (const auto &val)
 			{
 				printNullable (std::cout, val);
-				if (++index != size) std::cout << ",";
+				if (++index != size) std::cout << ", ";
 			});
 			std::cout << ")\n";
 		}
@@ -299,7 +288,8 @@ int main ()
 	// Sec 3
 	printTuples (result3,
 				 std::tuple_size<decltype (result3)::value_type>::value);
-	printNullable (std::cout, sum) << std::endl;
+	printTuples (result4,
+				 std::tuple_size<decltype (result4)::value_type>::value);
 
 	std::cin.get ();
 	return 0;
