@@ -9,8 +9,7 @@
 
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
-using namespace BOT_ORM::FieldHelper;
-using namespace BOT_ORM::AggregateHelper;
+using namespace BOT_ORM::Helper;
 
 namespace PrintHelper
 {
@@ -191,7 +190,7 @@ int main ()
 
 	// Define a Query Helper Object and its Field Extractor
 	UserModel helper;
-	auto field = Field (helper);
+	auto field = FieldExtractor (helper);
 
 	// Select by Query :-)
 	auto result2 = mapper.Query (UserModel {})
@@ -259,7 +258,7 @@ int main ()
 	UserModel user;
 	SellerModel seller;
 	OrderModel order;
-	field = Field (user, seller, order);
+	field = FieldExtractor (user, seller, order);
 
 	// Insert Values into the table
 	// mapper.Insert (..., false) means Insert without Primary Key
@@ -282,7 +281,7 @@ int main ()
 		.Where (field (user.user_id) >= 65);
 
 	// Get Result to List
-	// There is Join Called, so the Result is nullable-tuples
+	// There is Join Called, so the Result are Nullable-Tuples
 	auto result3 = joinedQuery.ToList ();
 
 	// Remarks:
@@ -301,14 +300,14 @@ int main ()
 	//            ... ]
 
 	// Group & Having ~
-	// There is Select Called, so the Result is nullable-tuples
+	// There is Select Called, so the Result are Nullable-Tuples
 	auto result4 = joinedQuery
 		.Select (field (order.user_id),
 				 field (user.user_name),
 				 Avg (field (order.fee)))
 		.GroupBy (field (user.user_name))
 		.Having (Sum (field (order.fee)) >= 40.5)
-		.Take (2)
+		.Skip (3)
 		.ToList ();
 
 	// Remarks:
@@ -323,8 +322,9 @@ int main ()
 	//       WHERE (UserModel.user_id>=65)
 	//       GROUP BY UserModel.user_name
 	//       HAVING SUM (OrderModel.fee)>=40.5
-	// result4 = [(70, July_70, 20.25),
-	//            (71, July_71, 21.25)]
+	//       LIMIT ~0 OFFSET 3
+	// result4 = [(73, "July_73", 23.25),
+	//            (74, "July_74", 24.25)]
 
 	// ==========
 
