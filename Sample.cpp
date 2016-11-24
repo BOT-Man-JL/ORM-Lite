@@ -10,7 +10,6 @@
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
-using namespace BOT_ORM::Helper;
 
 namespace PrintHelper
 {
@@ -208,8 +207,8 @@ int main ()
 
 	// Remarks:
 	// sql = SELECT * FROM UserModel
-	//       WHERE (name LIKE 'July%' AND
-	//              (age>=32 AND title IS NOT NULL))
+	//       WHERE (user_name LIKE 'July%' AND
+	//             (age>=32 AND title IS NOT NULL))
 	//       ORDER BY age DESC
 	//       ORDER BY id
 	//       LIMIT 3 OFFSET 1
@@ -224,7 +223,7 @@ int main ()
 
 	// Remarks:
 	// sql = SELECT AVG (credit_count) FROM UserModel
-	//       WHERE (name LIKE 'July')
+	//       WHERE (user_name LIKE 'July%')
 	// avg = 14.9
 
 	auto count = mapper.Query (UserModel {})
@@ -233,18 +232,18 @@ int main ()
 
 	// Remarks:
 	// sql = SELECT COUNT (*) FROM UserModel
-	//       WHERE (name NOT LIKE 'July')
+	//       WHERE (user_name NOT LIKE 'July%')
 	// count = 2
 
 	// Update by Condition :-)
-	//mapper.Update (UserModel {},
-	//			   field (helper.age) = 10 &&
-	//			   field (helper.credit_count) = 1.0,
-	//			   field (helper.user_name) == std::string ("July"));
+	mapper.Update (UserModel {},
+				   (field (helper.age) = 10) &&
+				   (field (helper.credit_count) = 1.0),
+				   field (helper.user_name) == std::string ("July"));
 
 	// Remarks:
 	// sql = UPDATE UserModel SET age=10,credit_count=1.0
-	//       WHERE (name='July')
+	//       WHERE (user_name='July')
 
 	// Delete by Condition :-)
 	mapper.Delete (UserModel {},

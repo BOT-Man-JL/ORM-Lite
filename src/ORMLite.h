@@ -108,6 +108,7 @@ namespace BOT_ORM
 		{ return m_value; }
 	};
 
+	// == varialbe
 	template <typename T2>
 	inline bool operator== (const Nullable<T2> &op1,
 							const Nullable<T2> &op2)
@@ -116,13 +117,13 @@ namespace BOT_ORM
 			(!op1.m_hasValue || op1.m_value == op2.m_value);
 	}
 
+	// == value
 	template <typename T2>
 	inline bool operator== (const Nullable<T2> &op,
 							const T2 &value)
 	{
 		return op.m_hasValue && op.m_value == value;
 	}
-
 	template <typename T2>
 	inline bool operator== (const T2 &value,
 							const Nullable<T2> &op)
@@ -130,13 +131,13 @@ namespace BOT_ORM
 		return op.m_hasValue && op.m_value == value;
 	}
 
+	// == nullptr
 	template <typename T2>
 	inline bool operator== (const Nullable<T2> &op,
 							nullptr_t)
 	{
 		return !op.m_hasValue;
 	}
-
 	template <typename T2>
 	inline bool operator== (nullptr_t,
 							const Nullable<T2> &op)
@@ -149,6 +150,8 @@ namespace BOT_ORM
 
 namespace BOT_ORM_Impl
 {
+	// Naive SQL Driver ... (Improved Later)
+
 	class SQLConnector
 	{
 	public:
@@ -324,6 +327,7 @@ namespace BOT_ORM_Impl
 	}
 
 	// Injection Helper - Fn Visitor
+
 	class FnVisitor
 	{
 	public:
@@ -349,6 +353,7 @@ namespace BOT_ORM_Impl
 	};
 
 	// Injection Helper - Extract Field Names
+
 	std::vector<std::string> ExtractFieldName (std::string input)
 	{
 		std::vector<std::string> ret;
@@ -448,14 +453,13 @@ namespace BOT_ORM
 
 			AggregateFunc (std::string function, const Field<T> &field)
 				: Comparable<T> { function + "(" + field.prefixStr +
-				"." + field.fieldName + ")" } {}
+				"." + field.fieldName + ")", nullptr } {}
 		};
 
 		// Expr
 
-		class Expr
+		struct Expr
 		{
-		public:
 			template <typename T>
 			Expr (const Comparable<T> &field,
 				  std::string op_val)
@@ -517,6 +521,32 @@ namespace BOT_ORM
 			}
 		};
 
+		// Field / Aggregate ? Value
+
+		template <typename T>
+		inline Expr operator == (const Comparable<T> &op, T value)
+		{ return Expr (op, "=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator != (const Comparable<T> &op, T value)
+		{ return Expr (op, "!=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator > (const Comparable<T> &op, T value)
+		{ return Expr (op, ">", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator >= (const Comparable<T> &op, T value)
+		{ return Expr (op, ">=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator < (const Comparable<T> &op, T value)
+		{ return Expr (op, "<", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator <= (const Comparable<T> &op, T value)
+		{ return Expr (op, "<=", std::move (value)); }
+
 		// Field ? Field
 
 		template <typename T>
@@ -543,31 +573,7 @@ namespace BOT_ORM
 		inline Expr operator <= (const Field<T> &op1, const Field<T> &op2)
 		{ return Expr { op1, "<=", op2 }; }
 
-		// Field ? Value
-
-		template <typename T>
-		inline Expr operator == (const Comparable<T> &op, T value)
-		{ return Expr (op, "=", std::move (value)); }
-
-		template <typename T>
-		inline Expr operator != (const Comparable<T> &op, T value)
-		{ return Expr (op, "!=", std::move (value)); }
-
-		template <typename T>
-		inline Expr operator > (const Comparable<T> &op, T value)
-		{ return Expr (op, ">", std::move (value)); }
-
-		template <typename T>
-		inline Expr operator >= (const Comparable<T> &op, T value)
-		{ return Expr (op, ">=", std::move (value)); }
-
-		template <typename T>
-		inline Expr operator < (const Comparable<T> &op, T value)
-		{ return Expr (op, "<", std::move (value)); }
-
-		template <typename T>
-		inline Expr operator <= (const Comparable<T> &op, T value)
-		{ return Expr (op, "<=", std::move (value)); }
+		// Nullable Field == / != nullptr
 
 		template <typename T>
 		inline Expr operator == (const NullableField<T> &op, nullptr_t)
@@ -577,7 +583,7 @@ namespace BOT_ORM
 		inline Expr operator != (const NullableField<T> &op, nullptr_t)
 		{ return Expr { op, " is not null" }; }
 
-		// StringField &/| String
+		// String Field & / | std::string
 
 		inline Expr operator & (const Field<std::string> &field,
 								std::string val)
@@ -590,6 +596,31 @@ namespace BOT_ORM
 		{
 			return Expr (field, " not like ", std::move (val));
 		}
+
+		// Aggregate Function Helpers
+
+		inline auto Count ()
+		{ return AggregateFunc<size_t> { "count (*)" }; }
+
+		template <typename T>
+		inline auto Count (const Field<T> &field)
+		{ return AggregateFunc<T> { "count", field }; }
+
+		template <typename T>
+		inline auto Sum (const Field<T> &field)
+		{ return AggregateFunc<T> { "sum", field }; }
+
+		template <typename T>
+		inline auto Avg (const Field<T> &field)
+		{ return AggregateFunc<T> { "avg", field }; }
+
+		template <typename T>
+		inline auto Max (const Field<T> &field)
+		{ return AggregateFunc<T> { "max", field }; }
+
+		template <typename T>
+		inline auto Min (const Field<T> &field)
+		{ return AggregateFunc<T> { "min", field }; }
 	}
 
 	// ORMapper
@@ -828,7 +859,7 @@ namespace BOT_ORM
 		class Queryable
 		{
 		public:
-			Queryable (ORMapper *pMapper,
+			Queryable (ORMapper &mapper,
 					   QueryResult queryHelper,
 					   std::string queryFrom,
 					   std::string queryTarget = "*",
@@ -838,7 +869,7 @@ namespace BOT_ORM
 					   std::string sqlOrderBy = "",
 					   std::string sqlLimit = "",
 					   std::string sqlOffset = "") :
-				_pMapper (pMapper),
+				_mapper (mapper),
 				_queryHelper (std::move (queryHelper)),
 				_sqlFrom (std::move (queryFrom)),
 				_sqlTarget (std::move (queryTarget)),
@@ -849,9 +880,6 @@ namespace BOT_ORM
 				_sqlLimit (std::move (sqlLimit)),
 				_sqlOffset (std::move (sqlOffset))
 			{}
-
-			// Result Type
-			typedef QueryResult result_type;
 
 			// Where
 			inline Queryable &Where (const Expression::Expr &expr)
@@ -870,6 +898,20 @@ namespace BOT_ORM
 			inline Queryable &Having (const Expression::Expr &expr)
 			{
 				_sqlHaving = " having " + expr.ToString (true);
+				return *this;
+			}
+
+			// Limit and Offset
+			inline Queryable &Take (size_t count)
+			{
+				_sqlLimit = " limit " + std::to_string (count);
+				return *this;
+			}
+			inline Queryable &Skip (size_t count)
+			{
+				// ~0 is a trick :-)
+				if (_sqlLimit.empty ()) _sqlLimit = " limit ~0";
+				_sqlOffset = " offset " + std::to_string (count);
 				return *this;
 			}
 
@@ -893,18 +935,15 @@ namespace BOT_ORM
 				return *this;
 			}
 
-			// Limit and Offset
-			inline Queryable &Take (size_t count)
+			// Select
+			template <typename... Args>
+			inline auto Select (const Args & ... args) const
 			{
-				_sqlLimit = " limit " + std::to_string (count);
-				return *this;
-			}
-			inline Queryable &Skip (size_t count)
-			{
-				// ~0 is a trick :-)
-				if (_sqlLimit.empty ()) _sqlLimit = " limit ~0";
-				_sqlOffset = " offset " + std::to_string (count);
-				return *this;
+				return _NewQuery (
+					_GetFieldSql (args...),
+					_sqlFrom,
+					_SelectToTuple (args...)
+				);
 			}
 
 			// Join
@@ -931,24 +970,13 @@ namespace BOT_ORM
 					_ToTuple (_queryHelper, queryHelper2));
 			}
 
-			// Select
-			template <typename... Args>
-			inline auto Select (const Args & ... args) const
-			{
-				return _NewQuery (
-					_GetFieldSql (args...),
-					_sqlFrom,
-					_SelectToTuple (args...)
-				);
-			}
-
 			// Aggregate
 			template <typename T>
 			Nullable<T> Aggregate (
 				const Expression::AggregateFunc<T> &agg) const
 			{
 				Nullable<T> ret;
-				_pMapper->_Select (
+				_mapper._Select (
 					agg.fieldName, _GetFromSql (),
 					[&] (int argc, char **argv, char **)
 				{
@@ -972,7 +1000,7 @@ namespace BOT_ORM
 			}
 
 		protected:
-			ORMapper *_pMapper;
+			ORMapper &_mapper;
 			QueryResult _queryHelper;
 
 			std::string _sqlFrom;
@@ -1002,7 +1030,7 @@ namespace BOT_ORM
 			{
 				return Queryable<std::tuple<Args...>>
 				{
-					_pMapper, std::move (newQueryHelper),
+					_mapper, std::move (newQueryHelper),
 						std::move (from), std::move (target),
 						_sqlWhere,
 						_sqlGroupBy, _sqlHaving,
@@ -1016,8 +1044,8 @@ namespace BOT_ORM
 			void _Select (const C &, Out &out) const
 			{
 				auto copy = _queryHelper;
-				_pMapper->_Select (_sqlTarget, _GetFromSql (),
-								   [&] (int, char **argv, char **)
+				_mapper._Select (_sqlTarget, _GetFromSql (),
+								 [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
 					copy.__Accept ([&argv, &index] (auto &val)
@@ -1034,8 +1062,8 @@ namespace BOT_ORM
 			void _Select (const std::tuple<Args...> &, Out &out) const
 			{
 				auto copy = _queryHelper;
-				_pMapper->_Select (_sqlTarget, _GetFromSql (),
-								   [&] (int, char **argv, char **)
+				_mapper._Select (_sqlTarget, _GetFromSql (),
+								 [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
 					_TupleHelper<QueryResult, sizeof... (Args)>::Visit (
@@ -1090,20 +1118,16 @@ namespace BOT_ORM
 			// Get Nullable Value Wrappers for non-nullable Types
 			template <typename T>
 			static inline auto _ToNullable (const T &val)
-			{
-				return Nullable<T> (val);
-			}
+			{ return Nullable<T> (val); }
+
 			template <typename T>
 			static inline auto _ToNullable (const Nullable<T> &val)
-			{
-				return val;
-			}
+			{ return val; }
 
 			template <typename TupleType, size_t N>
 			struct _TupleHelper
 			{
-				// Tuple Nullable-Cat
-				// Covert Tuple to Tuple with all Nullable Fields
+				// Tuple Nullable Cater
 				static inline auto ToNullable (const TupleType &tuple)
 				{
 					return std::tuple_cat (
@@ -1167,7 +1191,7 @@ namespace BOT_ORM
 			static_assert (std::is_copy_constructible<C>::value,
 						   "It must be Copy Constructible");
 
-			return Queryable<C> (this, std::move (queryHelper),
+			return Queryable<C> (*this, std::move (queryHelper),
 								 std::string (C::__TableName));
 		}
 
@@ -1217,18 +1241,18 @@ namespace BOT_ORM
 
 		template <typename T>
 		inline Expression::Field<T> operator () (
-			const T &property)
+			const T &field)
 		{
-			const auto &result = Get (property);
+			const auto &result = Get (field);
 			return Expression::Field<T> {
 				std::move (result.first), result.second };
 		}
 
 		template <typename T>
 		inline Expression::NullableField<T> operator () (
-			const Nullable<T> &property)
+			const Nullable<T> &field)
 		{
-			const auto &result = Get (property);
+			const auto &result = Get (field);
 			return Expression::NullableField<T> {
 				std::move (result.first), result.second };
 		}
@@ -1237,11 +1261,11 @@ namespace BOT_ORM
 		std::unordered_map<const void *, pair_type> _map;
 
 		template <typename T>
-		const pair_type &Get (const T &property)
+		const pair_type &Get (const T &field)
 		{
 			try
 			{
-				return _map.at ((const void *) &property);
+				return _map.at ((const void *) &field);
 			}
 			catch (...)
 			{
@@ -1249,34 +1273,6 @@ namespace BOT_ORM
 			}
 		}
 	};
-
-	namespace Helper
-	{
-		using namespace Expression;
-
-		inline auto Count ()
-		{ return AggregateFunc<size_t> { "count (*)" }; }
-
-		template <typename T>
-		inline auto Count (const Field<T> &field)
-		{ return AggregateFunc<T> { "count", field }; }
-
-		template <typename T>
-		inline auto Sum (const Field<T> &field)
-		{ return AggregateFunc<T> { "sum", field }; }
-
-		template <typename T>
-		inline auto Avg (const Field<T> &field)
-		{ return AggregateFunc<T> { "avg", field }; }
-
-		template <typename T>
-		inline auto Max (const Field<T> &field)
-		{ return AggregateFunc<T> { "max", field }; }
-
-		template <typename T>
-		inline auto Min (const Field<T> &field)
-		{ return AggregateFunc<T> { "min", field }; }
-	}
 }
 
 #endif // !BOT_ORM_H

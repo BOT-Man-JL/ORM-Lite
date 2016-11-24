@@ -7,23 +7,22 @@
   - gcc >= 5
 - **SQLite 3** (zipped in *src*)
 
-## `BOT_ORM`
+## `BOT_ORM` Layout
 
 ``` cpp
 #include "ORMLite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
-using namespace BOT_ORM::Helper;
 ```
 
-Modules under `namespace BOT_ORM`:
+Modules under `namespace BOT_ORM`
 
 - `BOT_ORM::Nullable`
 - `BOT_ORM::ORMapper`
-- `BOT_ORM::ORMapper::Queryable<...>`
+- `BOT_ORM::ORMapper::Queryable<QueryResult>`
 - `BOT_ORM::FieldExtractor`
 
-Modules under `namespace BOT_ORM::Expression`:
+Modules under `namespace BOT_ORM::Expression`
 
 - `BOT_ORM::Expression::Comparable`
 - `BOT_ORM::Expression::Field`
@@ -31,14 +30,11 @@ Modules under `namespace BOT_ORM::Expression`:
 - `BOT_ORM::Expression::AggregateFunc`
 - `BOT_ORM::Expression::Expr`
 - `BOT_ORM::Expression::SetExpr`
-
-Modules under `namespace BOT_ORM::Helper`:
-
-- `BOT_ORM::Helper::Count ()`
-- `BOT_ORM::Helper::Sum ()`
-- `BOT_ORM::Helper::Avg ()`
-- `BOT_ORM::Helper::Max ()`
-- `BOT_ORM::Helper::Min ()`
+- `BOT_ORM::Expression::Count ()`
+- `BOT_ORM::Expression::Sum ()`
+- `BOT_ORM::Expression::Avg ()`
+- `BOT_ORM::Expression::Max ()`
+- `BOT_ORM::Expression::Min ()`
 
 ## `BOT_ORM::Nullable`
 
@@ -233,7 +229,7 @@ Remarks:
 - Update `entity` / `entities` in Table `MyClass`
   with the Same **Primary Key**;
 - Update Set `setExpr` Where `whereExpr` for Table `MyClass`
-  (`Expression` will be described later);
+  (`Expressions` will be described later);
 - `entities` must **SUPPORT** `forward_iterator`;
 
 SQL:
@@ -280,139 +276,235 @@ Queryable<MyClass> Query (MyClass queryHelper);
 ```
 
 Remarks:
-- Return new `Queryable` object (described later);
+- Return new `Queryable` object;
+- `MyClass` **MUST** be **Copy Constructible**
+  to Construct `queryHelper`;
 
-## `BOT_ORM::ORMapper::Queryable<...>`
+## `BOT_ORM::ORMapper::Queryable<QueryResult>`
 
-### Why `Queryable` is inside `ORMapper`
+> Why `Queryable` is inside `ORMapper`?
+>
+> Since `Queryable` is a template,
+> it's hard to define an access to Injected Class's Private Members;
 
-Since `Queryable` is a template,
-it's hard to define an access to Injected Class;
+### Retrieve Result
 
-## `BOT_ORM::FieldExtractor`
+``` cpp
+Nullable<T> Aggregate (
+    const Expression::AggregateFunc<T> &agg) const;
+std::vector<QueryResult> ToVector () const;
+std::list<QueryResult> ToList () const;
+```
+
+Remarks:
+- `QueryResult` specifies the **Row Type** of Query Result;
+- `Aggregate` will Get the one-or-zero-row Result
+  for `agg` immediately;
+- `ToVector` / `ToList` returns the Collection of `QueryResult`;
+- All Functions will **NOT** Change the State of this Queryable Object;
+- `Expression` will be described later;
+
+### Set Conditions
+
+``` cpp
+Queryable &Where (const Expression::Expr &expr);
+
+Queryable &GroupBy (const Expression::Field<T> &field);
+Queryable &Having (const Expression::Expr &expr);
+
+Queryable &OrderBy (const Expression::Field<T> &field);
+Queryable &OrderByDescending (const Expression::Field<T> &field);
+
+Queryable &Take (size_t count);
+Queryable &Skip (size_t count);
+```
+
+Remarks:
+- These functions will Set/Append Conditions to `this` and
+  return the reference of `*this`;
+- `OrderBy*` will **Append** `field` to Condition, while Other
+  functions will **Set** `expr`, `field` and `count` to Condition;
+- `Expression` will be described later;
+
+### Construct New `Queryable`
+
+``` cpp
+auto Select (const Expression::Comparable<T1> &target1,
+             const Expression::Comparable<T2> &target2,
+             ...) const;
+auto Join (const MyClass2 &queryHelper2,
+           const Expression::Expr &onExpr) const;
+auto LeftJoin (const MyClass2 &queryHelper2,
+               const Expression::Expr &onExpr) const;
+```
+
+Remarks:
+- Default `QueryResult` is the Object of `MyClass`,
+  which can be retrieved by `SELECT *` (**All Columns**);
+- `Select` will Set `QueryResult` to `std::tuple<T1, T2, ...>`,
+  which can be retrieved by `SELECT target1, target2, ...`
+  (`target*` can be **Field** or **Aggregate Functions**);
+- `Join` / `LeftJoin` will Set `QueryResult` to `std::tuple<...>`
+  - `...` is the **flattened nullable concatenation** of all entries of
+    **Previous** `QueryResult` and `queryHelper2`;
+  - **Flatten** and **Nullable** means all fields of `...` are
+    all `Nullable<T>`, where `T` is the Supported Types of `ORMAP`
+    (NOT `std::tuple` or `MyClass`);
+  - `onExpr` specifies the `ON` Expression for `JOIN`;
+- All Functions will pass the **Conditions** of this Queryable Object
+  to the new one;
+- All Functions will **NOT** Change the State of this Queryable Object;
+- `Expression` will be described later;
+
+### Query SQL
+
+We will use the following SQL to Query:
+
+``` sql
+SELECT ...
+FROM TABLE
+     [LEFT] JOIN TABLE ON ...
+     ...
+WHERE ...
+GROUP BY <field>
+HAVING ...
+ORDER BY <field> [DESC], ...
+LIMIT <take> OFFSET <skip>;
+```
+
+Remarks:
+- If the Corresponding Condition is NOT Set, it will be omitted;
 
 ## `namespace BOT_ORM::Expression`
 
-## `namespace BOT_ORM::Helper`
+### Fields and Aggregate Functions
 
-### ORQuery &Where (const Expr &expr)
+#### Definitions
 
-Generate `WHERE ( <expr> )`;
+``` cpp
+BOT_ORM::Expression::Comparable<T>
+BOT_ORM::Expression::Field<T> : public Comparable<T>
+BOT_ORM::Expression::NullableField<T> : public Field<T>
+BOT_ORM::Expression::AggregateFunc<T> : public Comparable<T>
+```
 
-Details in `## Expr` Section;
+#### Operations
 
-### ORQuery &OrderBy (const T &property)
+``` cpp
+// Field / Aggregate ? Value
+Expr operator == (const Comparable<T> &op, T value);
+Expr operator != (const Comparable<T> &op, T value);
+Expr operator >  (const Comparable<T> &op, T value);
+Expr operator >= (const Comparable<T> &op, T value);
+Expr operator <  (const Comparable<T> &op, T value);
+Expr operator <= (const Comparable<T> &op, T value);
 
-Generate `ORDER BY <property>`;
+// Field ? Field
+Expr operator == (const Field<T> &op1, const Field<T> &op2);
+Expr operator != (const Field<T> &op1, const Field<T> &op2);
+Expr operator >  (const Field<T> &op1, const Field<T> &op2);
+Expr operator >= (const Field<T> &op1, const Field<T> &op2);
+Expr operator <  (const Field<T> &op1, const Field<T> &op2);
+Expr operator <= (const Field<T> &op1, const Field<T> &op2);
 
-If `property` is not a member of `queryHelper`,
-throw `std::runtime_error`;
+// Nullable Field ? nullptr
+Expr operator == (const NullableField<T> &op, nullptr_t);
+Expr operator !== (const NullableField<T> &op, nullptr_t);
 
-### ORQuery &OrderByDescending (const T &property)
+// String Field ? std::string
+Expr operator& (const Field<std::string> &op, std::string val);
+Expr operator| (const Field<std::string> &op, std::string val);
 
-Generate `ORDER BY <property> DESC`;
-
-If `property` is not a member of `queryHelper`,
-throw `std::runtime_error`;
-
-### ORQuery &Take (size_t count)
-
-Generate `LIMIT count`;
-
-### ORQuery &Skip (size_t count)
-
-Generate `OFFSET count`;
-
-Remarks:
-- If there is Not `Take`, it will **FAILED**;
-
-### vector\<MyClass\> ToVector () / list\<MyClass\> ToList ()
-
-Retrieve Select Result under **_WHERE_ _ORDER BY_ _LIMIT_ Constraints**;
-
-``` sql
-SELECT * FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
+// Get SetExpr
+SetExpr operator = (const Field<T> &op, T value);
+SetExpr operator = (const NullableField<T> &op, nullptr_t);
 ```
 
 Remarks:
-- `MyClass` **MUST** be **Copy Constructible**;
-- Deserialize Value to a copy of `queryHelper`;
-- Copy the copy to `std::vector` / `std::list`;
+- `Comparable<T> ? T` returns `Expr<op ? value>`;
+- `Field<T> ? Field<T>` returns `Expr<op1 ? op2>`;
+- `NullableField<T> == / != nullptr`
+  returns `Expr<op> IS NULL / IS NOT NULL`;
+- `Field<std::string> & / | T`
+  returns `Expr<op> LIKE / NOT LIKE <value>`;
+- `Field<T> = T` returns `SetExpr<op> = <value>`;
+- `NullableField<T> = nullptr` returns `SetExpr<op> = null`;
 
-### void Update (const Args & ... fields)
+### Expressions
 
-Update `fields` under **_WHERE_ Constraints**;
+#### Definitions
 
-``` sql
-UPDATE MyClass SET ... WHERE ...;
+``` cpp
+BOT_ORM::Expression::Expr
+BOT_ORM::Expression::SetExpr
 ```
 
-### void Delete ()
+#### Operations
 
-Delete Entries under **_WHERE_ Constraints**;
+``` cpp
+// Get Composite Expr
+Expr operator && (const Expr &op1, const Expr &op2);
+Expr operator || (const Expr &op1, const Expr &op2);
 
-``` sql
-DELETE FROM MyClass WHERE ...;
+// Concatenate 2 SetExpr
+SetExpr operator && (const SetExpr &op1, const SetExpr &op2);
 ```
-
-### unsigned long long Count ()
-
-Return the `Count` under **_WHERE_ _ORDER BY_ _LIMIT_ Constraints**;
-
-``` sql
-SELECT COUNT (*) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
-```
-
-### T Sum / Avg / Max / Min (const T &property)
-
-Return the `Sum / Average / Max / Min`
-under **_WHERE_ _ORDER BY_ _LIMIT_ Constraints**;
-    
-``` sql
-SELECT SUM (<property>) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
-SELECT AVG (<property>) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
-SELECT MAX (<property>) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
-SELECT MIN (<property>) FROM MyClass WHERE ... ORDER BY ... LIMIT ...;
-```
-
-If `property` is not a member of `queryHelper`,
-throw `std::runtime_error`;
-
-## Expr
-
-### Expr (const T &property, const string &relOp = "=", T value = property) / Expr (const Nullable<T> &property, bool isNull)
-
-Generate `<property> relOp <value>` or `<property> is [NOT] NULL`;
 
 Remarks:
-- `Expr (property)` is short for `Expr (property, "=", property)`
-- If `property` is not a member of `queryHelper`,
-  throw `std::runtime_error` at Calling `Where`;
+- `Expr && / || Expr` returns `(<op1> and / or <op2>)`;
+- `SetExpr && SetExpr` returns `<op1>, <op2>`;
 
-### Expr operator && / || (const Expr &left, const Expr &right)
+### Aggregate Function Helpers
 
-Generate `( <left> && <right> )` or `( <left> || <right> )`;
+``` cpp
+BOT_ORM::Expression::Count ();
+BOT_ORM::Expression::Count (const Field<T> &field);
+BOT_ORM::Expression::Sum (const Field<T> &field);
+BOT_ORM::Expression::Avg (const Field<T> &field);
+BOT_ORM::Expression::Max (const Field<T> &field);
+BOT_ORM::Expression::Min (const Field<T> &field);
+```
 
-### Expr_Field\<T\> (const T &property) (*Helper Struct of Expr*)
+Remarks:
 
-#### Expr operator *OP* (T value)
+They will Generate Aggregate Functions as:
 
-Return `Expr { property, OP_STR, value }; }`;
+- `COUNT (*)`
+- `COUNT (field)`
+- `SUM (field)`
+- `AVG (field)`
+- `MAX (field)`
+- `MIN (field)`
 
-| OP |  OP_STR  |
-|----|----------|
-| == |    "="   |
-| != |   "!="   |
-|  > |    ">"   |
-| >= |   ">="   |
-|  < |    "<"   |
-| <= |   "<="   |
+## `BOT_ORM::FieldExtractor`
 
-### Expr_Field<T> Field (T &property)
+### Construction
 
-Return `Expr_Field<T> { property }`;
+``` cpp
+FieldExtractor (const MyClass &queryHelper,
+                const MyClass2 &queryHelper2,
+                ...);
+```
+
+Remarks:
+- Construction of `FieldExtractor` will take all fields' pointers of
+  `queryHelper*` into a **Hash Table**;
+
+### Usage
+
+``` cpp
+Field<T> operator () (const T &field);
+NullableField<T> operator () (const Nullable<T> &field);
+```
+
+Remarks:
+- `fieldExtractor (field)` will find the position of `field`
+  in the **Hash Table** from `queryHelper*` and Construct the `Field`;
+- If the `field` is `Nullable<T>`
+  it will Construct a `NullableField<T>`;
+  and it will Construct a `Field<T>` otherwise;
 
 ## Error Handling
 
 All Functions will throw `std::runtime_error`
-with the **Error Message** if Failed at Query;
+with the **Error Message** if Failed;

@@ -8,13 +8,12 @@ written in Modern C++ style.
 - Easy to Use
 - Light Weight
 - Compile-time Overhead
+- Strong Typed
 - Fluent Interface
 
 ## Usage
 
 ### [View Full Documents](docs/ORM-Lite-doc.md)
-
-This Document is under update... (Will be Updated soon 😅)
 
 ### Including *ORM Lite*
 
@@ -25,7 +24,6 @@ Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
 #include "ORMLite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
-using namespace BOT_ORM::Helper;
 
 struct UserModel
 {
@@ -151,7 +149,7 @@ mapper.Transaction ([&] () {
 ``` cpp
 // Define a Query Helper Object and its Field Extractor
 UserModel helper;
-auto field = FieldExtractor (helper);
+FieldExtractor field { helper };
 
 // Select by Query :-)
 auto result2 = mapper.Query (UserModel {})
@@ -168,8 +166,8 @@ auto result2 = mapper.Query (UserModel {})
 
 // Remarks:
 // sql = SELECT * FROM UserModel
-//       WHERE (name LIKE 'July%' AND
-//              (age>=32 AND title IS NOT NULL))
+//       WHERE (user_name LIKE 'July%' AND
+//             (age>=32 AND title IS NOT NULL))
 //       ORDER BY age DESC
 //       ORDER BY id
 //       LIMIT 3 OFFSET 1
@@ -184,27 +182,27 @@ auto avg = mapper.Query (UserModel {})
 
 // Remarks:
 // sql = SELECT AVG (credit_count) FROM UserModel
-//       WHERE (name LIKE 'July')
+//       WHERE (user_name LIKE 'July%')
 // avg = 14.9
 
 auto count = mapper.Query (UserModel {})
-    .Where (field (helper.user_name) | std::string ("July%"))
-    .Aggregate (Count ());
+	.Where (field (helper.user_name) | std::string ("July%"))
+	.Aggregate (Count ());
 
 // Remarks:
 // sql = SELECT COUNT (*) FROM UserModel
-//       WHERE (name NOT LIKE 'July')
+//       WHERE (user_name NOT LIKE 'July%')
 // count = 2
 
 // Update by Condition :-)
 mapper.Update (UserModel {},
-               field (helper.user_name) == std::string ("July"),
-               field (helper.age) = 10,
-               field (helper.credit_count) = 1.0);
+			   (field (helper.age) = 10) &&
+			   (field (helper.credit_count) = 1.0),
+			   field (helper.user_name) == std::string ("July"));
 
 // Remarks:
 // sql = UPDATE UserModel SET age=10,credit_count=1.0
-//       WHERE (name='July')
+//       WHERE (user_name='July')
 
 // Delete by Condition :-)
 mapper.Delete (UserModel {},
@@ -221,7 +219,7 @@ mapper.Delete (UserModel {},
 UserModel user;
 SellerModel seller;
 OrderModel order;
-field = FieldExtractor (user, seller, order);
+field = FieldExtractor { user, seller, order };
 
 // Insert Values into the table
 // mapper.Insert (..., false) means Insert without Primary Key
