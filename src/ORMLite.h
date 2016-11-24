@@ -369,215 +369,220 @@ namespace BOT_ORM_Impl
 
 namespace BOT_ORM
 {
-	// SetExpr
-
-	struct SetExpr
+	namespace Expression
 	{
-		SetExpr (std::string field_op_val)
-			: expr { std::move (field_op_val) }
-		{}
+		// SetExpr
 
-		const std::string &ToString () const
-		{ return expr; }
-
-	protected:
-		std::string expr;
-	};
-
-	// Comparable
-
-	template <typename T>
-	struct Comparable
-	{
-		std::string fieldName;
-		const char *prefixStr;
-	};
-
-	// Field : Comparable
-
-	template <typename T>
-	struct Field : public Comparable<T>
-	{
-		Field (std::string fieldName,
-			   const char *tableName)
-			: Comparable<T> { std::move (fieldName), tableName } {}
-
-		inline SetExpr operator = (T value)
+		struct SetExpr
 		{
-			std::ostringstream os;
-			BOT_ORM_Impl::SerializeValue (
-				os << this->fieldName << "=", value);
-			return SetExpr { os.str () };
-		}
-	};
+			SetExpr (std::string field_op_val)
+				: expr { std::move (field_op_val) }
+			{}
 
-	// Nullable Field : Field : Comparable
+			const std::string &ToString () const
+			{ return expr; }
 
-	template <typename T>
-	struct NullableField : public Field<T>
-	{
-		NullableField (std::string fieldName,
-					   const char *tableName)
-			: Field<T> { std::move (fieldName), tableName } {}
+		protected:
+			std::string expr;
+		};
 
-		inline SetExpr operator = (T value)
-		{
-			std::ostringstream os;
-			BOT_ORM_Impl::SerializeValue (
-				os << this->fieldName << "=", value);
-			return SetExpr { os.str () };
-		}
-
-		inline SetExpr operator = (nullptr_t)
-		{ return SetExpr { this->fieldName + "=null" }; }
-	};
-
-	// Aggregate Function : Comparable
-
-	template <typename T>
-	struct AggregateFunc : public Comparable<T>
-	{
-		AggregateFunc (std::string function)
-			: Comparable<T> { std::move (function), nullptr } {}
-
-		AggregateFunc (std::string function, const Field<T> &field)
-			: Comparable<T> { function + "(" + field.prefixStr +
-			"." + field.fieldName + ")" } {}
-	};
-
-	// Expr
-
-	class Expr
-	{
-	public:
-		template <typename T>
-		Expr (const Comparable<T> &field,
-			  std::string op_val)
-			: exprs { { field.fieldName + op_val, field.prefixStr } }
-		{}
+		// Comparable
 
 		template <typename T>
-		Expr (const Comparable<T> &field,
-			  std::string op, T value)
+		struct Comparable
 		{
-			std::ostringstream os;
-			BOT_ORM_Impl::SerializeValue (
-				os << field.fieldName << op, value);
-			exprs.emplace_back (os.str (), field.prefixStr);
-		}
+			std::string fieldName;
+			const char *prefixStr;
+		};
+
+		// Field : Comparable
 
 		template <typename T>
-		Expr (const Field<T> &field1,
-			  std::string op,
-			  const Field<T> &field2)
-			: exprs
+		struct Field : public Comparable<T>
 		{
-			{ field1.fieldName, field1.prefixStr },
-			{ std::move (op), nullptr },
-			{ field2.fieldName, field2.prefixStr }
-		}
-		{}
+			Field (std::string fieldName,
+				   const char *tableName)
+				: Comparable<T> { std::move (fieldName), tableName } {}
 
-		std::string ToString (bool withField) const
-		{
-			std::stringstream out;
-			for (const auto &expr : exprs)
+			inline SetExpr operator = (T value)
 			{
-				if (withField && expr.second != nullptr)
-					out << expr.second << ".";
-				out << expr.first;
+				std::ostringstream os;
+				BOT_ORM_Impl::SerializeValue (
+					os << this->fieldName << "=", value);
+				return SetExpr { os.str () };
 			}
-			return out.str ();
-		}
+		};
 
-		inline Expr operator && (const Expr &right) const
-		{ return And_Or (right, " and "); }
-		inline Expr operator || (const Expr &right) const
-		{ return And_Or (right, " or "); }
+		// Nullable Field : Field : Comparable
 
-	protected:
-		std::list<std::pair<std::string, const char*>> exprs;
-
-		Expr And_Or (const Expr &right, std::string logOp) const
+		template <typename T>
+		struct NullableField : public Field<T>
 		{
-			auto ret = *this;
-			auto rigthExprs = right.exprs;
-			ret.exprs.emplace_front ("(", nullptr);
-			ret.exprs.emplace_back (std::move (logOp), nullptr);
-			ret.exprs.splice (ret.exprs.cend (),
-							  std::move (rigthExprs));
-			ret.exprs.emplace_back (")", nullptr);
-			return std::move (ret);
-		}
-	};
+			NullableField (std::string fieldName,
+						   const char *tableName)
+				: Field<T> { std::move (fieldName), tableName } {}
 
-	// Field ? Field
+			inline SetExpr operator = (T value)
+			{
+				std::ostringstream os;
+				BOT_ORM_Impl::SerializeValue (
+					os << this->fieldName << "=", value);
+				return SetExpr { os.str () };
+			}
 
-	template <typename T>
-	inline Expr operator == (const Field<T> &op1, const Field<T> &op2)
-	{ return Expr { op1 , "=", op2 }; }
+			inline SetExpr operator = (nullptr_t)
+			{ return SetExpr { this->fieldName + "=null" }; }
+		};
 
-	template <typename T>
-	inline Expr operator != (const Field<T> &op1, const Field<T> &op2)
-	{ return Expr { op1, "!=", op2 }; }
+		// Aggregate Function : Comparable
 
-	template <typename T>
-	inline Expr operator > (const Field<T> &op1, const Field<T> &op2)
-	{ return Expr { op1 , ">", op2 }; }
+		template <typename T>
+		struct AggregateFunc : public Comparable<T>
+		{
+			AggregateFunc (std::string function)
+				: Comparable<T> { std::move (function), nullptr } {}
 
-	template <typename T>
-	inline Expr operator >= (const Field<T> &op1, const Field<T> &op2)
-	{ return Expr { op1, ">=", op2 }; }
+			AggregateFunc (std::string function, const Field<T> &field)
+				: Comparable<T> { function + "(" + field.prefixStr +
+				"." + field.fieldName + ")" } {}
+		};
 
-	template <typename T>
-	inline Expr operator < (const Field<T> &op1, const Field<T> &op2)
-	{ return Expr { op1 , "<", op2 }; }
+		// Expr
 
-	template <typename T>
-	inline Expr operator <= (const Field<T> &op1, const Field<T> &op2)
-	{ return Expr { op1, "<=", op2 }; }
+		class Expr
+		{
+		public:
+			template <typename T>
+			Expr (const Comparable<T> &field,
+				  std::string op_val)
+				: exprs { { field.fieldName + op_val, field.prefixStr } }
+			{}
 
-	// Field ? Value
+			template <typename T>
+			Expr (const Comparable<T> &field,
+				  std::string op, T value)
+			{
+				std::ostringstream os;
+				BOT_ORM_Impl::SerializeValue (
+					os << field.fieldName << op, value);
+				exprs.emplace_back (os.str (), field.prefixStr);
+			}
 
-	template <typename T>
-	inline Expr operator == (const Comparable<T> &op, T value)
-	{ return Expr (op, "=", std::move (value)); }
+			template <typename T>
+			Expr (const Field<T> &field1,
+				  std::string op,
+				  const Field<T> &field2)
+				: exprs
+			{
+				{ field1.fieldName, field1.prefixStr },
+				{ std::move (op), nullptr },
+				{ field2.fieldName, field2.prefixStr }
+			}
+			{}
 
-	template <typename T>
-	inline Expr operator != (const Comparable<T> &op, T value)
-	{ return Expr (op, "!=", std::move (value)); }
+			std::string ToString (bool withField) const
+			{
+				std::stringstream out;
+				for (const auto &expr : exprs)
+				{
+					if (withField && expr.second != nullptr)
+						out << expr.second << ".";
+					out << expr.first;
+				}
+				return out.str ();
+			}
 
-	template <typename T>
-	inline Expr operator > (const Comparable<T> &op, T value)
-	{ return Expr (op, ">", std::move (value)); }
+			inline Expr operator && (const Expr &right) const
+			{ return And_Or (right, " and "); }
+			inline Expr operator || (const Expr &right) const
+			{ return And_Or (right, " or "); }
 
-	template <typename T>
-	inline Expr operator >= (const Comparable<T> &op, T value)
-	{ return Expr (op, ">=", std::move (value)); }
+		protected:
+			std::list<std::pair<std::string, const char*>> exprs;
 
-	template <typename T>
-	inline Expr operator < (const Comparable<T> &op, T value)
-	{ return Expr (op, "<", std::move (value)); }
+			Expr And_Or (const Expr &right, std::string logOp) const
+			{
+				auto ret = *this;
+				auto rigthExprs = right.exprs;
+				ret.exprs.emplace_front ("(", nullptr);
+				ret.exprs.emplace_back (std::move (logOp), nullptr);
+				ret.exprs.splice (ret.exprs.cend (),
+								  std::move (rigthExprs));
+				ret.exprs.emplace_back (")", nullptr);
+				return std::move (ret);
+			}
+		};
 
-	template <typename T>
-	inline Expr operator <= (const Comparable<T> &op, T value)
-	{ return Expr (op, "<=", std::move (value)); }
+		// Field ? Field
 
-	template <typename T>
-	inline Expr operator == (const NullableField<T> &op, nullptr_t)
-	{ return Expr { op, " is null" }; }
+		template <typename T>
+		inline Expr operator == (const Field<T> &op1, const Field<T> &op2)
+		{ return Expr { op1 , "=", op2 }; }
 
-	template <typename T>
-	inline Expr operator != (const NullableField<T> &op, nullptr_t)
-	{ return Expr { op, " is not null" }; }
+		template <typename T>
+		inline Expr operator != (const Field<T> &op1, const Field<T> &op2)
+		{ return Expr { op1, "!=", op2 }; }
 
-	// StringField &/| String
+		template <typename T>
+		inline Expr operator > (const Field<T> &op1, const Field<T> &op2)
+		{ return Expr { op1 , ">", op2 }; }
 
-	inline Expr operator & (const Field<std::string> &field, std::string val)
-	{ return Expr (field, " like ", std::move (val)); }
+		template <typename T>
+		inline Expr operator >= (const Field<T> &op1, const Field<T> &op2)
+		{ return Expr { op1, ">=", op2 }; }
 
-	inline Expr operator | (const Field<std::string> &field, std::string val)
-	{ return Expr (field, " not like ", std::move (val)); }
+		template <typename T>
+		inline Expr operator < (const Field<T> &op1, const Field<T> &op2)
+		{ return Expr { op1 , "<", op2 }; }
+
+		template <typename T>
+		inline Expr operator <= (const Field<T> &op1, const Field<T> &op2)
+		{ return Expr { op1, "<=", op2 }; }
+
+		// Field ? Value
+
+		template <typename T>
+		inline Expr operator == (const Comparable<T> &op, T value)
+		{ return Expr (op, "=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator != (const Comparable<T> &op, T value)
+		{ return Expr (op, "!=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator > (const Comparable<T> &op, T value)
+		{ return Expr (op, ">", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator >= (const Comparable<T> &op, T value)
+		{ return Expr (op, ">=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator < (const Comparable<T> &op, T value)
+		{ return Expr (op, "<", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator <= (const Comparable<T> &op, T value)
+		{ return Expr (op, "<=", std::move (value)); }
+
+		template <typename T>
+		inline Expr operator == (const NullableField<T> &op, nullptr_t)
+		{ return Expr { op, " is null" }; }
+
+		template <typename T>
+		inline Expr operator != (const NullableField<T> &op, nullptr_t)
+		{ return Expr { op, " is not null" }; }
+
+		// StringField &/| String
+
+		inline Expr operator & (const Field<std::string> &field,
+								std::string val)
+		{ return Expr (field, " like ", std::move (val)); }
+
+		inline Expr operator | (const Field<std::string> &field,
+								std::string val)
+		{ return Expr (field, " not like ", std::move (val)); }
+	}
 
 	// ORMapper
 

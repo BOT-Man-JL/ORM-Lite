@@ -9,6 +9,7 @@
 
 #include "src/ORMLite.h"
 using namespace BOT_ORM;
+using namespace BOT_ORM::Expression;
 using namespace BOT_ORM::Helper;
 
 namespace PrintHelper

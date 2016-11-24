@@ -7,20 +7,44 @@
   - gcc >= 5
 - **SQLite 3** (zipped in *src*)
 
-## Include to Your Project
+## `BOT_ORM`
 
 ``` cpp
 #include "ORMLite.h"
 using namespace BOT_ORM;
+using namespace BOT_ORM::Expression;
+using namespace BOT_ORM::Helper;
 ```
 
 Modules under `namespace BOT_ORM`:
 
 - `BOT_ORM::Nullable`
 - `BOT_ORM::ORMapper`
-- `BOT_ORM::Field`
 
-## `Nullable`
+Modules under `BOT_ORM::ORMapper`:
+
+- `BOT_ORM::ORMapper::Queryable<...>`
+- `BOT_ORM::ORMapper::FieldExtractor`
+
+Modules under `namespace BOT_ORM::Helper`:
+
+- `BOT_ORM::Helper::FieldExtractor ()`
+- `BOT_ORM::Helper::Count ()`
+- `BOT_ORM::Helper::Sum ()`
+- `BOT_ORM::Helper::Avg ()`
+- `BOT_ORM::Helper::Max ()`
+- `BOT_ORM::Helper::Min ()`
+
+Modules under `namespace BOT_ORM::Expression`:
+
+- `BOT_ORM::Expression::Comparable`
+- `BOT_ORM::Expression::Field`
+- `BOT_ORM::Expression::NullableField`
+- `BOT_ORM::Expression::AggregateFunc`
+- `BOT_ORM::Expression::Expr`
+- `BOT_ORM::Expression::SetExpr`
+
+## `BOT_ORM::Nullable`
 
 It keeps the Similar Semantic as `Nullable<T>` as `C#`; and
 [Reference Here](http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
@@ -71,7 +95,9 @@ bool operator==(const Nullable<T> &op1, nullptr_t);
 bool operator==(nullptr_t, const Nullable<T> &op2);
 ```
 
-## Inject into Class
+## `BOT_ORM::ORMapper`
+
+### Inject `BOT_ORM::ORMapper` into Class
 
 ``` cpp
 struct MyClass
@@ -100,7 +126,6 @@ In this Sample, `ORMAP ("TableName", ...)` do that:
 - The first entry `field1` will be set as the **Primary Key** of the Table;
 
 Note that:
-- `ORMAP (...)` will **auto** Inject some **private members**;
 - Currently Only Support
   - T such that `std::is_integral<T>::value == true`
     and **NOT** `char` or `*char_t`
@@ -109,8 +134,10 @@ Note that:
   - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
 - Field Names MUST **NOT** be SQL Keywords (SQL Constraint);
 - `std::string` Value MUST **NOT** contain `\0` (SQL Constraint);
-
-## ORMapper
+- `ORMAP (...)` will **auto** Inject some **private members**;
+  - `__Accept ()` to Implement **Visitor Pattern**;
+  - `__Tuple ()` to **Flatten** data to tuple;
+  - `__FieldNames ()` and `__TableName` to store strings;
 
 ### ORMapper (const string &connectionString)
 
