@@ -24,7 +24,7 @@ Modules under `namespace BOT_ORM`
 
 Modules under `namespace BOT_ORM::Expression`
 
-- `BOT_ORM::Expression::Comparable`
+- `BOT_ORM::Expression::Selectable`
 - `BOT_ORM::Expression::Field`
 - `BOT_ORM::Expression::NullableField`
 - `BOT_ORM::Expression::AggregateFunc`
@@ -251,7 +251,7 @@ UPDATE MyClass SET (...) WHERE ...;
 void Delete (const MyClass &entity);
 
 // Delete by Expressions
-void Delete (const C &,
+void Delete (const MyClass &,
              const Expression::Expr &whereExpr);
 ```
 
@@ -329,8 +329,8 @@ Remarks:
 ### Construct New `Queryable`
 
 ``` cpp
-auto Select (const Expression::Comparable<T1> &target1,
-             const Expression::Comparable<T2> &target2,
+auto Select (const Expression::Selectable<T1> &target1,
+             const Expression::Selectable<T2> &target2,
              ...) const;
 auto Join (const MyClass2 &queryHelper2,
            const Expression::Expr &onExpr) const;
@@ -382,22 +382,22 @@ Remarks:
 #### Definitions
 
 ``` cpp
-BOT_ORM::Expression::Comparable<T>
-BOT_ORM::Expression::Field<T> : public Comparable<T>
+BOT_ORM::Expression::Selectable<T>
+BOT_ORM::Expression::Field<T> : public Selectable<T>
 BOT_ORM::Expression::NullableField<T> : public Field<T>
-BOT_ORM::Expression::AggregateFunc<T> : public Comparable<T>
+BOT_ORM::Expression::AggregateFunc<T> : public Selectable<T>
 ```
 
 #### Operations
 
 ``` cpp
 // Field / Aggregate ? Value
-Expr operator == (const Comparable<T> &op, T value);
-Expr operator != (const Comparable<T> &op, T value);
-Expr operator >  (const Comparable<T> &op, T value);
-Expr operator >= (const Comparable<T> &op, T value);
-Expr operator <  (const Comparable<T> &op, T value);
-Expr operator <= (const Comparable<T> &op, T value);
+Expr operator == (const Selectable<T> &op, T value);
+Expr operator != (const Selectable<T> &op, T value);
+Expr operator >  (const Selectable<T> &op, T value);
+Expr operator >= (const Selectable<T> &op, T value);
+Expr operator <  (const Selectable<T> &op, T value);
+Expr operator <= (const Selectable<T> &op, T value);
 
 // Field ? Field
 Expr operator == (const Field<T> &op1, const Field<T> &op2);
@@ -421,7 +421,7 @@ SetExpr operator = (const NullableField<T> &op, nullptr_t);
 ```
 
 Remarks:
-- `Comparable<T> ? T` returns `Expr<op ? value>`;
+- `Selectable<T> ? T` returns `Expr<op ? value>`;
 - `Field<T> ? Field<T>` returns `Expr<op1 ? op2>`;
 - `NullableField<T> == / != nullptr`
   returns `Expr<op> IS NULL / IS NOT NULL`;

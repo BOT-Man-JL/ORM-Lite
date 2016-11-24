@@ -395,23 +395,23 @@ namespace BOT_ORM
 			std::string expr;
 		};
 
-		// Comparable
+		// Selectable
 
 		template <typename T>
-		struct Comparable
+		struct Selectable
 		{
 			std::string fieldName;
 			const char *prefixStr;
 		};
 
-		// Field : Comparable
+		// Field : Selectable
 
 		template <typename T>
-		struct Field : public Comparable<T>
+		struct Field : public Selectable<T>
 		{
 			Field (std::string fieldName,
 				   const char *tableName)
-				: Comparable<T> { std::move (fieldName), tableName } {}
+				: Selectable<T> { std::move (fieldName), tableName } {}
 
 			inline SetExpr operator = (T value)
 			{
@@ -422,7 +422,7 @@ namespace BOT_ORM
 			}
 		};
 
-		// Nullable Field : Field : Comparable
+		// Nullable Field : Field : Selectable
 
 		template <typename T>
 		struct NullableField : public Field<T>
@@ -443,16 +443,16 @@ namespace BOT_ORM
 			{ return SetExpr { this->fieldName + "=null" }; }
 		};
 
-		// Aggregate Function : Comparable
+		// Aggregate Function : Selectable
 
 		template <typename T>
-		struct AggregateFunc : public Comparable<T>
+		struct AggregateFunc : public Selectable<T>
 		{
 			AggregateFunc (std::string function)
-				: Comparable<T> { std::move (function), nullptr } {}
+				: Selectable<T> { std::move (function), nullptr } {}
 
 			AggregateFunc (std::string function, const Field<T> &field)
-				: Comparable<T> { function + "(" + field.prefixStr +
+				: Selectable<T> { function + "(" + field.prefixStr +
 				"." + field.fieldName + ")", nullptr } {}
 		};
 
@@ -461,13 +461,13 @@ namespace BOT_ORM
 		struct Expr
 		{
 			template <typename T>
-			Expr (const Comparable<T> &field,
+			Expr (const Selectable<T> &field,
 				  std::string op_val)
 				: exprs { { field.fieldName + op_val, field.prefixStr } }
 			{}
 
 			template <typename T>
-			Expr (const Comparable<T> &field,
+			Expr (const Selectable<T> &field,
 				  std::string op, T value)
 			{
 				std::ostringstream os;
@@ -524,27 +524,27 @@ namespace BOT_ORM
 		// Field / Aggregate ? Value
 
 		template <typename T>
-		inline Expr operator == (const Comparable<T> &op, T value)
+		inline Expr operator == (const Selectable<T> &op, T value)
 		{ return Expr (op, "=", std::move (value)); }
 
 		template <typename T>
-		inline Expr operator != (const Comparable<T> &op, T value)
+		inline Expr operator != (const Selectable<T> &op, T value)
 		{ return Expr (op, "!=", std::move (value)); }
 
 		template <typename T>
-		inline Expr operator > (const Comparable<T> &op, T value)
+		inline Expr operator > (const Selectable<T> &op, T value)
 		{ return Expr (op, ">", std::move (value)); }
 
 		template <typename T>
-		inline Expr operator >= (const Comparable<T> &op, T value)
+		inline Expr operator >= (const Selectable<T> &op, T value)
 		{ return Expr (op, ">=", std::move (value)); }
 
 		template <typename T>
-		inline Expr operator < (const Comparable<T> &op, T value)
+		inline Expr operator < (const Selectable<T> &op, T value)
 		{ return Expr (op, "<", std::move (value)); }
 
 		template <typename T>
-		inline Expr operator <= (const Comparable<T> &op, T value)
+		inline Expr operator <= (const Selectable<T> &op, T value)
 		{ return Expr (op, "<=", std::move (value)); }
 
 		// Field ? Field
@@ -1081,7 +1081,7 @@ namespace BOT_ORM
 			// Return Field Strings for OrderBy and Select
 			template <typename T>
 			static inline std::string _GetFieldSql (
-				const Expression::Comparable<T> &op)
+				const Expression::Selectable<T> &op)
 			{
 				if (op.prefixStr)
 					return op.prefixStr + ("." + op.fieldName);
@@ -1091,7 +1091,7 @@ namespace BOT_ORM
 
 			template <typename T, typename... Args>
 			static inline std::string _GetFieldSql (
-				const Expression::Comparable<T> &arg,
+				const Expression::Selectable<T> &arg,
 				const Args & ... args)
 			{
 				return _GetFieldSql (arg) + "," + _GetFieldSql (args...);
@@ -1100,14 +1100,14 @@ namespace BOT_ORM
 			// Return Select Target Tuple
 			template <typename T>
 			static inline auto _SelectToTuple (
-				const Expression::Comparable<T> &)
+				const Expression::Selectable<T> &)
 			{
 				return std::make_tuple (Nullable<T> {});
 			}
 
 			template <typename T, typename... Args>
 			static inline auto _SelectToTuple (
-				const Expression::Comparable<T> &arg,
+				const Expression::Selectable<T> &arg,
 				const Args & ... args)
 			{
 				return std::tuple_cat (_SelectToTuple (arg),

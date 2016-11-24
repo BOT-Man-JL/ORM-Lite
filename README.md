@@ -64,12 +64,12 @@ mapper.CreateTbl (UserModel {});
 mapper.DropTbl (UserModel {});
 ```
 
-| id| score| name|    age|  salary|  title|
-|---|------|-----|-------|--------|-------|
-|  0|   0.2| John|     21|  `null`| `null`|
-|  1|   0.4| Jack| `null`|    3.14| `null`|
-|  2|   0.6| Jess| `null`|  `null`|    Dr.|
-|...|   ...|  ...|    ...|     ...|    ...|
+| user_id| user_name| credit_count|    age|  salary|  title|
+|--------|----------|-------------|-------|--------|-------|
+|       0|      John|          0.2|     21|  `null`| `null`|
+|       1|      Jack|          0.4| `null`|    3.14| `null`|
+|       2|      Jess|          0.6| `null`|  `null`|    Dr.|
+|     ...|       ...|          ...|    ...|     ...|    ...|
 
 ### Working on *Database* with *ORMapper*
 
