@@ -237,10 +237,10 @@ int main ()
 	// count = 2
 
 	// Update by Condition :-)
-	mapper.Update (UserModel {},
-				   field (helper.user_name) == std::string ("July"),
-				   field (helper.age) = 10,
-				   field (helper.credit_count) = 1.0);
+	//mapper.Update (UserModel {},
+	//			   field (helper.age) = 10 &&
+	//			   field (helper.credit_count) = 1.0,
+	//			   field (helper.user_name) == std::string ("July"));
 
 	// Remarks:
 	// sql = UPDATE UserModel SET age=10,credit_count=1.0

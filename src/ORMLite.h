@@ -382,6 +382,9 @@ namespace BOT_ORM
 			const std::string &ToString () const
 			{ return expr; }
 
+			inline SetExpr operator && (const SetExpr &right) const
+			{ return SetExpr { expr + "," + right.expr }; }
+
 		protected:
 			std::string expr;
 		};
@@ -577,11 +580,15 @@ namespace BOT_ORM
 
 		inline Expr operator & (const Field<std::string> &field,
 								std::string val)
-		{ return Expr (field, " like ", std::move (val)); }
+		{
+			return Expr (field, " like ", std::move (val));
+		}
 
 		inline Expr operator | (const Field<std::string> &field,
 								std::string val)
-		{ return Expr (field, " not like ", std::move (val)); }
+		{
+			return Expr (field, " not like ", std::move (val));
+		}
 	}
 
 	// ORMapper
@@ -776,25 +783,15 @@ namespace BOT_ORM
 			_connector.Execute (os.str ());
 		}
 
-		template <typename C, typename... Args>
-		void Update (const C &,
-					 const Expr &expr,
-					 const Args & ... setExprs)
+		template <typename C>
+		inline void Update (const C &,
+							const Expression::SetExpr &setExpr,
+							const Expression::Expr &whereExpr)
 		{
-			std::stringstream setSql;
-			setSql << "set ";
-			auto count = sizeof... (Args);
-			BOT_ORM_Impl::FnVisitor::Visit (
-				[&setSql, &count] (const SetExpr &setExpr)
-			{
-				setSql << setExpr.ToString ();
-				if (--count != 0) setSql << ",";
-				return true;
-			}, setExprs...);
 			_connector.Execute ("update " +
 								std::string (C::__TableName) +
-								" " + setSql.str () +
-								" where " + expr.ToString (false) + ";");
+								" set " + setExpr.ToString () +
+								" where " + whereExpr.ToString (false) + ";");
 		}
 
 		template <typename C>
@@ -817,11 +814,11 @@ namespace BOT_ORM
 
 		template <typename C>
 		inline void Delete (const C &,
-							const Expr &expr)
+							const Expression::Expr &whereExpr)
 		{
 			_connector.Execute ("delete from " +
 								std::string (C::__TableName) +
-								" where " + expr.ToString (false) + ";");
+								" where " + whereExpr.ToString (false) + ";");
 		}
 
 		// Query Object :-)
@@ -856,7 +853,7 @@ namespace BOT_ORM
 			typedef QueryResult result_type;
 
 			// Where
-			inline Queryable &Where (const Expr &expr)
+			inline Queryable &Where (const Expression::Expr &expr)
 			{
 				_sqlWhere = " where (" + expr.ToString (true) + ")";
 				return *this;
@@ -864,12 +861,12 @@ namespace BOT_ORM
 
 			// Group By
 			template <typename T>
-			inline Queryable &GroupBy (const Field<T> &field)
+			inline Queryable &GroupBy (const Expression::Field<T> &field)
 			{
 				_sqlGroupBy = " group by " + _GetFieldSql (field);
 				return *this;
 			}
-			inline Queryable &Having (const Expr &expr)
+			inline Queryable &Having (const Expression::Expr &expr)
 			{
 				_sqlHaving = " having " + expr.ToString (true);
 				return *this;
@@ -877,7 +874,7 @@ namespace BOT_ORM
 
 			// Order By
 			template <typename T>
-			inline Queryable &OrderBy (const Field<T> &field)
+			inline Queryable &OrderBy (const Expression::Field<T> &field)
 			{
 				if (_sqlOrderBy.empty ())
 					_sqlOrderBy = " order by " + _GetFieldSql (field);
@@ -886,7 +883,7 @@ namespace BOT_ORM
 				return *this;
 			}
 			template <typename T>
-			inline Queryable &OrderByDescending (const Field<T> &field)
+			inline Queryable &OrderByDescending (const Expression::Field<T> &field)
 			{
 				if (_sqlOrderBy.empty ())
 					_sqlOrderBy = " order by " + _GetFieldSql (field) + " desc";
@@ -912,7 +909,7 @@ namespace BOT_ORM
 			// Join
 			template <typename C>
 			inline auto Join (const C &queryHelper2,
-							  const Expr &onExpr) const
+							  const Expression::Expr &onExpr) const
 			{
 				return _NewQuery (
 					_sqlTarget,
@@ -923,7 +920,7 @@ namespace BOT_ORM
 			}
 			template <typename C>
 			inline auto LeftJoin (const C &queryHelper2,
-								  const Expr &onExpr) const
+								  const Expression::Expr &onExpr) const
 			{
 				return _NewQuery (
 					_sqlTarget,
@@ -946,7 +943,8 @@ namespace BOT_ORM
 
 			// Aggregate
 			template <typename T>
-			Nullable<T> Aggregate (const AggregateFunc<T> &agg) const
+			Nullable<T> Aggregate (
+				const Expression::AggregateFunc<T> &agg) const
 			{
 				Nullable<T> ret;
 				_pMapper->_Select (
@@ -1054,7 +1052,7 @@ namespace BOT_ORM
 			// Return Field Strings for OrderBy and Select
 			template <typename T>
 			static inline std::string _GetFieldSql (
-				const Comparable<T> &op)
+				const Expression::Comparable<T> &op)
 			{
 				if (op.prefixStr)
 					return op.prefixStr + ("." + op.fieldName);
@@ -1063,20 +1061,25 @@ namespace BOT_ORM
 			}
 
 			template <typename T, typename... Args>
-			static inline std::string _GetFieldSql (const Comparable<T> &arg,
-													const Args & ... args)
+			static inline std::string _GetFieldSql (
+				const Expression::Comparable<T> &arg,
+				const Args & ... args)
 			{
 				return _GetFieldSql (arg) + "," + _GetFieldSql (args...);
 			}
 
 			// Return Select Target Tuple
 			template <typename T>
-			static inline auto _SelectToTuple (const Comparable<T> &)
-			{ return std::make_tuple (Nullable<T> {}); }
+			static inline auto _SelectToTuple (
+				const Expression::Comparable<T> &)
+			{
+				return std::make_tuple (Nullable<T> {});
+			}
 
 			template <typename T, typename... Args>
-			static inline auto _SelectToTuple (const Comparable<T> &arg,
-											   const Args & ... args)
+			static inline auto _SelectToTuple (
+				const Expression::Comparable<T> &arg,
+				const Args & ... args)
 			{
 				return std::tuple_cat (_SelectToTuple (arg),
 									   _SelectToTuple (args...));
@@ -1095,11 +1098,11 @@ namespace BOT_ORM
 				return val;
 			}
 
-			// Tuple Nullable-Cat
-			// Covert Tuple to Tuple with all Nullable Fields
 			template <typename TupleType, size_t N>
 			struct _TupleHelper
 			{
+				// Tuple Nullable-Cat
+				// Covert Tuple to Tuple with all Nullable Fields
 				static inline auto ToNullable (const TupleType &tuple)
 				{
 					return std::tuple_cat (
@@ -1108,6 +1111,7 @@ namespace BOT_ORM
 					);
 				}
 
+				// Tuple Visitor
 				template <typename Fn>
 				static inline void Visit (TupleType &tuple, Fn fn)
 				{
@@ -1115,6 +1119,7 @@ namespace BOT_ORM
 					fn (std::get<N - 1> (tuple));
 				}
 			};
+
 			template <typename TupleType>
 			struct _TupleHelper <TupleType, 1>
 			{
@@ -1197,18 +1202,20 @@ namespace BOT_ORM
 			}
 
 			template <typename T>
-			inline Field<T> operator () (const T &property)
+			inline Expression::Field<T> operator () (
+				const T &property)
 			{
 				const auto &result = Get (property);
-				return Field<T> {
+				return Expression::Field<T> {
 					std::move (result.first), result.second };
 			}
 
 			template <typename T>
-			inline NullableField<T> operator () (const Nullable<T> &property)
+			inline Expression::NullableField<T> operator () (
+				const Nullable<T> &property)
 			{
 				const auto &result = Get (property);
-				return NullableField<T> {
+				return Expression::NullableField<T> {
 					std::move (result.first), result.second };
 			}
 
@@ -1244,6 +1251,8 @@ namespace BOT_ORM
 
 	namespace Helper
 	{
+		using namespace Expression;
+
 		template <typename... Args>
 		inline ORMapper::FieldExtractor FieldExtractor (
 			const Args & ... args)
