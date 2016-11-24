@@ -20,20 +20,8 @@ Modules under `namespace BOT_ORM`:
 
 - `BOT_ORM::Nullable`
 - `BOT_ORM::ORMapper`
-
-Modules under `BOT_ORM::ORMapper`:
-
 - `BOT_ORM::ORMapper::Queryable<...>`
-- `BOT_ORM::ORMapper::FieldExtractor`
-
-Modules under `namespace BOT_ORM::Helper`:
-
-- `BOT_ORM::Helper::FieldExtractor ()`
-- `BOT_ORM::Helper::Count ()`
-- `BOT_ORM::Helper::Sum ()`
-- `BOT_ORM::Helper::Avg ()`
-- `BOT_ORM::Helper::Max ()`
-- `BOT_ORM::Helper::Min ()`
+- `BOT_ORM::FieldExtractor`
 
 Modules under `namespace BOT_ORM::Expression`:
 
@@ -43,6 +31,14 @@ Modules under `namespace BOT_ORM::Expression`:
 - `BOT_ORM::Expression::AggregateFunc`
 - `BOT_ORM::Expression::Expr`
 - `BOT_ORM::Expression::SetExpr`
+
+Modules under `namespace BOT_ORM::Helper`:
+
+- `BOT_ORM::Helper::Count ()`
+- `BOT_ORM::Helper::Sum ()`
+- `BOT_ORM::Helper::Avg ()`
+- `BOT_ORM::Helper::Max ()`
+- `BOT_ORM::Helper::Min ()`
 
 ## `BOT_ORM::Nullable`
 
@@ -135,17 +131,29 @@ Note that:
 - Field Names MUST **NOT** be SQL Keywords (SQL Constraint);
 - `std::string` Value MUST **NOT** contain `\0` (SQL Constraint);
 - `ORMAP (...)` will **auto** Inject some **private members**;
+  - Access by `BOT_ORM::ORMapper` and `BOT_ORM::FieldExtractor`;
   - `__Accept ()` to Implement **Visitor Pattern**;
   - `__Tuple ()` to **Flatten** data to tuple;
   - `__FieldNames ()` and `__TableName` to store strings;
 
-### ORMapper (const string &connectionString)
+### Connection
 
-Construct a **O/R Mapper** to connect to `connectionString`;
+``` cpp
+ORMapper (const string &connectionString);
+```
 
-### void Transaction (Fn fn)
+Remarks:
+- Construct a **O/R Mapper** to connect to `connectionString`;
+- For SQLite, the `connectionString` is the **database name**;
 
-Invoke `fn` **Transactionally**;
+### Transaction
+
+``` cpp
+void Transaction (Fn fn);
+```
+
+Remarks:
+- Invoke `fn` **Transactionally**, as following:
 
 ``` cpp
 try
@@ -161,75 +169,131 @@ catch (...)
 }
 ```
 
-### void CreateTbl (const MyClass &entity)
+### Create and Drop Table
 
-Create Table `MyClass` for class `MyClass`;
+``` cpp
+// Create Table
+void CreateTbl (const MyClass &);
+
+// Drop Table
+void DropTbl (const MyClass &);
+```
+
+Remarks:
+- Create/Drop Table for class `MyClass`;
+
+SQL:
 
 ``` sql
 CREATE TABLE MyClass (...);
-```
 
-### void DropTbl (const MyClass &)
-
-Drop Table `MyClass` from the DB File;
-
-``` sql
 DROP TABLE MyClass;
 ```
 
-### void Insert (const MyClass &entity)
+### Insert
 
-Insert `entity` into Table `MyClass`;
+``` cpp
+// Insert a single value
+void Insert (const MyClass &entity, bool withId = true);
+
+// Insert values
+void InsertRange (const Container<MyClass> &entities, bool withId = true);
+```
+
+Remarks:
+- Insert `entity` / `entities` into Table for `MyClass`;
+- If `withId` is `false`, it will insert the `entity` with
+  `NULL` **Primary Key**;
+- `entities` must **SUPPORT** `forward_iterator`;
+
+SQL:
 
 ``` sql
 INSERT INTO MyClass VALUES (...);
-```
 
-### void InsertRange (const Container\<MyClass\> &entities)
-
-Insert `entities` into Table `MyClass`;
-
-`entities` must **SUPPORT** `forward_iterator`;
-    
-``` sql
 INSERT INTO MyClass VALUES (...), (...) ...;
 ```
 
-### void Update (const MyClass &entity)
+### Update
 
-Update Entity in Table `MyClass` with the Same `KEY` with `entity`;
+``` cpp
+// Update value by Primary Key
+void Update (const MyClass &entity);
+
+// Update values by Primary Key
+void UpdateRange (const Container<MyClass> &entities);
+
+// Update by Expressions
+void Update (const MyClass &,
+             const Expression::SetExpr &setExpr,
+             const Expression::Expr &whereExpr);
+```
+
+Remarks:
+- Update `entity` / `entities` in Table `MyClass`
+  with the Same **Primary Key**;
+- Update Set `setExpr` Where `whereExpr` for Table `MyClass`
+  (`Expression` will be described later);
+- `entities` must **SUPPORT** `forward_iterator`;
+
+SQL:
 
 ``` sql
 UPDATE MyClass SET (...) WHERE KEY = <entity.id>;
-```
 
-### void UpdateRange (const Container\<MyClass\> &entities)
-    
-Update Entries with the Same `KEY` with `entities`;
-
-`entities` must **SUPPORT** `forward_iterator`;
-
-``` sql
 UPDATE MyClass SET (...) WHERE KEY = <entity.id>;
 UPDATE MyClass SET (...) WHERE KEY = <entity.id>;
 ...
+
+UPDATE MyClass SET (...) WHERE ...;
 ```
 
-### void Delete (const MyClass &entity)
+### Delete
 
-Delete Entry in Table `MyClass` with the Same `KEY` with `entity`;
+``` cpp
+// Delete value by Primary Key
+void Delete (const MyClass &entity);
+
+// Delete by Expressions
+void Delete (const C &,
+             const Expression::Expr &whereExpr);
+```
+
+Remarks:
+- Delete Entry in Table `MyClass` with the Same **Primary Key**;
+- Delete Where `whereExpr` for Table `MyClass`
+  (`Expression` will be described later);
+
+SQL:
 
 ``` sql
 DELETE FROM MyClass WHERE KEY = <entity.id>;
+
+DELETE FROM MyClass WHERE ...;
 ```
 
-### ORQuery\<MyClass\> Query (const MyClass &queryHelper)
+### Query
 
-Return new `ORQuery` object and Capturing `queryHelper`;
+``` cpp
+// Retrieve a Queryable Object
+Queryable<MyClass> Query (MyClass queryHelper);
+```
 
-Detailed in `## ORQuery` Section;
+Remarks:
+- Return new `Queryable` object (described later);
 
-## ORQuery
+## `BOT_ORM::ORMapper::Queryable<...>`
+
+### Why `Queryable` is inside `ORMapper`
+
+Since `Queryable` is a template,
+it's hard to define an access to Injected Class;
+
+## `BOT_ORM::FieldExtractor`
+
+## `namespace BOT_ORM::Expression`
+
+## `namespace BOT_ORM::Helper`
 
 ### ORQuery &Where (const Expr &expr)
 

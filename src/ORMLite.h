@@ -26,6 +26,7 @@
 #define ORMAP(_TABLE_NAME_, ...)                          \
 private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
+friend class BOT_ORM::FieldExtractor;                     \
 template <typename FN>                                    \
 void __Accept (FN fn)                                     \
 {                                                         \
@@ -1170,72 +1171,6 @@ namespace BOT_ORM
 								 std::string (C::__TableName));
 		}
 
-		class FieldExtractor
-		{
-			using pair_type = std::pair<std::string, const char *>;
-
-		public:
-			template <typename... Args>
-			FieldExtractor (const Args & ... args)
-			{
-				BOT_ORM_Impl::FnVisitor::Visit ([this] (auto &helper)
-				{
-					const auto &fieldNames =
-						std::remove_reference_t<
-						std::remove_cv_t<decltype (helper)>
-						>::__FieldNames ();
-					constexpr auto tableName =
-						std::remove_reference_t<
-						std::remove_cv_t<decltype (helper)>
-						>::__TableName;
-
-					size_t index = 0;
-					helper.__Accept (
-						[this, &index, &fieldNames, &tableName] (auto &val)
-					{
-						_map.emplace ((const void *) &val, pair_type {
-							fieldNames[index++], tableName });
-						return true;
-					});
-					return true;
-				}, args...);
-			}
-
-			template <typename T>
-			inline Expression::Field<T> operator () (
-				const T &property)
-			{
-				const auto &result = Get (property);
-				return Expression::Field<T> {
-					std::move (result.first), result.second };
-			}
-
-			template <typename T>
-			inline Expression::NullableField<T> operator () (
-				const Nullable<T> &property)
-			{
-				const auto &result = Get (property);
-				return Expression::NullableField<T> {
-					std::move (result.first), result.second };
-			}
-
-		private:
-			std::unordered_map<const void *, pair_type> _map;
-
-			template <typename T>
-			const pair_type &Get (const T &property)
-			{
-				try
-				{
-					return _map.at ((const void *) &property);
-				}
-				catch (...)
-				{
-					throw std::runtime_error ("No Such Field...");
-				}
-			}
-		};
-
 	private:
 		BOT_ORM_Impl::SQLConnector _connector;
 
@@ -1249,16 +1184,75 @@ namespace BOT_ORM
 		}
 	};
 
+	class FieldExtractor
+	{
+		using pair_type = std::pair<std::string, const char *>;
+
+	public:
+		template <typename... Args>
+		FieldExtractor (const Args & ... args)
+		{
+			BOT_ORM_Impl::FnVisitor::Visit ([this] (auto &helper)
+			{
+				const auto &fieldNames =
+					std::remove_reference_t<
+					std::remove_cv_t<decltype (helper)>
+					>::__FieldNames ();
+				constexpr auto tableName =
+					std::remove_reference_t<
+					std::remove_cv_t<decltype (helper)>
+					>::__TableName;
+
+				size_t index = 0;
+				helper.__Accept (
+					[this, &index, &fieldNames, &tableName] (auto &val)
+				{
+					_map.emplace ((const void *) &val, pair_type {
+						fieldNames[index++], tableName });
+					return true;
+				});
+				return true;
+			}, args...);
+		}
+
+		template <typename T>
+		inline Expression::Field<T> operator () (
+			const T &property)
+		{
+			const auto &result = Get (property);
+			return Expression::Field<T> {
+				std::move (result.first), result.second };
+		}
+
+		template <typename T>
+		inline Expression::NullableField<T> operator () (
+			const Nullable<T> &property)
+		{
+			const auto &result = Get (property);
+			return Expression::NullableField<T> {
+				std::move (result.first), result.second };
+		}
+
+	private:
+		std::unordered_map<const void *, pair_type> _map;
+
+		template <typename T>
+		const pair_type &Get (const T &property)
+		{
+			try
+			{
+				return _map.at ((const void *) &property);
+			}
+			catch (...)
+			{
+				throw std::runtime_error ("No Such Field...");
+			}
+		}
+	};
+
 	namespace Helper
 	{
 		using namespace Expression;
-
-		template <typename... Args>
-		inline ORMapper::FieldExtractor FieldExtractor (
-			const Args & ... args)
-		{
-			return ORMapper::FieldExtractor { args... };
-		}
 
 		inline auto Count ()
 		{ return AggregateFunc<size_t> { "count (*)" }; }

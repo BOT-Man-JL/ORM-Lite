@@ -191,7 +191,7 @@ int main ()
 
 	// Define a Query Helper Object and its Field Extractor
 	UserModel helper;
-	auto field = FieldExtractor (helper);
+	FieldExtractor field { helper };
 
 	// Select by Query :-)
 	auto result2 = mapper.Query (UserModel {})
@@ -259,7 +259,7 @@ int main ()
 	UserModel user;
 	SellerModel seller;
 	OrderModel order;
-	field = FieldExtractor (user, seller, order);
+	field = FieldExtractor { user, seller, order };
 
 	// Insert Values into the table
 	// mapper.Insert (..., false) means Insert without Primary Key
