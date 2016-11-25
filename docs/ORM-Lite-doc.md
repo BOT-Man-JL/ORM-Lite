@@ -471,37 +471,32 @@ Remarks:
 
 They will Generate Aggregate Functions as:
 
-- `COUNT (*)`
-- `COUNT (field)`
-- `SUM (field)`
-- `AVG (field)`
-- `MAX (field)`
-- `MIN (field)`
+- `size_t COUNT (*)`
+- `size_t COUNT (field)`
+- `T SUM (field)`
+- `T AVG (field)`
+- `T MAX (field)`
+- `T MIN (field)`
 
 ## `BOT_ORM::FieldExtractor`
 
-### Construction
-
 ``` cpp
+// Construction
 FieldExtractor (const MyClass &queryHelper,
                 const MyClass2 &queryHelper2,
                 ...);
-```
 
-Remarks:
-- Construction of `FieldExtractor` will take all fields' pointers of
-  `queryHelper*` into a **Hash Table**;
-
-### Usage
-
-``` cpp
+// Get Field<> by operator ()
 Field<T> operator () (const T &field);
 NullableField<T> operator () (const Nullable<T> &field);
 ```
 
 Remarks:
-- `fieldExtractor (field)` will find the position of `field`
-  in the **Hash Table** from `queryHelper*` and Construct the `Field`;
+- Construction of `FieldExtractor` will take all fields' pointers of
+  `queryHelper*` into a **Hash Table**;
+- `operator () (field)` will find the position of `field`
+  in the **Hash Table** from `queryHelper*`
+  and Construct the corresponding `Field`;
 - If the `field` is `Nullable<T>`
   it will Construct a `NullableField<T>`;
   and it will Construct a `Field<T>` otherwise;
