@@ -862,7 +862,8 @@ namespace BOT_ORM
 			Queryable (ORMapper &mapper,
 					   QueryResult queryHelper,
 					   std::string queryFrom,
-					   std::string queryTarget = "*",
+					   std::string sqlSelect = "select ",
+					   std::string sqlTarget = "*",
 					   std::string sqlWhere = "",
 					   std::string sqlGroupBy = "",
 					   std::string sqlHaving = "",
@@ -872,7 +873,8 @@ namespace BOT_ORM
 				_mapper (mapper),
 				_queryHelper (std::move (queryHelper)),
 				_sqlFrom (std::move (queryFrom)),
-				_sqlTarget (std::move (queryTarget)),
+				_sqlSelect (std::move (sqlSelect)),
+				_sqlTarget (std::move (sqlTarget)),
 				_sqlWhere (std::move (sqlWhere)),
 				_sqlGroupBy (std::move (sqlGroupBy)),
 				_sqlHaving (std::move (sqlHaving)),
@@ -880,6 +882,13 @@ namespace BOT_ORM
 				_sqlLimit (std::move (sqlLimit)),
 				_sqlOffset (std::move (sqlOffset))
 			{}
+
+			// Distinct
+			inline Queryable &Distinct (bool isDistinct = true)
+			{
+				_sqlSelect = isDistinct ? "select distinct " : "select ";
+				return *this;
+			}
 
 			// Where
 			inline Queryable &Where (const Expression::Expr &expr)
@@ -977,7 +986,7 @@ namespace BOT_ORM
 			{
 				Nullable<T> ret;
 				_mapper._Select (
-					agg.fieldName, _GetFromSql (),
+					_sqlSelect + agg.fieldName, _GetFromSql (),
 					[&] (int argc, char **argv, char **)
 				{
 					BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
@@ -1004,6 +1013,7 @@ namespace BOT_ORM
 			QueryResult _queryHelper;
 
 			std::string _sqlFrom;
+			std::string _sqlSelect;
 			std::string _sqlTarget;
 
 			std::string _sqlWhere;
@@ -1031,7 +1041,9 @@ namespace BOT_ORM
 				return Queryable<std::tuple<Args...>>
 				{
 					_mapper, std::move (newQueryHelper),
-						std::move (from), std::move (target),
+						std::move (from),
+						_sqlSelect,
+						std::move (target),
 						_sqlWhere,
 						_sqlGroupBy, _sqlHaving,
 						_sqlOrderBy,
@@ -1044,7 +1056,7 @@ namespace BOT_ORM
 			void _Select (const C &, Out &out) const
 			{
 				auto copy = _queryHelper;
-				_mapper._Select (_sqlTarget, _GetFromSql (),
+				_mapper._Select (_sqlSelect + _sqlTarget, _GetFromSql (),
 								 [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
@@ -1062,7 +1074,7 @@ namespace BOT_ORM
 			void _Select (const std::tuple<Args...> &, Out &out) const
 			{
 				auto copy = _queryHelper;
-				_mapper._Select (_sqlTarget, _GetFromSql (),
+				_mapper._Select (_sqlSelect + _sqlTarget, _GetFromSql (),
 								 [&] (int, char **argv, char **)
 				{
 					size_t index = 0;
@@ -1192,19 +1204,18 @@ namespace BOT_ORM
 						   "It must be Copy Constructible");
 
 			return Queryable<C> (*this, std::move (queryHelper),
-								 std::string (C::__TableName));
+								 "from " + std::string (C::__TableName));
 		}
 
 	private:
 		BOT_ORM_Impl::SQLConnector _connector;
 
 		template <typename Fn>
-		inline void _Select (const std::string &sqlTarget,
+		inline void _Select (const std::string &sqlSelect,
 							 const std::string &sqlFrom,
 							 Fn fn)
 		{
-			_connector.Execute ("select " + sqlTarget +
-								" from " + sqlFrom + ";", fn);
+			_connector.Execute (sqlSelect + sqlFrom + ";", fn);
 		}
 	};
 

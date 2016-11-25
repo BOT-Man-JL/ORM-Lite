@@ -38,7 +38,7 @@ Modules under `namespace BOT_ORM::Expression`
 
 ## `BOT_ORM::Nullable`
 
-It keeps the Similar Semantic as `Nullable<T>` as `C#`; and
+It keeps the *Similar Semantic* of `Nullable<T>` as `C#`; and
 [Reference Here](http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
 
 ### Construction & Assignment
@@ -307,6 +307,7 @@ Remarks:
 ### Set Conditions
 
 ``` cpp
+Queryable &Distinct (bool isDistinct = true);
 Queryable &Where (const Expression::Expr &expr);
 
 Queryable &GroupBy (const Expression::Field<T> &field);
@@ -322,8 +323,9 @@ Queryable &Skip (size_t count);
 Remarks:
 - These functions will Set/Append Conditions to `this` and
   return the reference of `*this`;
-- `OrderBy*` will **Append** `field` to Condition, while Other
-  functions will **Set** `expr`, `field` and `count` to Condition;
+- `OrderBy*` will **Append** `field` to Condition,
+  while Other functions will **Set** `DISTINCT`,
+  `expr`, `field` or `count` to Condition;
 - `Expression` will be described later;
 
 ### Construct New `Queryable`
@@ -361,7 +363,7 @@ Remarks:
 We will use the following SQL to Query:
 
 ``` sql
-SELECT ...
+SELECT [DISTINCT] ...
 FROM TABLE
      [LEFT] JOIN TABLE ON ...
      ...
