@@ -288,6 +288,12 @@ auto result4 = joinedQuery
 //            (74, "July_74", 24.25)]
 ```
 
+## Planned Features
+
+- Blob / DateTime Types
+- Compound Select
+- Constraints on Creating Table
+
 ## Implementation Details
 
 Details of the Design in **Chinese** are posted on my

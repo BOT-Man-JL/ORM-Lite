@@ -66,8 +66,9 @@ const Nullable<T> & operator= (const T &value);
 
 ### Get Value
 
-Return the `Underlying Value` of the object,
-which is **Valid** only if it's `NOT NULL`;
+Return the `Underlying Value` of the object or
+`Default Not-null Value` of `T`;
+(similar to `GetValueOrDefault` in C#)
 
 ``` cpp
 const T &Value (); const
