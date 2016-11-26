@@ -251,15 +251,22 @@ namespace BOT_ORM_Impl
 	inline void DeserializeValue (
 		T &property, const char *value)
 	{
-		std::stringstream ostr (value);
-		ostr >> property;
+		if (value)
+			std::istringstream { value } >> property;
+		else
+			throw std::runtime_error (
+				"Get Null Value for NOT Nullable Type");
 	}
 
 	template <>
 	inline void DeserializeValue <std::string> (
 		std::string &property, const char *value)
 	{
-		property = value;
+		if (value)
+			property = value;
+		else
+			throw std::runtime_error (
+				"Get Null Value for NOT Nullable Type");
 	}
 
 	template <typename T>

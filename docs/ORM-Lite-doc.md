@@ -7,7 +7,7 @@
   - gcc >= 5
 - **SQLite 3** (zipped in *src*)
 
-## `BOT_ORM` Layout
+## `BOT_ORM` Modules
 
 ``` cpp
 #include "ORMLite.h"
@@ -302,6 +302,9 @@ Remarks:
 - `Aggregate` will Get the one-or-zero-row Result
   for `agg` immediately;
 - `ToVector` / `ToList` returns the Collection of `QueryResult`;
+- If the Result is `null` for `NOT Nullable` Field,
+  it will throw `std::runtime_error`
+  with message `Get Null Value for NOT Nullable Type`;
 - All Functions will **NOT** Change the State of this Queryable Object;
 - `Expression` will be described later;
 
@@ -346,7 +349,7 @@ Remarks:
   which can be retrieved by `SELECT *` (**All Columns**);
 - `Select` will Set `QueryResult` to `std::tuple<T1, T2, ...>`,
   which can be retrieved by `SELECT target1, target2, ...`
-  (`target*` can be **Field** or **Aggregate Functions**);
+  (`target` can be **Field** or **Aggregate Functions**);
 - `Join` / `LeftJoin` will Set `QueryResult` to `std::tuple<...>`
   - `...` is the **flattened nullable concatenation** of all entries of
     **Previous** `QueryResult` and `queryHelper2`;
@@ -483,7 +486,7 @@ They will Generate Aggregate Functions as:
 
 ``` cpp
 // Construction
-FieldExtractor (const MyClass &queryHelper,
+FieldExtractor (const MyClass1 &queryHelper1,
                 const MyClass2 &queryHelper2,
                 ...);
 
@@ -494,13 +497,15 @@ NullableField<T> operator () (const Nullable<T> &field);
 
 Remarks:
 - Construction of `FieldExtractor` will take all fields' pointers of
-  `queryHelper*` into a **Hash Table**;
+  `queryHelper` into a **Hash Table**;
 - `operator () (field)` will find the position of `field`
-  in the **Hash Table** from `queryHelper*`
+  in the **Hash Table** from `queryHelper`
   and Construct the corresponding `Field`;
 - If the `field` is `Nullable<T>`
   it will Construct a `NullableField<T>`;
   and it will Construct a `Field<T>` otherwise;
+- If `field` is not a member of `queryHelper`,
+  it will throw `std::runtime_error` with message `No Such Field...`;
 
 ## Error Handling
 
