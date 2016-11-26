@@ -5,7 +5,7 @@
 - **C++ 14** Support
   - MSVC >= 14 (2015)
   - gcc >= 5
-- **SQLite 3** (zipped in *src*)
+- **SQLite 3**
 
 ## `BOT_ORM` Modules
 
@@ -128,10 +128,10 @@ Note that:
 - Field Names MUST **NOT** be SQL Keywords (SQL Constraint);
 - `std::string` Value MUST **NOT** contain `\0` (SQL Constraint);
 - `ORMAP (...)` will **auto** Inject some **private members**;
-  - Access by `BOT_ORM::ORMapper` and `BOT_ORM::FieldExtractor`;
   - `__Accept ()` to Implement **Visitor Pattern**;
   - `__Tuple ()` to **Flatten** data to tuple;
   - `__FieldNames ()` and `__TableName` to store strings;
+  - and the Access by Implementation;
 
 ### Connection
 

@@ -1020,8 +1020,8 @@ namespace BOT_ORM
 								[&] (int, char **argv, char **)
 			{
 				size_t index = 0;
-				BOT_ORM_Impl::TupleHelper<QueryResult, sizeof... (Args)>::Visit (
-					copy, [&argv, &index] (auto &val)
+				BOT_ORM_Impl::TupleHelper<QueryResult, sizeof... (Args)>
+					::Visit (copy, [&argv, &index] (auto &val)
 				{
 					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 					return true;

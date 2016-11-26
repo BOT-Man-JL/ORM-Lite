@@ -17,8 +17,10 @@ written in Modern C++ style.
 
 ### Including *ORM Lite*
 
-Before we start,
-Include `ORMLite.h` and `sqlite3.h`/`sqlite3.c` into your Project;
+Before we start, Include **src** into your Project:
+
+- `ORMLite.h`
+- `sqlite3.h` and `sqlite3.c`
 
 ``` cpp
 #include "ORMLite.h"
@@ -87,12 +89,13 @@ std::vector<UserModel> initObjs =
 for (const auto &obj : initObjs)
     mapper.Insert (obj);
 
-// Update Entry by Primary Key
 initObjs[1].salary = nullptr;
 initObjs[1].title = "St.";
+
+// Update Entity by Primary Key (WHERE UserModel.id = 1)
 mapper.Update (initObjs[1]);
 
-// Delete Entry by Primary Key
+// Delete Entity by Primary Key (WHERE UserModel.id = 2)
 mapper.Delete (initObjs[2]);
 
 // Transactional Statements
@@ -100,8 +103,8 @@ try
 {
     mapper.Transaction ([&] ()
     {
-        mapper.Delete (initObjs[0]);
-        mapper.Insert (UserModel { 1, "Joke", 0 });
+        mapper.Delete (initObjs[0]);  // OK
+        mapper.Insert (UserModel { 1, "Joke", 0 });  // Failed
     });
 }
 catch (const std::exception &ex)
@@ -323,6 +326,7 @@ auto result5 = mapper.Query (OrderModel {})
 ## Planned Features
 
 - Blob / DateTime Types
+- Subquery
 - Constraints on Creating Table
 
 ## Implementation Details
