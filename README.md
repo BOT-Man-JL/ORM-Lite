@@ -329,9 +329,9 @@ auto result5 = mapper.Query (OrderModel {})
 - Subquery
 - Constraints on Creating Table
 
-## Implementation Details
+## Implementation Details （实现细节）
 
-Details of the Design in **Chinese** are posted on my
-[Blog](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Naive-Cpp-ORM);
+Posts in **Chinese** only:
 
-There will be a new Post detailing the New Design soon ~ 😉
+- [How to Design a Naive C++ ORM](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Naive-Cpp-ORM)
+- [How to Design a Better C++ ORM](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Better-Cpp-ORM)
