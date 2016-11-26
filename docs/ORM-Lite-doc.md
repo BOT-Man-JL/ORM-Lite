@@ -27,7 +27,7 @@ Modules under `namespace BOT_ORM::Expression`
 - `BOT_ORM::Expression::Selectable`
 - `BOT_ORM::Expression::Field`
 - `BOT_ORM::Expression::NullableField`
-- `BOT_ORM::Expression::AggregateFunc`
+- `BOT_ORM::Expression::Aggregate`
 - `BOT_ORM::Expression::Expr`
 - `BOT_ORM::Expression::SetExpr`
 - `BOT_ORM::Expression::Count ()`
@@ -286,8 +286,7 @@ Remarks:
 ### Retrieve Result
 
 ``` cpp
-Nullable<T> Select (
-    const Expression::AggregateFunc<T> &agg) const;
+Nullable<T> Select (const Expression::Aggregate<T> &agg) const;
 std::vector<QueryResult> ToVector () const;
 std::list<QueryResult> ToList () const;
 ```
@@ -397,7 +396,7 @@ Remarks:
 BOT_ORM::Expression::Selectable<T>
 BOT_ORM::Expression::Field<T> : public Selectable<T>
 BOT_ORM::Expression::NullableField<T> : public Field<T>
-BOT_ORM::Expression::AggregateFunc<T> : public Selectable<T>
+BOT_ORM::Expression::Aggregate<T> : public Selectable<T>
 ```
 
 #### Operations

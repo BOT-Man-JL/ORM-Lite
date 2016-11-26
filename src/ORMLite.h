@@ -457,12 +457,12 @@ namespace BOT_ORM
 		// Aggregate Function : Selectable
 
 		template <typename T>
-		struct AggregateFunc : public Selectable<T>
+		struct Aggregate : public Selectable<T>
 		{
-			AggregateFunc (std::string function)
+			Aggregate (std::string function)
 				: Selectable<T> { std::move (function), nullptr } {}
 
-			AggregateFunc (std::string function, const Field<T> &field)
+			Aggregate (std::string function, const Field<T> &field)
 				: Selectable<T> { function + "(" + field.prefixStr +
 				"." + field.fieldName + ")", nullptr } {}
 		};
@@ -611,27 +611,27 @@ namespace BOT_ORM
 		// Aggregate Function Helpers
 
 		inline auto Count ()
-		{ return AggregateFunc<size_t> { "count (*)" }; }
+		{ return Aggregate<size_t> { "count (*)" }; }
 
 		template <typename T>
 		inline auto Count (const Field<T> &field)
-		{ return AggregateFunc<T> { "count", field }; }
+		{ return Aggregate<T> { "count", field }; }
 
 		template <typename T>
 		inline auto Sum (const Field<T> &field)
-		{ return AggregateFunc<T> { "sum", field }; }
+		{ return Aggregate<T> { "sum", field }; }
 
 		template <typename T>
 		inline auto Avg (const Field<T> &field)
-		{ return AggregateFunc<T> { "avg", field }; }
+		{ return Aggregate<T> { "avg", field }; }
 
 		template <typename T>
 		inline auto Max (const Field<T> &field)
-		{ return AggregateFunc<T> { "max", field }; }
+		{ return Aggregate<T> { "max", field }; }
 
 		template <typename T>
 		inline auto Min (const Field<T> &field)
-		{ return AggregateFunc<T> { "min", field }; }
+		{ return Aggregate<T> { "min", field }; }
 	}
 }
 
@@ -925,8 +925,7 @@ namespace BOT_ORM
 
 		// Get Result
 		template <typename T>
-		Nullable<T> Select (
-			const Expression::AggregateFunc<T> &agg) const
+		Nullable<T> Select (const Expression::Aggregate<T> &agg) const
 		{
 			Nullable<T> ret;
 			_connector.Execute (_sqlSelect + agg.fieldName +
