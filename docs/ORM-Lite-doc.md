@@ -19,7 +19,7 @@ Modules under `namespace BOT_ORM`
 
 - `BOT_ORM::Nullable`
 - `BOT_ORM::ORMapper`
-- `BOT_ORM::ORMapper::Queryable<QueryResult>`
+- `BOT_ORM::Queryable<QueryResult>`
 - `BOT_ORM::FieldExtractor`
 
 Modules under `namespace BOT_ORM::Expression`
@@ -277,21 +277,16 @@ Queryable<MyClass> Query (MyClass queryHelper);
 ```
 
 Remarks:
-- Return new `Queryable` object;
+- Return new `Queryable` object with `QueryResult` is `MyClass`;
 - `MyClass` **MUST** be **Copy Constructible**
   to Construct `queryHelper`;
 
-## `BOT_ORM::ORMapper::Queryable<QueryResult>`
-
-> Why `Queryable` is inside `ORMapper`?
->
-> Since `Queryable` is a template,
-> it's hard to define an access to Injected Class's Private Members;
+## `BOT_ORM::Queryable<QueryResult>`
 
 ### Retrieve Result
 
 ``` cpp
-Nullable<T> Aggregate (
+Nullable<T> Select (
     const Expression::AggregateFunc<T> &agg) const;
 std::vector<QueryResult> ToVector () const;
 std::list<QueryResult> ToList () const;
@@ -299,40 +294,38 @@ std::list<QueryResult> ToList () const;
 
 Remarks:
 - `QueryResult` specifies the **Row Type** of Query Result;
-- `Aggregate` will Get the one-or-zero-row Result
-  for `agg` immediately;
+- `Select` will Get the one-or-zero-row Result for `agg` immediately;
 - `ToVector` / `ToList` returns the Collection of `QueryResult`;
 - If the Result is `null` for `NOT Nullable` Field,
   it will throw `std::runtime_error`
   with message `Get Null Value for NOT Nullable Type`;
-- All Functions will **NOT** Change the State of this Queryable Object;
 - `Expression` will be described later;
 
 ### Set Conditions
 
 ``` cpp
-Queryable &Distinct (bool isDistinct = true);
-Queryable &Where (const Expression::Expr &expr);
+Queryable Distinct (bool isDistinct = true) const;
+Queryable Where (const Expression::Expr &expr) const;
 
-Queryable &GroupBy (const Expression::Field<T> &field);
-Queryable &Having (const Expression::Expr &expr);
+Queryable GroupBy (const Expression::Field<T> &field) const;
+Queryable Having (const Expression::Expr &expr) const;
 
-Queryable &OrderBy (const Expression::Field<T> &field);
-Queryable &OrderByDescending (const Expression::Field<T> &field);
+Queryable OrderBy (const Expression::Field<T> &field) const;
+Queryable OrderByDescending (const Expression::Field<T> &field) const;
 
-Queryable &Take (size_t count);
-Queryable &Skip (size_t count);
+Queryable Take (size_t count) const;
+Queryable Skip (size_t count) const;
 ```
 
 Remarks:
-- These functions will Set/Append Conditions to `this` and
-  return the reference of `*this`;
-- `OrderBy*` will **Append** `field` to Condition,
+- Default Selection is `ALL`;
+- These functions will Set/Append Conditions to a copy of `this`;
+- `OrderBy` will **Append** `field` to Condition,
   while Other functions will **Set** `DISTINCT`,
   `expr`, `field` or `count` to Condition;
 - `Expression` will be described later;
 
-### Construct New `Queryable`
+### Construct New `QueryResult`
 
 ``` cpp
 auto Select (const Expression::Selectable<T1> &target1,
@@ -345,8 +338,7 @@ auto LeftJoin (const MyClass2 &queryHelper2,
 ```
 
 Remarks:
-- Default `QueryResult` is the Object of `MyClass`,
-  which can be retrieved by `SELECT *` (**All Columns**);
+- Default Selection is **All Columns** (`SELECT *`);
 - `Select` will Set `QueryResult` to `std::tuple<T1, T2, ...>`,
   which can be retrieved by `SELECT target1, target2, ...`
   (`target` can be **Field** or **Aggregate Functions**);
@@ -357,10 +349,23 @@ Remarks:
     all `Nullable<T>`, where `T` is the Supported Types of `ORMAP`
     (NOT `std::tuple` or `MyClass`);
   - `onExpr` specifies the `ON` Expression for `JOIN`;
-- All Functions will pass the **Conditions** of this Queryable Object
-  to the new one;
-- All Functions will **NOT** Change the State of this Queryable Object;
+- All Functions will pass the **Conditions** of `this` to the new one;
 - `Expression` will be described later;
+
+### Compound Select
+
+``` cpp
+Queryable Union (const Queryable &queryable) const;
+Queryable UnionAll (const Queryable &queryable) const;
+Queryable Intersect (const Queryable &queryable) const;
+Queryable Expect (const Queryable &queryable) const;
+```
+
+Remarks:
+- All Functions will return a Compound Select
+  for `this` and `queryable`;
+- All Functions will only **Inherit Conditions**
+  `OrderBy` and `Limit` from `this`;
 
 ### Query SQL
 
@@ -374,6 +379,7 @@ FROM TABLE
 WHERE ...
 GROUP BY <field>
 HAVING ...
+[<Compound> SELECT ... FROM ...]
 ORDER BY <field> [DESC], ...
 LIMIT <take> OFFSET <skip>;
 ```

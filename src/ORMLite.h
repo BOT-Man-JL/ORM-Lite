@@ -26,6 +26,7 @@
 #define ORMAP(_TABLE_NAME_, ...)                          \
 private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
+template <typename Q> friend class BOT_ORM::Queryable;    \
 friend class BOT_ORM::FieldExtractor;                     \
 template <typename FN>                                    \
 void __Accept (FN fn)                                     \
@@ -205,7 +206,8 @@ namespace BOT_ORM_Impl
 
 			if (rc != SQLITE_OK)
 			{
-				auto errStr = std::string ("SQL error: ") + zErrMsg;
+				auto errStr = std::string ("SQL error: '") + zErrMsg
+					+ "' at '" + cmd;
 				sqlite3_free (zErrMsg);
 				throw std::runtime_error (errStr);
 			}
@@ -376,7 +378,7 @@ namespace BOT_ORM_Impl
 				tmpStr.clear ();
 			}
 		}
-		return std::move (ret);
+		return ret;
 	};
 }
 
@@ -524,7 +526,7 @@ namespace BOT_ORM
 				ret.exprs.splice (ret.exprs.cend (),
 								  std::move (rigthExprs));
 				ret.exprs.emplace_back (")", nullptr);
-				return std::move (ret);
+				return ret;
 			}
 		};
 
@@ -629,6 +631,392 @@ namespace BOT_ORM
 		inline auto Min (const Field<T> &field)
 		{ return AggregateFunc<T> { "min", field }; }
 	}
+
+	class ORMapper;
+
+	// Queryable
+
+	template <typename QueryResult>
+	class Queryable
+	{
+	protected:
+		BOT_ORM_Impl::SQLConnector &_connector;
+		QueryResult _queryHelper;
+
+		std::string _sqlFrom;
+		std::string _sqlSelect;
+		std::string _sqlTarget;
+
+		std::string _sqlWhere;
+		std::string _sqlGroupBy;
+		std::string _sqlHaving;
+
+		std::string _sqlOrderBy;
+		std::string _sqlLimit;
+		std::string _sqlOffset;
+
+		Queryable (BOT_ORM_Impl::SQLConnector &connector,
+				   QueryResult queryHelper,
+				   std::string sqlFrom,
+				   std::string sqlSelect = "select ",
+				   std::string sqlTarget = "*",
+				   std::string sqlWhere = "",
+				   std::string sqlGroupBy = "",
+				   std::string sqlHaving = "",
+				   std::string sqlOrderBy = "",
+				   std::string sqlLimit = "",
+				   std::string sqlOffset = "")
+			:
+			_connector (connector),
+			_queryHelper (std::move (queryHelper)),
+			_sqlFrom (std::move (sqlFrom)),
+			_sqlSelect (std::move (sqlSelect)),
+			_sqlTarget (std::move (sqlTarget)),
+			_sqlWhere (std::move (sqlWhere)),
+			_sqlGroupBy (std::move (sqlGroupBy)),
+			_sqlHaving (std::move (sqlHaving)),
+			_sqlOrderBy (std::move (sqlOrderBy)),
+			_sqlLimit (std::move (sqlLimit)),
+			_sqlOffset (std::move (sqlOffset))
+		{}
+
+		template <typename Q> friend class Queryable;
+		friend class ORMapper;
+
+	public:
+		// Distinct
+		inline Queryable Distinct () const
+		{
+			auto ret = *this;
+			ret._sqlSelect = "select distinct ";
+			return ret;
+		}
+
+		// Where
+		inline Queryable Where (const Expression::Expr &expr) const
+		{
+			auto ret = *this;
+			ret._sqlWhere = " where (" + expr.ToString (true) + ")";
+			return ret;
+		}
+
+		// Group By
+		template <typename T>
+		inline Queryable GroupBy (const Expression::Field<T> &field) const
+		{
+			auto ret = *this;
+			ret._sqlGroupBy = " group by " + _GetFieldSql (field);
+			return ret;
+		}
+		inline Queryable Having (const Expression::Expr &expr) const
+		{
+			auto ret = *this;
+			ret._sqlHaving = " having " + expr.ToString (true);
+			return ret;
+		}
+
+		// Limit and Offset
+		inline Queryable Take (size_t count) const
+		{
+			auto ret = *this;
+			ret._sqlLimit = " limit " + std::to_string (count);
+			return ret;
+		}
+		inline Queryable Skip (size_t count) const
+		{
+			auto ret = *this;
+			if (ret._sqlLimit.empty ())
+				ret._sqlLimit = " limit ~0";  // ~0 is a trick :-)
+			ret._sqlOffset = " offset " + std::to_string (count);
+			return ret;
+		}
+
+		// Order By
+		template <typename T>
+		inline Queryable OrderBy (
+			const Expression::Field<T> &field) const
+		{
+			auto ret = *this;
+			if (ret._sqlOrderBy.empty ())
+				ret._sqlOrderBy = " order by " + _GetFieldSql (field);
+			else
+				ret._sqlOrderBy += "," + _GetFieldSql (field);
+			return ret;
+		}
+		template <typename T>
+		inline Queryable OrderByDescending (
+			const Expression::Field<T> &field) const
+		{
+			auto ret = *this;
+			if (ret._sqlOrderBy.empty ())
+				ret._sqlOrderBy = " order by " + _GetFieldSql (field) +
+				" desc";
+			else
+				ret._sqlOrderBy += "," + _GetFieldSql (field) +
+				" desc";
+			return ret;
+		}
+
+		// Select
+		template <typename... Args>
+		inline auto Select (const Args & ... args) const
+		{
+			return _NewQuery (
+				_GetFieldSql (args...),
+				_sqlFrom,
+				_SelectToTuple (args...)
+			);
+		}
+
+		// Join
+		template <typename C>
+		inline auto Join (const C &queryHelper2,
+						  const Expression::Expr &onExpr) const
+		{
+			return _NewQuery (
+				_sqlTarget,
+				_sqlFrom + " join " +
+				std::string (C::__TableName) +
+				" on " + onExpr.ToString (true),
+				_JoinToTuple (_queryHelper, queryHelper2));
+		}
+		template <typename C>
+		inline auto LeftJoin (const C &queryHelper2,
+							  const Expression::Expr &onExpr) const
+		{
+			return _NewQuery (
+				_sqlTarget,
+				_sqlFrom + " left join " +
+				std::string (C::__TableName) +
+				" on " + onExpr.ToString (true),
+				_JoinToTuple (_queryHelper, queryHelper2));
+		}
+
+		// Compound Select
+		inline Queryable Union (const Queryable &queryable) const
+		{ return _NewCompoundQuery (queryable, " union "); }
+		inline Queryable UnionAll (Queryable queryable) const
+		{ return _NewCompoundQuery (queryable, " union all "); }
+		inline Queryable Intersect (Queryable queryable) const
+		{ return _NewCompoundQuery (queryable, " intersect "); }
+		inline Queryable Except (Queryable queryable) const
+		{ return _NewCompoundQuery (queryable, " excpet "); }
+
+		// Get Result
+		template <typename T>
+		Nullable<T> Select (
+			const Expression::AggregateFunc<T> &agg) const
+		{
+			Nullable<T> ret;
+			_connector.Execute (_sqlSelect + agg.fieldName +
+								_GetFromSql () + _GetLimit () + ";",
+								[&] (int argc, char **argv, char **)
+			{
+				BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
+			});
+			return ret;
+		}
+
+		std::vector<QueryResult> ToVector () const
+		{
+			std::vector<QueryResult> ret;
+			_Select (_queryHelper, ret);
+			return ret;
+		}
+		std::list<QueryResult> ToList () const
+		{
+			std::list<QueryResult> ret;
+			_Select (_queryHelper, ret);
+			return ret;
+		}
+
+	protected:
+		// Return FROM part for Query
+		inline std::string _GetFromSql () const
+		{ return _sqlFrom + _sqlWhere + _sqlGroupBy + _sqlHaving; }
+
+		// Return ORDER BY & LIMIT part for Query
+		inline std::string _GetLimit () const
+		{ return _sqlOrderBy + _sqlLimit + _sqlOffset; }
+
+		// Return a new Queryable Object
+		template <typename... Args>
+		auto _NewQuery (std::string sqlTarget,
+						std::string sqlFrom,
+						std::tuple<Args...> &&newQueryHelper) const
+		{
+			return Queryable<std::tuple<Args...>>
+			{
+				_connector, newQueryHelper,
+					std::move (sqlFrom),
+					_sqlSelect, std::move (sqlTarget),
+					_sqlWhere, _sqlGroupBy, _sqlHaving,
+					_sqlOrderBy, _sqlLimit, _sqlOffset
+			};
+		}
+
+		// Return a new Compound Queryable Object
+		auto _NewCompoundQuery (const Queryable &queryable,
+								std::string compoundStr) const
+		{
+			auto ret = *this;
+			ret._sqlFrom = ret._GetFromSql () +
+				std::move (compoundStr) +
+				queryable._sqlSelect + queryable._sqlTarget +
+				queryable._GetFromSql ();
+			ret._sqlWhere.clear ();
+			ret._sqlGroupBy.clear ();
+			ret._sqlHaving.clear ();
+			return ret;
+		}
+
+		// Select for Normal Objects
+		template <typename C, typename Out>
+		void _Select (const C &, Out &out) const
+		{
+			auto copy = _queryHelper;
+			_connector.Execute (_sqlSelect + _sqlTarget +
+								_GetFromSql () + _GetLimit () + ";",
+								[&] (int, char **argv, char **)
+			{
+				size_t index = 0;
+				copy.__Accept ([&argv, &index] (auto &val)
+				{
+					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
+					return true;
+				});
+				out.push_back (copy);
+			});
+		}
+
+		// Select for Tuples
+		template <typename Out, typename... Args>
+		void _Select (const std::tuple<Args...> &, Out &out) const
+		{
+			auto copy = _queryHelper;
+			_connector.Execute (_sqlSelect + _sqlTarget +
+								_GetFromSql () + _GetLimit () + ";",
+								[&] (int, char **argv, char **)
+			{
+				size_t index = 0;
+				_TupleHelper<QueryResult, sizeof... (Args)>::Visit (
+					copy, [&argv, &index] (auto &val)
+				{
+					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
+					return true;
+				});
+				out.push_back (copy);
+			});
+		}
+
+		// Static Helper Functions
+
+		// Return Field Strings for OrderBy and Select
+		template <typename T>
+		static inline std::string _GetFieldSql (
+			const Expression::Selectable<T> &op)
+		{
+			if (op.prefixStr)
+				return op.prefixStr + ("." + op.fieldName);
+			else
+				return op.fieldName;
+		}
+
+		template <typename T, typename... Args>
+		static inline std::string _GetFieldSql (
+			const Expression::Selectable<T> &arg,
+			const Args & ... args)
+		{
+			return _GetFieldSql (arg) + "," + _GetFieldSql (args...);
+		}
+
+		// Return Select Target Tuple
+		template <typename T>
+		static inline auto _SelectToTuple (
+			const Expression::Selectable<T> &)
+		{
+			return std::make_tuple (Nullable<T> {});
+		}
+
+		template <typename T, typename... Args>
+		static inline auto _SelectToTuple (
+			const Expression::Selectable<T> &arg,
+			const Args & ... args)
+		{
+			return std::tuple_cat (_SelectToTuple (arg),
+								   _SelectToTuple (args...));
+		}
+
+		// To Nullable
+		// Get Nullable Value Wrappers for non-nullable Types
+		template <typename T>
+		static inline auto _ToNullable (const T &val)
+		{ return Nullable<T> (val); }
+
+		template <typename T>
+		static inline auto _ToNullable (const Nullable<T> &val)
+		{ return val; }
+
+		template <typename TupleType, size_t N>
+		struct _TupleHelper
+		{
+			// Tuple Nullable Cater
+			static inline auto ToNullable (const TupleType &tuple)
+			{
+				return std::tuple_cat (
+					_TupleHelper<TupleType, N - 1>::ToNullable (tuple),
+					std::make_tuple (_ToNullable (std::get<N - 1> (tuple)))
+				);
+			}
+
+			// Tuple Visitor
+			template <typename Fn>
+			static inline void Visit (TupleType &tuple, Fn fn)
+			{
+				_TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
+				fn (std::get<N - 1> (tuple));
+			}
+		};
+
+		template <typename TupleType>
+		struct _TupleHelper <TupleType, 1>
+		{
+			static inline auto ToNullable (const TupleType &tuple)
+			{
+				return std::make_tuple (
+					_ToNullable (std::get<0> (tuple)));
+			}
+
+			template <typename Fn>
+			static inline void Visit (TupleType &tuple, Fn fn)
+			{
+				fn (std::get<0> (tuple));
+			}
+		};
+
+		// Flaten Arguments into Tuple
+		template <typename C>
+		static inline auto _JoinToTuple (const C &arg)
+		{
+			using TupleType = decltype (arg.__Tuple ());
+			constexpr size_t size = std::tuple_size<TupleType>::value;
+			return _TupleHelper<TupleType, size>::ToNullable (
+				arg.__Tuple ());
+		}
+		template <typename... Args>
+		static inline auto _JoinToTuple (const std::tuple<Args...>& t)
+		{
+			// _TupleHelper is not necessary
+			return t;
+		}
+		template <typename Arg, typename... Args>
+		static inline auto _JoinToTuple (const Arg &arg,
+										 const Args & ... args)
+		{
+			return std::tuple_cat (_JoinToTuple (arg),
+								   _JoinToTuple (args...));
+		}
+	};
 
 	// ORMapper
 
@@ -830,7 +1218,8 @@ namespace BOT_ORM
 			_connector.Execute ("update " +
 								std::string (C::__TableName) +
 								" set " + setExpr.ToString () +
-								" where " + whereExpr.ToString (false) + ";");
+								" where " +
+								whereExpr.ToString (false) + ";");
 		}
 
 		template <typename C>
@@ -857,352 +1246,9 @@ namespace BOT_ORM
 		{
 			_connector.Execute ("delete from " +
 								std::string (C::__TableName) +
-								" where " + whereExpr.ToString (false) + ";");
+								" where " +
+								whereExpr.ToString (false) + ";");
 		}
-
-		// Query Object :-)
-
-		template <typename QueryResult>
-		class Queryable
-		{
-		public:
-			Queryable (ORMapper &mapper,
-					   QueryResult queryHelper,
-					   std::string queryFrom,
-					   std::string sqlSelect = "select ",
-					   std::string sqlTarget = "*",
-					   std::string sqlWhere = "",
-					   std::string sqlGroupBy = "",
-					   std::string sqlHaving = "",
-					   std::string sqlOrderBy = "",
-					   std::string sqlLimit = "",
-					   std::string sqlOffset = "") :
-				_mapper (mapper),
-				_queryHelper (std::move (queryHelper)),
-				_sqlFrom (std::move (queryFrom)),
-				_sqlSelect (std::move (sqlSelect)),
-				_sqlTarget (std::move (sqlTarget)),
-				_sqlWhere (std::move (sqlWhere)),
-				_sqlGroupBy (std::move (sqlGroupBy)),
-				_sqlHaving (std::move (sqlHaving)),
-				_sqlOrderBy (std::move (sqlOrderBy)),
-				_sqlLimit (std::move (sqlLimit)),
-				_sqlOffset (std::move (sqlOffset))
-			{}
-
-			// Distinct
-			inline Queryable &Distinct (bool isDistinct = true)
-			{
-				_sqlSelect = isDistinct ? "select distinct " : "select ";
-				return *this;
-			}
-
-			// Where
-			inline Queryable &Where (const Expression::Expr &expr)
-			{
-				_sqlWhere = " where (" + expr.ToString (true) + ")";
-				return *this;
-			}
-
-			// Group By
-			template <typename T>
-			inline Queryable &GroupBy (const Expression::Field<T> &field)
-			{
-				_sqlGroupBy = " group by " + _GetFieldSql (field);
-				return *this;
-			}
-			inline Queryable &Having (const Expression::Expr &expr)
-			{
-				_sqlHaving = " having " + expr.ToString (true);
-				return *this;
-			}
-
-			// Limit and Offset
-			inline Queryable &Take (size_t count)
-			{
-				_sqlLimit = " limit " + std::to_string (count);
-				return *this;
-			}
-			inline Queryable &Skip (size_t count)
-			{
-				// ~0 is a trick :-)
-				if (_sqlLimit.empty ()) _sqlLimit = " limit ~0";
-				_sqlOffset = " offset " + std::to_string (count);
-				return *this;
-			}
-
-			// Order By
-			template <typename T>
-			inline Queryable &OrderBy (const Expression::Field<T> &field)
-			{
-				if (_sqlOrderBy.empty ())
-					_sqlOrderBy = " order by " + _GetFieldSql (field);
-				else
-					_sqlOrderBy += "," + _GetFieldSql (field);
-				return *this;
-			}
-			template <typename T>
-			inline Queryable &OrderByDescending (const Expression::Field<T> &field)
-			{
-				if (_sqlOrderBy.empty ())
-					_sqlOrderBy = " order by " + _GetFieldSql (field) + " desc";
-				else
-					_sqlOrderBy += "," + _GetFieldSql (field) + " desc";
-				return *this;
-			}
-
-			// Select
-			template <typename... Args>
-			inline auto Select (const Args & ... args) const
-			{
-				return _NewQuery (
-					_GetFieldSql (args...),
-					_sqlFrom,
-					_SelectToTuple (args...)
-				);
-			}
-
-			// Join
-			template <typename C>
-			inline auto Join (const C &queryHelper2,
-							  const Expression::Expr &onExpr) const
-			{
-				return _NewQuery (
-					_sqlTarget,
-					_sqlFrom + " join " +
-					std::string (C::__TableName) +
-					" on " + onExpr.ToString (true),
-					_ToTuple (_queryHelper, queryHelper2));
-			}
-			template <typename C>
-			inline auto LeftJoin (const C &queryHelper2,
-								  const Expression::Expr &onExpr) const
-			{
-				return _NewQuery (
-					_sqlTarget,
-					_sqlFrom + " left join " +
-					std::string (C::__TableName) +
-					" on " + onExpr.ToString (true),
-					_ToTuple (_queryHelper, queryHelper2));
-			}
-
-			// Aggregate
-			template <typename T>
-			Nullable<T> Aggregate (
-				const Expression::AggregateFunc<T> &agg) const
-			{
-				Nullable<T> ret;
-				_mapper._Select (
-					_sqlSelect + agg.fieldName, _GetFromSql (),
-					[&] (int argc, char **argv, char **)
-				{
-					BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
-				});
-				return std::move (ret);
-			}
-
-			// Retrieve Select Result
-			std::vector<QueryResult> ToVector () const
-			{
-				std::vector<QueryResult> ret;
-				_Select (_queryHelper, ret);
-				return std::move (ret);
-			}
-			std::list<QueryResult> ToList () const
-			{
-				std::list<QueryResult> ret;
-				_Select (_queryHelper, ret);
-				return std::move (ret);
-			}
-
-		protected:
-			ORMapper &_mapper;
-			QueryResult _queryHelper;
-
-			std::string _sqlFrom;
-			std::string _sqlSelect;
-			std::string _sqlTarget;
-
-			std::string _sqlWhere;
-			std::string _sqlGroupBy;
-			std::string _sqlHaving;
-			std::string _sqlOrderBy;
-			std::string _sqlLimit, _sqlOffset;
-
-			// Return "from ..." for Query
-			inline std::string _GetFromSql () const
-			{
-				return _sqlFrom +
-					_sqlWhere +
-					_sqlGroupBy + _sqlHaving +
-					_sqlOrderBy +
-					_sqlLimit + _sqlOffset;
-			}
-
-			// Return a new Queryable Object
-			template <typename... Args>
-			auto _NewQuery (std::string target,
-							std::string from,
-							std::tuple<Args...> newQueryHelper) const
-			{
-				return Queryable<std::tuple<Args...>>
-				{
-					_mapper, std::move (newQueryHelper),
-						std::move (from),
-						_sqlSelect,
-						std::move (target),
-						_sqlWhere,
-						_sqlGroupBy, _sqlHaving,
-						_sqlOrderBy,
-						_sqlLimit, _sqlOffset
-				};
-			}
-
-			// Select for Normal Objects
-			template <typename C, typename Out>
-			void _Select (const C &, Out &out) const
-			{
-				auto copy = _queryHelper;
-				_mapper._Select (_sqlSelect + _sqlTarget, _GetFromSql (),
-								 [&] (int, char **argv, char **)
-				{
-					size_t index = 0;
-					copy.__Accept ([&argv, &index] (auto &val)
-					{
-						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
-						return true;
-					});
-					out.push_back (copy);
-				});
-			}
-
-			// Select for Tuples
-			template <typename Out, typename... Args>
-			void _Select (const std::tuple<Args...> &, Out &out) const
-			{
-				auto copy = _queryHelper;
-				_mapper._Select (_sqlSelect + _sqlTarget, _GetFromSql (),
-								 [&] (int, char **argv, char **)
-				{
-					size_t index = 0;
-					_TupleHelper<QueryResult, sizeof... (Args)>::Visit (
-						copy, [&argv, &index] (auto &val)
-					{
-						BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
-						return true;
-					});
-					out.push_back (copy);
-				});
-			}
-
-			// Static Helper Functions
-
-			// Return Field Strings for OrderBy and Select
-			template <typename T>
-			static inline std::string _GetFieldSql (
-				const Expression::Selectable<T> &op)
-			{
-				if (op.prefixStr)
-					return op.prefixStr + ("." + op.fieldName);
-				else
-					return op.fieldName;
-			}
-
-			template <typename T, typename... Args>
-			static inline std::string _GetFieldSql (
-				const Expression::Selectable<T> &arg,
-				const Args & ... args)
-			{
-				return _GetFieldSql (arg) + "," + _GetFieldSql (args...);
-			}
-
-			// Return Select Target Tuple
-			template <typename T>
-			static inline auto _SelectToTuple (
-				const Expression::Selectable<T> &)
-			{
-				return std::make_tuple (Nullable<T> {});
-			}
-
-			template <typename T, typename... Args>
-			static inline auto _SelectToTuple (
-				const Expression::Selectable<T> &arg,
-				const Args & ... args)
-			{
-				return std::tuple_cat (_SelectToTuple (arg),
-									   _SelectToTuple (args...));
-			}
-
-			// To Nullable
-			// Get Nullable Value Wrappers for non-nullable Types
-			template <typename T>
-			static inline auto _ToNullable (const T &val)
-			{ return Nullable<T> (val); }
-
-			template <typename T>
-			static inline auto _ToNullable (const Nullable<T> &val)
-			{ return val; }
-
-			template <typename TupleType, size_t N>
-			struct _TupleHelper
-			{
-				// Tuple Nullable Cater
-				static inline auto ToNullable (const TupleType &tuple)
-				{
-					return std::tuple_cat (
-						_TupleHelper<TupleType, N - 1>::ToNullable (tuple),
-						std::make_tuple (_ToNullable (std::get<N - 1> (tuple)))
-					);
-				}
-
-				// Tuple Visitor
-				template <typename Fn>
-				static inline void Visit (TupleType &tuple, Fn fn)
-				{
-					_TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
-					fn (std::get<N - 1> (tuple));
-				}
-			};
-
-			template <typename TupleType>
-			struct _TupleHelper <TupleType, 1>
-			{
-				static inline auto ToNullable (const TupleType &tuple)
-				{
-					return std::make_tuple (
-						_ToNullable (std::get<0> (tuple)));
-				}
-
-				template <typename Fn>
-				static inline void Visit (TupleType &tuple, Fn fn)
-				{
-					fn (std::get<0> (tuple));
-				}
-			};
-
-			// Flaten Arguments into Tuple
-			template <typename C>
-			static inline auto _ToTuple (const C &arg)
-			{
-				using TupleType = decltype (arg.__Tuple ());
-				constexpr size_t size = std::tuple_size<TupleType>::value;
-				return _TupleHelper<TupleType, size>::ToNullable (
-					arg.__Tuple ());
-			}
-			template <typename... Args>
-			static inline auto _ToTuple (const std::tuple<Args...>& t)
-			{
-				// _TupleHelper is not necessary
-				return t;
-			}
-			template <typename Arg, typename... Args>
-			static inline auto _ToTuple (const Arg &arg,
-										 const Args & ... args)
-			{
-				return std::tuple_cat (_ToTuple (arg),
-									   _ToTuple (args...));
-			}
-		};
 
 		template <typename C>
 		inline Queryable<C> Query (C queryHelper)
@@ -1210,21 +1256,16 @@ namespace BOT_ORM
 			static_assert (std::is_copy_constructible<C>::value,
 						   "It must be Copy Constructible");
 
-			return Queryable<C> (*this, std::move (queryHelper),
-								 "from " + std::string (C::__TableName));
+			return Queryable<C> { _connector,
+				std::move (queryHelper),
+				std::string (" from ") + C::__TableName };
 		}
 
-	private:
+	protected:
 		BOT_ORM_Impl::SQLConnector _connector;
-
-		template <typename Fn>
-		inline void _Select (const std::string &sqlSelect,
-							 const std::string &sqlFrom,
-							 Fn fn)
-		{
-			_connector.Execute (sqlSelect + sqlFrom + ";", fn);
-		}
 	};
+
+	// Field Extractor
 
 	class FieldExtractor
 	{
