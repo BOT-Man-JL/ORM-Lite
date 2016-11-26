@@ -28,6 +28,8 @@ private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
 template <typename Q> friend class BOT_ORM::Queryable;    \
 friend class BOT_ORM::FieldExtractor;                     \
+template <typename T>                                     \
+friend auto BOT_ORM_Impl::JoinToTuple (const T &);        \
 template <typename FN>                                    \
 void __Accept (FN fn)                                     \
 {                                                         \
@@ -631,7 +633,123 @@ namespace BOT_ORM
 		inline auto Min (const Field<T> &field)
 		{ return AggregateFunc<T> { "min", field }; }
 	}
+}
 
+namespace BOT_ORM_Impl
+{
+	template <typename T>
+	using Nullable = BOT_ORM::Nullable<T>;
+
+	template <typename T>
+	using Selectable = BOT_ORM::Expression::Selectable<T>;
+
+	// To Nullable
+	// Get Nullable Value Wrappers for non-nullable Types
+	template <typename T>
+	inline auto FieldToNullable (const T &val)
+	{ return Nullable<T> (val); }
+
+	template <typename T>
+	inline auto FieldToNullable (const Nullable<T> &val)
+	{ return val; }
+
+	template <typename TupleType, size_t N>
+	struct TupleHelper
+	{
+		// Tuple Nullable Cater
+		static inline auto ToNullable (const TupleType &tuple)
+		{
+			return std::tuple_cat (
+				TupleHelper<TupleType, N - 1>::ToNullable (tuple),
+				std::make_tuple (FieldToNullable (std::get<N - 1> (tuple)))
+			);
+		}
+
+		// Tuple Visitor
+		template <typename Fn>
+		static inline void Visit (TupleType &tuple, Fn fn)
+		{
+			TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
+			fn (std::get<N - 1> (tuple));
+		}
+	};
+
+	template <typename TupleType>
+	struct TupleHelper <TupleType, 1>
+	{
+		static inline auto ToNullable (const TupleType &tuple)
+		{
+			return std::make_tuple (
+				FieldToNullable (std::get<0> (tuple)));
+		}
+
+		template <typename Fn>
+		static inline void Visit (TupleType &tuple, Fn fn)
+		{
+			fn (std::get<0> (tuple));
+		}
+	};
+
+	// Flaten Arguments into Tuple
+	template <typename C>
+	inline auto JoinToTuple (const C &arg)
+	{
+		// Injection Helper
+
+		using TupleType = decltype (arg.__Tuple ());
+		constexpr size_t size = std::tuple_size<TupleType>::value;
+		return TupleHelper<TupleType, size>::ToNullable (
+			arg.__Tuple ());
+	}
+	template <typename... Args>
+	inline auto JoinToTuple (const std::tuple<Args...>& t)
+	{
+		// TupleHelper::ToNullable is not necessary
+		return t;
+	}
+	template <typename Arg, typename... Args>
+	inline auto JoinToTuple (const Arg &arg,
+							 const Args & ... args)
+	{
+		return std::tuple_cat (JoinToTuple (arg),
+							   JoinToTuple (args...));
+	}
+
+	// Return Select Target Tuple
+	template <typename T>
+	inline auto SelectToTuple (const Selectable<T> &)
+	{
+		return std::make_tuple (Nullable<T> {});
+	}
+
+	template <typename T, typename... Args>
+	inline auto SelectToTuple (const Selectable<T> &arg,
+							   const Args & ... args)
+	{
+		return std::tuple_cat (SelectToTuple (arg),
+							   SelectToTuple (args...));
+	}
+
+	// Return Field Strings for OrderBy and Select
+	template <typename T>
+	inline std::string FieldToSql (const Selectable<T> &op)
+	{
+		if (op.prefixStr)
+			return op.prefixStr + ("." + op.fieldName);
+		else
+			return op.fieldName;
+	}
+
+	template <typename T, typename... Args>
+	inline std::string FieldToSql (const Selectable<T> &arg,
+								   const Args & ... args)
+	{
+		return FieldToSql (arg) + "," + FieldToSql (args...);
+	}
+}
+
+namespace BOT_ORM
+{
 	class ORMapper;
 
 	// Queryable
@@ -705,7 +823,8 @@ namespace BOT_ORM
 		inline Queryable GroupBy (const Expression::Field<T> &field) const
 		{
 			auto ret = *this;
-			ret._sqlGroupBy = " group by " + _GetFieldSql (field);
+			ret._sqlGroupBy = " group by " +
+				BOT_ORM_Impl::FieldToSql (field);
 			return ret;
 		}
 		inline Queryable Having (const Expression::Expr &expr) const
@@ -738,9 +857,11 @@ namespace BOT_ORM
 		{
 			auto ret = *this;
 			if (ret._sqlOrderBy.empty ())
-				ret._sqlOrderBy = " order by " + _GetFieldSql (field);
+				ret._sqlOrderBy = " order by " +
+				BOT_ORM_Impl::FieldToSql (field);
 			else
-				ret._sqlOrderBy += "," + _GetFieldSql (field);
+				ret._sqlOrderBy += "," +
+				BOT_ORM_Impl::FieldToSql (field);
 			return ret;
 		}
 		template <typename T>
@@ -749,11 +870,11 @@ namespace BOT_ORM
 		{
 			auto ret = *this;
 			if (ret._sqlOrderBy.empty ())
-				ret._sqlOrderBy = " order by " + _GetFieldSql (field) +
-				" desc";
+				ret._sqlOrderBy = " order by " +
+				BOT_ORM_Impl::FieldToSql (field) + " desc";
 			else
-				ret._sqlOrderBy += "," + _GetFieldSql (field) +
-				" desc";
+				ret._sqlOrderBy += "," +
+				BOT_ORM_Impl::FieldToSql (field) + " desc";
 			return ret;
 		}
 
@@ -762,9 +883,9 @@ namespace BOT_ORM
 		inline auto Select (const Args & ... args) const
 		{
 			return _NewQuery (
-				_GetFieldSql (args...),
+				BOT_ORM_Impl::FieldToSql (args...),
 				_sqlFrom,
-				_SelectToTuple (args...)
+				BOT_ORM_Impl::SelectToTuple (args...)
 			);
 		}
 
@@ -778,7 +899,7 @@ namespace BOT_ORM
 				_sqlFrom + " join " +
 				std::string (C::__TableName) +
 				" on " + onExpr.ToString (true),
-				_JoinToTuple (_queryHelper, queryHelper2));
+				BOT_ORM_Impl::JoinToTuple (_queryHelper, queryHelper2));
 		}
 		template <typename C>
 		inline auto LeftJoin (const C &queryHelper2,
@@ -789,7 +910,7 @@ namespace BOT_ORM
 				_sqlFrom + " left join " +
 				std::string (C::__TableName) +
 				" on " + onExpr.ToString (true),
-				_JoinToTuple (_queryHelper, queryHelper2));
+				BOT_ORM_Impl::JoinToTuple (_queryHelper, queryHelper2));
 		}
 
 		// Compound Select
@@ -899,7 +1020,7 @@ namespace BOT_ORM
 								[&] (int, char **argv, char **)
 			{
 				size_t index = 0;
-				_TupleHelper<QueryResult, sizeof... (Args)>::Visit (
+				BOT_ORM_Impl::TupleHelper<QueryResult, sizeof... (Args)>::Visit (
 					copy, [&argv, &index] (auto &val)
 				{
 					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
@@ -907,114 +1028,6 @@ namespace BOT_ORM
 				});
 				out.push_back (copy);
 			});
-		}
-
-		// Static Helper Functions
-
-		// Return Field Strings for OrderBy and Select
-		template <typename T>
-		static inline std::string _GetFieldSql (
-			const Expression::Selectable<T> &op)
-		{
-			if (op.prefixStr)
-				return op.prefixStr + ("." + op.fieldName);
-			else
-				return op.fieldName;
-		}
-
-		template <typename T, typename... Args>
-		static inline std::string _GetFieldSql (
-			const Expression::Selectable<T> &arg,
-			const Args & ... args)
-		{
-			return _GetFieldSql (arg) + "," + _GetFieldSql (args...);
-		}
-
-		// Return Select Target Tuple
-		template <typename T>
-		static inline auto _SelectToTuple (
-			const Expression::Selectable<T> &)
-		{
-			return std::make_tuple (Nullable<T> {});
-		}
-
-		template <typename T, typename... Args>
-		static inline auto _SelectToTuple (
-			const Expression::Selectable<T> &arg,
-			const Args & ... args)
-		{
-			return std::tuple_cat (_SelectToTuple (arg),
-								   _SelectToTuple (args...));
-		}
-
-		// To Nullable
-		// Get Nullable Value Wrappers for non-nullable Types
-		template <typename T>
-		static inline auto _ToNullable (const T &val)
-		{ return Nullable<T> (val); }
-
-		template <typename T>
-		static inline auto _ToNullable (const Nullable<T> &val)
-		{ return val; }
-
-		template <typename TupleType, size_t N>
-		struct _TupleHelper
-		{
-			// Tuple Nullable Cater
-			static inline auto ToNullable (const TupleType &tuple)
-			{
-				return std::tuple_cat (
-					_TupleHelper<TupleType, N - 1>::ToNullable (tuple),
-					std::make_tuple (_ToNullable (std::get<N - 1> (tuple)))
-				);
-			}
-
-			// Tuple Visitor
-			template <typename Fn>
-			static inline void Visit (TupleType &tuple, Fn fn)
-			{
-				_TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
-				fn (std::get<N - 1> (tuple));
-			}
-		};
-
-		template <typename TupleType>
-		struct _TupleHelper <TupleType, 1>
-		{
-			static inline auto ToNullable (const TupleType &tuple)
-			{
-				return std::make_tuple (
-					_ToNullable (std::get<0> (tuple)));
-			}
-
-			template <typename Fn>
-			static inline void Visit (TupleType &tuple, Fn fn)
-			{
-				fn (std::get<0> (tuple));
-			}
-		};
-
-		// Flaten Arguments into Tuple
-		template <typename C>
-		static inline auto _JoinToTuple (const C &arg)
-		{
-			using TupleType = decltype (arg.__Tuple ());
-			constexpr size_t size = std::tuple_size<TupleType>::value;
-			return _TupleHelper<TupleType, size>::ToNullable (
-				arg.__Tuple ());
-		}
-		template <typename... Args>
-		static inline auto _JoinToTuple (const std::tuple<Args...>& t)
-		{
-			// _TupleHelper is not necessary
-			return t;
-		}
-		template <typename Arg, typename... Args>
-		static inline auto _JoinToTuple (const Arg &arg,
-										 const Args & ... args)
-		{
-			return std::tuple_cat (_JoinToTuple (arg),
-								   _JoinToTuple (args...));
 		}
 	};
 
