@@ -56,8 +56,8 @@ In this Sample, `ORMAP ("UserModel", ...)` do that:
 ### Create or Drop a Table for the Class
 
 ``` cpp
-// Open a Connection with *test.db*
-ORMapper mapper ("test.db");
+// Open a Connection with *Sample.db*
+ORMapper mapper ("Sample.db");
 
 // Create a table for "UserModel"
 mapper.CreateTbl (UserModel {});

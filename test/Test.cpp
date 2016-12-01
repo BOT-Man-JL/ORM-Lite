@@ -1,5 +1,5 @@
 
-// A Sample of ORM Lite
+// Unit Test of ORM Lite
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
 
@@ -7,7 +7,7 @@
 #include <iostream>
 #include <tuple>
 
-#include "src/ORMLite.h"
+#include "../src/ORMLite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
 
@@ -97,8 +97,8 @@ struct OrderModel
 
 int main ()
 {
-	// Open a Connection with *Sample.db*
-	ORMapper mapper ("Sample.db");
+	// Open a Connection with *Test.db*
+	ORMapper mapper ("Test.db");
 
 	// Create Brand New Tables
 	auto initTable = [&mapper] (const auto &model)
