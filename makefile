@@ -1,6 +1,6 @@
 
 TARGET = Sample
-SOURCES=../Sample.cpp ../src/sqlite3.c
+SOURCES=Sample.cpp src/sqlite3.c
 CPPFLAGS = -std=c++14
 LINKS = -lstdc++ -lpthread -ldl
 

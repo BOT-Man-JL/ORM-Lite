@@ -1,3 +1,0 @@
-make
-./Sample
-make clean
