@@ -47,7 +47,8 @@ auto __Tuple () const                                     \
 static const std::vector<std::string> &__FieldNames ()    \
 {                                                         \
     static const std::vector<std::string> _fieldNames {   \
-        BOT_ORM_Impl::ExtractFieldName (#__VA_ARGS__) };  \
+        BOT_ORM_Impl::FieldNameHelper::ExtractFieldName ( \
+        #__VA_ARGS__) };                                  \
     return _fieldNames;                                   \
 }                                                         \
 constexpr static const char *__TableName =  _TABLE_NAME_; \
@@ -365,22 +366,25 @@ namespace BOT_ORM_Impl
 
 	// Injection Helper - Extract Field Names
 
-	std::vector<std::string> ExtractFieldName (std::string input)
+	struct FieldNameHelper
 	{
-		std::vector<std::string> ret;
-		std::string tmpStr;
-
-		for (const auto &ch : std::move (input) + ",")
+		static std::vector<std::string> ExtractFieldName (std::string input)
 		{
-			if (isalnum (ch) || ch == '_')
-				tmpStr += ch;
-			else if (ch == ',')
+			std::vector<std::string> ret;
+			std::string tmpStr;
+
+			for (const auto &ch : std::move (input) + ",")
 			{
-				ret.push_back (tmpStr);
-				tmpStr.clear ();
+				if (isalnum (ch) || ch == '_')
+					tmpStr += ch;
+				else if (ch == ',')
+				{
+					ret.push_back (tmpStr);
+					tmpStr.clear ();
+				}
 			}
-		}
-		return ret;
+			return ret;
+		};
 	};
 }
 
