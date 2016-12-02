@@ -1,19 +1,16 @@
 
 TARGET = Sample
-SOURCES=Sample.cpp src/sqlite3.c
-CPPFLAGS = -std=c++14
-LINKS = -lstdc++ -lpthread -ldl
-
-OBJS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SOURCES)))
-
-%.o: %.c
-	$(CC) -c $< -o $@ $(LINKS)
-
-%.o: %.cpp
-	$(CC) -c $< -o $@ $(LINKS) $(CPPFLAGS)
+OBJS = Sample.o sqlite3.o
+LINKCPP = -std=c++14 -lstdc++
 
 $(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $(TARGET) $(LINKS)
+	$(CC) $(OBJS) -o $(TARGET) $(LINKCPP) -lpthread -ldl
+
+Sample.o: Sample.cpp
+	$(CC) -c $< -o $@ $(LINKCPP) -lpthread -ldl
+
+sqlite3.o: src/sqlite3.c
+	$(CC) -c $< -o $@ -lpthread -ldl
 
 clean:
 	rm -rf $(OBJS) $(TARGET) *.db
