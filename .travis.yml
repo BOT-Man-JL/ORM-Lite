@@ -1,6 +1,8 @@
 language: cpp
 sudo: required
 script:
+  - unzip src/sqlite3.h.zip -d src
+  - unzip src/sqlite3.c.zip -d src
   - make
 install:
   - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
@@ -11,3 +13,4 @@ addons:
     packages:
     - gcc-5
     - g++-5
+	- unzip
