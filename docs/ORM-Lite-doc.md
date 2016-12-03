@@ -1,12 +1,12 @@
 ﻿# ORM Lite
 
-## Requirement
+## Requirements
 
 - **C++ 14** Support
   - MSVC >= 14 (VS 2015)
   - gcc >= 5.4
   - Clang >= 3.8
-- **SQLite 3**
+- **SQLite 3** Dependency
 
 ## `BOT_ORM` Modules
 
@@ -40,7 +40,7 @@ Modules under `namespace BOT_ORM::Expression`
 ## `BOT_ORM::Nullable`
 
 It keeps the *Similar Semantic* of `Nullable<T>` as `C#`; and
-[Reference Here](http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
+[Reference Here](https://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646)
 
 ### Construction & Assignment
 
@@ -514,6 +514,23 @@ Remarks:
   it will throw `std::runtime_error` with message `No Such Field...`;
 
 ## Error Handling
+
+### Compile-time Error
+
+ORM Lite uses `static_assert` to Check if the Code is valid:
+
+- **Forget** to **Place** `ORMAP` into the Class
+  - > Please Inject the Class with 'ORMAP' first
+- Place **Unsupported Types** into `ORMAP`
+  - > Only Support Integral, Floating Point and std::string
+- `helper` is **NOT Copy Constructable** in `Mapper.Query (helper)`
+  - > The Class must be Copy Constructible
+
+Note that: Many Compilers will **Keep Compiling**
+even though it sees a failure of `static_assert`;
+So the Error Messages will often appear at the **TOP**;
+
+### Runtime Error
 
 All Functions will throw `std::runtime_error`
 with the **Error Message** if Failed;

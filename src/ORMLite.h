@@ -27,6 +27,7 @@
 private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
 template <typename Q> friend class BOT_ORM::Queryable;    \
+template<typename T> friend class BOT_ORM_Impl::HasInjected; \
 friend class BOT_ORM::FieldExtractor;                     \
 template <typename T>                                     \
 friend auto BOT_ORM_Impl::JoinToTuple (const T &);        \
@@ -53,8 +54,14 @@ static const std::vector<std::string> &__FieldNames ()    \
 }                                                         \
 constexpr static const char *__TableName =  _TABLE_NAME_; \
 
+// Private Macros
+
+#define NO_ORMAP "Please Inject the Class with 'ORMAP' first"
+#define BAD_TYPE "Only Support Integral, Floating Point and std::string"
+#define NOT_COPYABLE "The Class must be Copy Constructible"
+
 // Nullable Template
-// http://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646
+// https://stackoverflow.com/questions/2537942/nullable-values-in-c/28811646#28811646
 
 namespace BOT_ORM
 {
@@ -154,7 +161,7 @@ namespace BOT_ORM
 
 namespace BOT_ORM_Impl
 {
-	// Naive SQL Driver ... (Improved Later)
+	// Naive SQL Driver ... (Todo: Improved Later)
 
 	class SQLConnector
 	{
@@ -220,6 +227,27 @@ namespace BOT_ORM_Impl
 		sqlite3 *db;
 		static void _callback (int argc, char **argv, char **azColName)
 		{ return; }
+	};
+
+	// Checking Injection
+	// https://stackoverflow.com/questions/87372/check-if-a-class-has-a-member-function-of-a-given-signature
+
+	template<typename T> class HasInjected
+	{
+		template<typename U> struct SFINAE {};
+		template<typename U> static constexpr std::true_type Test (
+			SFINAE<decltype (U::__TableName)>*)
+		{
+			return std::true_type {};
+		}
+		template<typename U> static constexpr std::false_type Test (...)
+		{
+			return std::false_type {};
+		}
+	public:
+		static constexpr bool value =
+			decltype (Test<std::remove_reference_t<
+					  std::remove_cv_t<T>>> (nullptr))::value;
 	};
 
 	// Helper - Serialize
@@ -307,11 +335,8 @@ namespace BOT_ORM_Impl
 			? "text not null"
 			: nullptr;
 
-		static_assert (
-			typeStr != nullptr,
-			"Only Support Integral, Floating Point and std::string :-)");
-
-		return typeStr;;
+		static_assert (typeStr != nullptr, BAD_TYPE);
+		return typeStr;
 	}
 
 	template <typename T>
@@ -331,11 +356,8 @@ namespace BOT_ORM_Impl
 			? "text"
 			: nullptr;
 
-		static_assert (
-			typeStr != nullptr,
-			"Only Support Integral, Floating Point and std::string :-)");
-
-		return typeStr;;
+		static_assert (typeStr != nullptr, BAD_TYPE);
+		return typeStr;
 	}
 
 	// Injection Helper - Fn Visitor
@@ -898,6 +920,8 @@ namespace BOT_ORM
 		inline auto Join (const C &queryHelper2,
 						  const Expression::Expr &onExpr) const
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			return _NewQuery (
 				_sqlTarget,
 				_sqlFrom + " join " +
@@ -909,6 +933,8 @@ namespace BOT_ORM
 		inline auto LeftJoin (const C &queryHelper2,
 							  const Expression::Expr &onExpr) const
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			return _NewQuery (
 				_sqlTarget,
 				_sqlFrom + " left join " +
@@ -1061,6 +1087,8 @@ namespace BOT_ORM
 		template <typename C>
 		void CreateTbl (const C &entity)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			const auto &fieldNames = C::__FieldNames ();
 			std::vector<std::string> strTypes (fieldNames.size ());
 			size_t index = 0;
@@ -1085,6 +1113,8 @@ namespace BOT_ORM
 		template <typename C>
 		void DropTbl (const C &)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			_connector.Execute ("drop table " +
 								std::string (C::__TableName) +
 								";");
@@ -1093,6 +1123,8 @@ namespace BOT_ORM
 		template <typename C>
 		void Insert (const C &entity, bool withId = true)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			std::ostringstream os;
 			size_t index = 0;
 			auto fieldCount = C::__FieldNames ().size ();
@@ -1117,6 +1149,7 @@ namespace BOT_ORM
 		void InsertRange (const In &entities, bool withId = true)
 		{
 			using C = typename In::value_type;
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
 
 			std::ostringstream os;
 			size_t count = 0;
@@ -1153,6 +1186,8 @@ namespace BOT_ORM
 		template <typename C>
 		void Update (const C &entity)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			std::stringstream os, osKey;
 			size_t index = 0;
 			const auto &fieldNames = C::__FieldNames ();
@@ -1189,6 +1224,7 @@ namespace BOT_ORM
 		void UpdateRange (const In &entities)
 		{
 			using C = typename In::value_type;
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
 
 			std::stringstream os;
 			const auto &fieldNames = C::__FieldNames ();
@@ -1231,6 +1267,8 @@ namespace BOT_ORM
 							const Expression::SetExpr &setExpr,
 							const Expression::Expr &whereExpr)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			_connector.Execute ("update " +
 								std::string (C::__TableName) +
 								" set " + setExpr.ToString () +
@@ -1241,6 +1279,8 @@ namespace BOT_ORM
 		template <typename C>
 		void Delete (const C &entity)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			std::stringstream os;
 			os << "where ";
 
@@ -1260,6 +1300,8 @@ namespace BOT_ORM
 		inline void Delete (const C &,
 							const Expression::Expr &whereExpr)
 		{
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+
 			_connector.Execute ("delete from " +
 								std::string (C::__TableName) +
 								" where " +
@@ -1269,8 +1311,8 @@ namespace BOT_ORM
 		template <typename C>
 		inline Queryable<C> Query (C queryHelper)
 		{
-			static_assert (std::is_copy_constructible<C>::value,
-						   "It must be Copy Constructible");
+			static_assert (BOT_ORM_Impl::HasInjected<C>::value, NO_ORMAP);
+			static_assert (std::is_copy_constructible<C>::value, NOT_COPYABLE);
 
 			return Queryable<C> { _connector,
 				std::move (queryHelper),
@@ -1293,6 +1335,10 @@ namespace BOT_ORM
 		{
 			BOT_ORM_Impl::FnVisitor::Visit ([this] (auto &helper)
 			{
+				static_assert (
+					BOT_ORM_Impl::HasInjected<decltype (helper)>::value,
+					NO_ORMAP);
+
 				const auto &fieldNames =
 					std::remove_reference_t<
 					std::remove_cv_t<decltype (helper)>
@@ -1349,5 +1395,10 @@ namespace BOT_ORM
 		}
 	};
 }
+
+// Clear Intra Macros
+#undef NO_ORMAP
+#undef BAD_TYPE
+#undef NOT_COPYABLE
 
 #endif // !BOT_ORM_H
