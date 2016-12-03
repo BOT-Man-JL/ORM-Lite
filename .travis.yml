@@ -3,8 +3,10 @@ sudo: required
 script:
   - unzip src/sqlite3.h.zip -d src
   - unzip src/sqlite3.c.zip -d src
-  - make CC="gcc-5"
-  - make CC="clang"
+  - make
+install:
+  - if [ "$CC" = "gcc" ]; then export CXX="g++-5" CC="gcc-5"; fi
+  - if [ "$CC" = "clang" ]; then export CXX="clang++-3.8" CC="clang-3.8"; fi
 addons:
   apt:
     sources:
