@@ -3,14 +3,15 @@ sudo: required
 script:
   - unzip src/sqlite3.h.zip -d src
   - unzip src/sqlite3.c.zip -d src
-  - make
-install:
-  - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
+  - make CC="gcc-5"
+  - make CC="clang"
 addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.8
     packages:
     - gcc-5
     - g++-5
+    - clang-3.8
     - unzip

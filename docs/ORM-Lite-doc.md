@@ -3,8 +3,9 @@
 ## Requirement
 
 - **C++ 14** Support
-  - MSVC >= 14 (2015)
-  - gcc >= 5
+  - MSVC >= 14 (VS 2015)
+  - gcc >= 5.4
+  - Clang >= 3.8
 - **SQLite 3**
 
 ## `BOT_ORM` Modules

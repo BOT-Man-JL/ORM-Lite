@@ -3,9 +3,9 @@
 **ORM Lite** is a C++ [_**Object Relation Mapping** (ORM)_](https://en.wikipedia.org/wiki/Object-relational_mapping) for **SQLite3**,
 written in Modern C++ style.
 
-|  Platform  | Visual Studio 2015 | Linux gcc 5.4 |
-|------------|--------------------|---------------|
-| **Master** |[![Visual Studio 2015 Build status](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/orm-lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/orm-lite)|[![Linux gcc 5.4 Build status](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)|
+|  Platform  | Visual Studio 2015 | gcc 5.4 & Clang 3.8 |
+|------------|--------------------|---------------------|
+| **Master** |[![Build status](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)|[![Build status](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)|
 
 ## Features
 
