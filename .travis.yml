@@ -1,5 +1,8 @@
 language: cpp
 sudo: required
+compiler:
+  - gcc
+  - clang
 script:
   - unzip src/sqlite3.h.zip -d src
   - unzip src/sqlite3.c.zip -d src
