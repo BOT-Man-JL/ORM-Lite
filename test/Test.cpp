@@ -68,8 +68,27 @@ int main ()
 	initTable (ModelB {});
 	initTable (ModelC {});
 
-	// Case: ...
-	// Todo
+	// Case: Not Compile
+
+	//mapper.CreateTbl (int ());
+	//mapper.DropTbl (int ());
+	//mapper.Insert (int ());
+	//mapper.Insert (int (), false);
+	////mapper.InsertRange (int ());
+	//mapper.InsertRange (std::vector<int> ());
+	//mapper.InsertRange (std::vector<int> (), false);
+	//mapper.Update (int ());
+	////mapper.UpdateRange (int ());
+	//mapper.UpdateRange (std::vector<int> ());
+	//mapper.Update (int (), SetExpr { "" }, Expr { Selectable<int> {}, "" });
+	//mapper.Delete (int ());
+	//mapper.Delete (int (), Expr { Selectable<int> {}, "" });
+	//mapper.Query (int ());
+	//FieldExtractor { int (), double () };
+	//mapper.Query (ModelA {})
+	//	.Join (int (), Expr { Selectable<int> {}, "" });
+	//mapper.Query (ModelA {})
+	//	.LeftJoin (int (), Expr { Selectable<int> {}, "" });
 
 	return 0;
 }
