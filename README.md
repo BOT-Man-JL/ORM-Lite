@@ -3,9 +3,9 @@
 **ORM Lite** is a C++ [_**Object Relation Mapping** (ORM)_](https://en.wikipedia.org/wiki/Object-relational_mapping) for **SQLite3**,
 written in Modern C++ style.
 
-|  Platform  | Visual Studio 2015 | gcc 5.4 & Clang 3.8 |
-|------------|--------------------|---------------------|
-| **Master** |[![Build status](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)|[![Build status](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)|
+|  Platform  | MSVC 2015 | gcc 5.4 & Clang 3.8 |
+|------------|-----------|---------------------|
+| **Master** |[![Build status - VC](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)|[![Build status - gcc/clang](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)|
 
 ## Features
 
@@ -13,11 +13,14 @@ written in Modern C++ style.
 - Light Weight
 - Compile-time Overhead
 - Strong Typed
+- User Friendly Compile Error Prompt
 - Fluent Interface
 
-## Usage
+## Documentation
 
-### [View Full Documents](docs/ORM-Lite-doc.md)
+#### [Full Documents Here 😉](docs/ORM-Lite-doc.md)
+
+## Get Started
 
 ### Including *ORM Lite*
 

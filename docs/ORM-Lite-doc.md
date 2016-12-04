@@ -497,8 +497,8 @@ FieldExtractor (const MyClass1 &queryHelper1,
                 ...);
 
 // Get Field<> by operator ()
-Field<T> operator () (const T &field);
-NullableField<T> operator () (const Nullable<T> &field);
+Field<T> operator () (const T &field) const;
+NullableField<T> operator () (const Nullable<T> &field) const;
 ```
 
 Remarks:
@@ -520,11 +520,9 @@ Remarks:
 ORM Lite uses `static_assert` to Check if the Code is valid:
 
 - **Forget** to **Place** `ORMAP` into the Class
-  - > Please Inject the Class with 'ORMAP' first
+  > Please Inject the Class with 'ORMAP' first
 - Place **Unsupported Types** into `ORMAP`
-  - > Only Support Integral, Floating Point and std::string
-- `helper` is **NOT Copy Constructable** in `Mapper.Query (helper)`
-  - > The Class must be Copy Constructible
+  > Only Support Integral, Floating Point and std::string
 
 Note that: Many Compilers will **Keep Compiling**
 even though it sees a failure of `static_assert`;
@@ -533,4 +531,14 @@ So the Error Messages will often appear at the **TOP**;
 ### Runtime Error
 
 All Functions will throw `std::runtime_error`
-with the **Error Message** if Failed;
+with the **Error Message** if Failed:
+
+- Failed to **Connect** to **Database**
+  > SQL error: Can't open database `<connectionString>`
+- Failed at Executing **Query** Script
+  > SQL error: `<ErrorMessage>` at `<Generated SQL Script>`
+- Pass a **Non-Member** Var of Registered Object to Field **Extractor**
+  > No Such Field for current Extractor
+- Get `NULL` from Query while the Expected **Field** is **NOT NULL**
+  (happening in **NOT** *Code First* Cases...)
+  > Get Null Value for NOT Nullable Type
