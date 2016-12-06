@@ -434,6 +434,9 @@ namespace BOT_ORM
 		{
 			std::string fieldName;
 			const char *prefixStr;
+
+			Selectable (std::string &&_fieldName, const char *_prefixStr)
+				: fieldName (_fieldName), prefixStr (_prefixStr) {}
 		};
 
 		// Field : Selectable
