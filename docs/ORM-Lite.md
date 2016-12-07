@@ -16,12 +16,17 @@ using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
 ```
 
+Macro `ORMAP` in `ORMLite.h`
+
+- `ORMAP (TableName, field1, field2, ...);`
+
 Modules under `namespace BOT_ORM`
 
 - `BOT_ORM::Nullable`
 - `BOT_ORM::ORMapper`
 - `BOT_ORM::Queryable<QueryResult>`
 - `BOT_ORM::FieldExtractor`
+- `BOT_ORM::Constraint`
 
 Modules under `namespace BOT_ORM::Expression`
 
@@ -36,6 +41,64 @@ Modules under `namespace BOT_ORM::Expression`
 - `BOT_ORM::Expression::Avg ()`
 - `BOT_ORM::Expression::Max ()`
 - `BOT_ORM::Expression::Min ()`
+
+Static Modules under `class BOT_ORM::Constraint`
+
+- `BOT_ORM::Constraint::CompositeField`
+- `BOT_ORM::Constraint::Default`
+- `BOT_ORM::Constraint::Check`
+- `BOT_ORM::Constraint::Unique`
+- `BOT_ORM::Constraint::Reference`
+
+## Macro `ORMAP`
+
+Before we use ORM Lite, we should **Inject** some code into the Class;
+
+``` cpp
+struct MyClass
+{
+    int field1;
+    double field2;
+    std::string field3;
+
+    Nullable<int> field4;
+    Nullable<double> field5;
+    Nullable<std::string> field6;
+
+    // Inject ORM-Lite into this Class :-)
+    ORMAP ("TableName", field1, field2, field3,
+           field4, field5, field6);
+};
+```
+
+In this Sample, `ORMAP ("TableName", ...)` specifies that:
+- Class `MyClass` will be mapped into Table `TableName`;
+- `field1, field2, field3, field4, field5, field6` will be mapped
+  into `INTEGER field1 NOT NULL`, `REAL field2 NOT NULL`,
+  `TEXT field3 NOT NULL`, `INTEGER field4`, `REAL field5`
+  and `TEXT field6` respectively;
+- The first entry `field1` will be set as the **Primary Key**
+  of the Table;
+
+Note that:
+- Currently Only Support
+  - T such that `std::is_integral<T>::value == true`
+    and **NOT** `char` or `*char_t`
+  - T such that `std::is_floating_point<T>::value == true`
+  - T such that `std::is_same<T, std::string>::value == true`
+  - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
+- Not `Nullable` members will be mapped as `NOT NULL`;
+- The **Primary Key** (first entry) is **Recommended** to be
+  `Integral`, and it could be regarded as the `ROWID`
+  with a Better Query **Performance** :-)
+  (otherwise SQLite 3 will Generate a Column for `ROWID` Implicitly)
+- Field Names MUST **NOT** be SQL Keywords (SQL Constraint);
+- `std::string` Value MUST **NOT** contain `\0` (SQL Constraint);
+- `ORMAP (...)` will **auto** Inject some **private members**;
+  - `__Accept ()` to Implement **Visitor Pattern**;
+  - `__Tuple ()` to **Flatten** data to tuple;
+  - `__FieldNames ()` and `__TableName` to store strings;
+  - and the Access by Implementation;
 
 ## `BOT_ORM::Nullable`
 
@@ -91,49 +154,6 @@ bool operator==(nullptr_t, const Nullable<T> &op2);
 
 ## `BOT_ORM::ORMapper`
 
-### Inject `BOT_ORM::ORMapper` into Class
-
-``` cpp
-struct MyClass
-{
-    int field1;
-    double field2;
-    std::string field3;
-
-    Nullable<int> field4;
-    Nullable<double> field5;
-    Nullable<std::string> field6;
-
-    // Inject ORM-Lite into this Class :-)
-    ORMAP ("TableName", field1, field2, field3,
-           field4, field5, field6);
-};
-```
-
-In this Sample, `ORMAP ("TableName", ...)` do that:
-- Class `MyClass` will be mapped into Table `TableName`;
-- Not `Nullable` members will be mapped as `NOT NULL`;
-- `field1, field2, field3, field4, field5, field6` will be mapped
-  into `INT field1 NOT NULL`, `REAL field2 NOT NULL`,
-  `TEXT field3 NOT NULL`, `INT field4`, `REAL field5`
-  and `TEXT field6` respectively;
-- The first entry `field1` will be set as the **Primary Key** of the Table;
-
-Note that:
-- Currently Only Support
-  - T such that `std::is_integral<T>::value == true`
-    and **NOT** `char` or `*char_t`
-  - T such that `std::is_floating_point<T>::value == true`
-  - T such that `std::is_same<T, std::string>::value == true`
-  - which are mapped as `INTEGER`, `REAL` and `TEXT` (SQLite3);
-- Field Names MUST **NOT** be SQL Keywords (SQL Constraint);
-- `std::string` Value MUST **NOT** contain `\0` (SQL Constraint);
-- `ORMAP (...)` will **auto** Inject some **private members**;
-  - `__Accept ()` to Implement **Visitor Pattern**;
-  - `__Tuple ()` to **Flatten** data to tuple;
-  - `__FieldNames ()` and `__TableName` to store strings;
-  - and the Access by Implementation;
-
 ### Connection
 
 ``` cpp
@@ -172,6 +192,10 @@ catch (...)
 ``` cpp
 // Create Table
 void CreateTbl (const MyClass &);
+void CreateTbl (const MyClass &,
+                const Constraint &constraint1,
+                const Constraint &constraint2,
+                ...);
 
 // Drop Table
 void DropTbl (const MyClass &);
@@ -179,6 +203,9 @@ void DropTbl (const MyClass &);
 
 Remarks:
 - Create/Drop Table for class `MyClass`;
+- `void CreateTbl (const MyClass &, ...);`
+  will Create a Table with **Constraints**;
+- `Constraint` will be described later;
 
 SQL:
 
@@ -201,15 +228,19 @@ void InsertRange (const Container<MyClass> &entities, bool withId = true);
 Remarks:
 - Insert `entity` / `entities` into Table for `MyClass`;
 - If `withId` is `false`, it will insert the `entity` with
-  `NULL` **Primary Key**;
+  `NULL` for the **Primary Key**;
+  - Note that: **Primary Key** is recommended to be **Integral**
+    in this case (Floating Point / String may failed);
 - `entities` must **SUPPORT** `forward_iterator`;
 
 SQL:
 
 ``` sql
-INSERT INTO MyClass VALUES (...);
+INSERT INTO MyClass (...) VALUES (...);
 
-INSERT INTO MyClass VALUES (...), (...) ...;
+INSERT INTO MyClass (...) VALUES (...);
+INSERT INTO MyClass (...) VALUES (...);
+...
 ```
 
 ### Update
@@ -284,7 +315,7 @@ Remarks:
 
 ## `BOT_ORM::Queryable<QueryResult>`
 
-### Retrieve Result
+### Retrieve Results
 
 ``` cpp
 Nullable<T> Select (const Expression::Aggregate<T> &agg) const;
@@ -297,8 +328,7 @@ Remarks:
 - `Select` will Get the one-or-zero-row Result for `agg` immediately;
 - `ToVector` / `ToList` returns the Collection of `QueryResult`;
 - If the Result is `null` for `NOT Nullable` Field,
-  it will throw `std::runtime_error`
-  with message `Get Null Value for NOT Nullable Type`;
+  it will throw `std::runtime_error`;
 - `Expression` will be described later;
 
 ### Set Conditions
@@ -386,6 +416,32 @@ LIMIT <take> OFFSET <skip>;
 
 Remarks:
 - If the Corresponding Condition is NOT Set, it will be omitted;
+
+## `BOT_ORM::FieldExtractor`
+
+``` cpp
+// Construction
+FieldExtractor (const MyClass1 &queryHelper1,
+                const MyClass2 &queryHelper2,
+                ...);
+
+// Get Field<> by operator ()
+Field<T> operator () (const T &field) const;
+NullableField<T> operator () (const Nullable<T> &field) const;
+```
+
+Remarks:
+- Construction of `FieldExtractor` will take all fields' pointers of
+  `queryHelper` into a **Hash Table**;
+- `operator () (field)` will find the position of `field`
+  in the **Hash Table** from `queryHelper`
+  and Construct the corresponding `Field`;
+- If the `field` is `Nullable<T>`
+  it will Construct a `NullableField<T>`;
+  and it will Construct a `Field<T>` otherwise;
+- If `field` is not a member of `queryHelper`,
+  it will throw `std::runtime_error`;
+- `Expression` will be described later;
 
 ## `namespace BOT_ORM::Expression`
 
@@ -488,30 +544,47 @@ They will Generate Aggregate Functions as:
 - `T MAX (field)`
 - `T MIN (field)`
 
-## `BOT_ORM::FieldExtractor`
+## `class BOT_ORM::Constraint`
+
+### Composite Field
+
+`CompositeField` could be constructed from normal `Field`;
 
 ``` cpp
-// Construction
-FieldExtractor (const MyClass1 &queryHelper1,
-                const MyClass2 &queryHelper2,
+CompositeField (const Expression::Field<T1> &field1,
+                const Expression::Field<T2> &field2,
                 ...);
-
-// Get Field<> by operator ()
-Field<T> operator () (const T &field) const;
-NullableField<T> operator () (const Nullable<T> &field) const;
 ```
 
 Remarks:
-- Construction of `FieldExtractor` will take all fields' pointers of
-  `queryHelper` into a **Hash Table**;
-- `operator () (field)` will find the position of `field`
-  in the **Hash Table** from `queryHelper`
-  and Construct the corresponding `Field`;
-- If the `field` is `Nullable<T>`
-  it will Construct a `NullableField<T>`;
-  and it will Construct a `Field<T>` otherwise;
-- If `field` is not a member of `queryHelper`,
-  it will throw `std::runtime_error` with message `No Such Field...`;
+- Composite Field will Contain fields in the given **Order**;
+- If the `field`s are not from the Same Table,
+  it will throw `std::runtime_error`;
+
+### Generate Constraints
+
+``` cpp
+Constraint Default (const Expression::Field<T> &field,
+                    const T &value);
+Constraint Check (const Expression::Expr &expr);
+Constraint Unique (const Expression::Field<T> &field);
+Constraint Unique (const CompositeField &fields);
+Constraint Reference(const Expression::Field<T> &field,
+                     const Expression::Field<T> &refered);
+Constraint Reference (const CompositeField &field,
+                      const CompositeField &refered);
+```
+
+Remarks:
+- They will Generate Constraints as:
+  `DEFAULT`, `CHECK`, `UNIQUE` and `FOREIGN KEY`;
+- `FOREIGN KEY` is Enabled by Default
+  (during the Construction of `ORMapper`);
+- Why there is NO **Composite Primary Key** Constaints:
+  - It's recommended to use a **Integral** Field as the Primary Key,
+    described in Section ## Macro `ORMAP`;
+  - We can use `Unique` to implement a **Composite Unique** Constraint;
+  - And use `Reference` to define a **Composite Foreign Key**;
 
 ## Error Handling
 
@@ -542,3 +615,5 @@ with the **Error Message** if Failed:
 - Get `NULL` from Query while the Expected **Field** is **NOT NULL**
   (happening in **NOT** *Code First* Cases...)
   > Get Null Value for NOT Nullable Type
+- **Composite** Fields from **NOT** the Same Tables
+  > Fields are NOT from the Same Table
