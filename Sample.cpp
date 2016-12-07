@@ -97,29 +97,88 @@ struct OrderModel
 
 int main ()
 {
-	// Open a Connection with *Sample.db*
+	/*
+		## Field Extracting
+	*/
+
+	// Define more Query Helper Objects and their Field Extractor
+	UserModel user;
+	SellerModel seller;
+	OrderModel order;
+	auto field = FieldExtractor { user, seller, order };
+
+	// Extract Field from 'field'
+	// For example: field (user.user_name)
+	//   => Retrieve the field of user_name in UserModel table
+
+	/*
+		## Working on *Database* with *ORMapper*
+	*/
+
+	// Open a Connection with 'Sample.db'
 	ORMapper mapper ("Sample.db");
 
-	// Create Brand New Tables
-	auto initTable = [&mapper] (const auto &model)
+	/*
+		## Create or Drop Tables
+	*/
+
+	try
 	{
-		try
-		{
-			mapper.CreateTbl (model);
-		}
-		catch (...)
-		{
-			mapper.DropTbl (model);
-			mapper.CreateTbl (model);
-		}
-	};
-	initTable (UserModel {});
-	initTable (SellerModel {});
-	initTable (OrderModel {});
+		// Drop Tables
+		mapper.DropTbl (OrderModel {});
+		mapper.DropTbl (UserModel {});
+		mapper.DropTbl (SellerModel {});
+	}
+	catch (...) {}
 
-	// ==========
+	// Create Table with Constraints
+	mapper.CreateTbl (
+		UserModel {},
+		Constraint::Default (field (user.salary), 1000.0));
 
-	/* #1 Basic Usage */
+	// Remarks:
+	// CREATE TABLE UserModel(
+	//   user_id INTEGER NOT NULL PRIMARY KEY,
+	//   user_name TEXT NOT NULL,
+	//   credit_count REAL NOT NULL,
+	//   age INTEGER,
+	//   salary REAL DEFAULT 1000,
+	//   title TEXT);
+
+	mapper.CreateTbl (
+		SellerModel {},
+		Constraint::Check (field (seller.credit_count) > 0.0));
+
+	// Remarks:
+	// CREATE TABLE SellerModel(
+	//   seller_id INTEGER NOT NULL PRIMARY KEY,
+	//   seller_name TEXT NOT NULL,
+	//   credit_count REAL NOT NULL,
+	//   CHECK (credit_count > 0));
+
+	mapper.CreateTbl (
+		OrderModel {},
+		Constraint::Reference (
+			field (order.user_id), field (user.user_id)),
+		Constraint::Reference (
+			field (order.seller_id), field (seller.seller_id)),
+		Constraint::Unique (Constraint::CompositeField {
+			field (order.product_name), field (order.fee) }));
+
+	// Remarks:
+	// CREATE TABLE OrderModel(
+	//   order_id INTEGER NOT NULL PRIMARY KEY,
+	//   user_id INTEGER NOT NULL,
+	//   seller_id INTEGER NOT NULL,
+	//   product_name TEXT NOT NULL,
+	//   fee REAL,
+	//   FOREIGN KEY (user_id) REFERENCES UserModel(user_id),
+	//   FOREIGN KEY (seller_id) REFERENCES SellerModel(seller_id),
+	//   UNIQUE (product_name, fee));
+
+	/*
+		## Basic CRUD
+	*/
 
 	std::vector<UserModel> initObjs =
 	{
@@ -128,7 +187,7 @@ int main ()
 		{ 2, "Jess", 0.6, nullptr, nullptr, std::string ("Dr.") }
 	};
 
-	// Insert Values into the table
+	// Insert Values with Primary Key
 	for (const auto &obj : initObjs)
 		mapper.Insert (obj);
 
@@ -153,7 +212,9 @@ int main ()
 	catch (const std::exception &ex)
 	{
 		// If any statement Failed, throw an exception
-		// "SQL error: UNIQUE constraint failed: UserModel.id"
+
+		std::cerr << ex.what () << std::endl;
+		// SQL error: 'UNIQUE constraint failed: UserModel.id'
 
 		// Remarks:
 		// mapper.Delete (initObjs[0]); will not applied :-)
@@ -161,10 +222,24 @@ int main ()
 
 	// Select All to List
 	auto result1 = mapper.Query (UserModel {}).ToList ();
-	//   result1 = [{ 0, 0.2, "John", 21,   null, null  },
-	//              { 1, 0.4, "Jack", null, null, "St." }]
+	// result1 = [{ 0, 0.2, "John", 21,   1000, null  },
+	//            { 1, 0.4, "Jack", null, null, "St." }]
 
-	/* #2 Batch Operations */
+	// Table Constraints
+	try
+	{
+		// Insert Values without Primary Key
+		mapper.Insert (SellerModel { 0, "John Inc.", 0.0 }, false);
+	}
+	catch (const std::exception &ex)
+	{
+		std::cerr << ex.what () << std::endl;
+		// SQL error: 'CHECK constraint failed: SellerModel'
+	}
+
+	/*
+		## Batch Operations
+	*/
 
 	std::vector<UserModel> dataToSeed;
 	for (int i = 50; i < 100; i++)
@@ -184,93 +259,96 @@ int main ()
 
 	// Update by Batch Update
 	mapper.Transaction ([&] () {
+		// Note that: it will erase the default value of 'salary'
 		mapper.UpdateRange (dataToSeed);
 	});
 
-	/* #3 Composite Query */
+	/*
+		## Single-Table Query
+	*/
 
-	// Define a Query Helper Object and its Field Extractor
-	UserModel helper;
-	FieldExtractor field { helper };
-
-	// Select by Query
+	// Select by Condition
 	auto result2 = mapper.Query (UserModel {})
 		.Where (
-			field (helper.user_name) & std::string ("July%") &&
-			(field (helper.age) >= 32 &&
-			 field (helper.title) != nullptr)
+			field (user.user_name) & std::string ("July%") &&
+			(field (user.age) >= 32 &&
+			 field (user.title) != nullptr)
 		)
-		.OrderByDescending (field (helper.age))
-		.OrderBy (field (helper.user_id))
+		.OrderByDescending (field (user.age))
+		.OrderBy (field (user.user_id))
 		.Take (3)
 		.Skip (1)
 		.ToVector ();
 
 	// Remarks:
-	// sql = SELECT * FROM UserModel
-	//       WHERE (user_name LIKE 'July%' AND
-	//             (age>=32 AND title IS NOT NULL))
-	//       ORDER BY age DESC
-	//       ORDER BY id
-	//       LIMIT 3 OFFSET 1
+	// SELECT * FROM UserModel
+	// WHERE (user_name LIKE 'July%' AND
+	//       (age >= 32 AND title IS NOT NULL))
+	// ORDER BY age DESC, user_id
+	// LIMIT 3 OFFSET 1
+
 	// result2 = [{ 89, 17.8, "July_89", 34, null, "Mr. 19" },
 	//            { 86, 17.2, "July_86", 33, null, "Mr. 16" },
 	//            { 87, 17.4, "July_87", 33, null, "Mr. 17" }]
 
-	// Calculate Aggregate Function by Query
+	// Calculate Aggregate Function
 	auto avg = mapper.Query (UserModel {})
-		.Where (field (helper.user_name) & std::string ("July%"))
-		.Select (Avg (field (helper.credit_count)));
+		.Where (field (user.user_name) & std::string ("July%"))
+		.Select (Avg (field (user.credit_count)));
 
 	// Remarks:
-	// sql = SELECT AVG (credit_count) FROM UserModel
-	//       WHERE (user_name LIKE 'July%')
+	// SELECT AVG (credit_count) FROM UserModel
+	// WHERE (user_name LIKE 'July%')
+
 	// avg = 14.9
 
 	auto count = mapper.Query (UserModel {})
-		.Where (field (helper.user_name) | std::string ("July%"))
+		.Where (field (user.user_name) | std::string ("July%"))
 		.Select (Count ());
 
 	// Remarks:
-	// sql = SELECT COUNT (*) FROM UserModel
-	//       WHERE (user_name NOT LIKE 'July%')
+	// SELECT COUNT (*) FROM UserModel
+	// WHERE (user_name NOT LIKE 'July%')
+
 	// count = 2
 
 	// Update by Condition
 	mapper.Update (
 		UserModel {},
-		(field (helper.age) = 10) &&
-		(field (helper.credit_count) = 1.0),
-		field (helper.user_name) == std::string ("July"));
+		(field (user.age) = 10) &&
+		(field (user.credit_count) = 1.0),
+		field (user.user_name) == std::string ("July"));
 
 	// Remarks:
-	// sql = UPDATE UserModel SET age=10,credit_count=1.0
-	//       WHERE (user_name='July')
+	// UPDATE UserModel SET age = 10,credit_count = 1.0
+	// WHERE (user_name = 'July')
 
 	// Delete by Condition
 	mapper.Delete (UserModel {},
-				   field (helper.user_id) >= 90);
+				   field (user.user_id) >= 90);
 
 	// Remarks:
-	// sql = DELETE FROM UserModel WHERE (id>=90)
+	// DELETE FROM UserModel WHERE (id >= 90)
 
-	/* #4 Multi-Table Query */
+	/*
+		## Multi-Table Query
+	*/
 
-	// Define more Query Helper Objects and their Field Extractor
-	UserModel user;
-	SellerModel seller;
-	OrderModel order;
-	field = FieldExtractor { user, seller, order };
-
-	// Insert Values into the table
-	// mapper.Insert (..., false) means Insert without Primary Key
-	for (size_t i = 0; i < 50; i++)
-		mapper.Insert (
-			OrderModel { 0,
-			(int) i / 2 + 50,
-			(int) i / 4 + 50,
-			"Item " + std::to_string (i),
-			i * 0.5 }, false);
+	mapper.Transaction ([&] ()
+	{
+		for (size_t i = 0; i < 50; i++)
+		{
+			mapper.Insert (
+				SellerModel { (int) i + 50,
+				"Seller " + std::to_string (i), 3.14 });
+			mapper.Insert (
+				OrderModel { 0,
+				(int) i / 2 + 50,
+				(int) i / 4 + 50,
+				"Item " + std::to_string (i),
+				i * 0.5 }, false);
+		}
+	});
 
 	// Join Tables for Query
 	auto joinedQuery = mapper.Query (UserModel {})
@@ -287,18 +365,19 @@ int main ()
 	auto result3 = joinedQuery.ToList ();
 
 	// Remarks:
-	// sql = SELECT * FROM UserModel
-	//       JOIN OrderModel
-	//       ON UserModel.user_id=OrderModel.user_id
-	//       LEFT JOIN SellerModel
-	//       ON SellerModel.seller_id=OrderModel.seller_id
-	//       WHERE (UserModel.user_id>=65)
+	// SELECT * FROM UserModel
+	//               JOIN OrderModel
+	//               ON UserModel.user_id=OrderModel.user_id
+	//               LEFT JOIN SellerModel
+	//               ON SellerModel.seller_id=OrderModel.seller_id
+	// WHERE (UserModel.user_id>=65)
+
 	// result3 = [(65, "July_65", 13, null, null, null,
 	//             31, 65, 57, "Item 30", 15,
-	//             null, null, null),
+	//             57, "Seller 7", 3.14),
 	//            (65, "July_65", 13, null, null, null,
 	//             32, 65, 57, "Item 31", 15.5,
-	//             null, null, null),
+	//             57, "Seller 7", 3.14),
 	//            ... ]
 
 	// Group & Having ~
@@ -313,18 +392,19 @@ int main ()
 		.ToList ();
 
 	// Remarks:
-	// sql = SELECT OrderModel.user_id,
-	//              UserModel.user_name,
-	//              AVG (OrderModel.fee)
-	//       FROM UserModel
-	//            JOIN OrderModel
-	//            ON UserModel.user_id=OrderModel.user_id
-	//            LEFT JOIN SellerModel
-	//            ON SellerModel.seller_id=OrderModel.seller_id
-	//       WHERE (UserModel.user_id>=65)
-	//       GROUP BY UserModel.user_name
-	//       HAVING SUM (OrderModel.fee)>=40.5
-	//       LIMIT ~0 OFFSET 3
+	// SELECT OrderModel.user_id,
+	//        UserModel.user_name,
+	//        AVG (OrderModel.fee)
+	// FROM UserModel
+	//      JOIN OrderModel
+	//      ON UserModel.user_id=OrderModel.user_id
+	//      LEFT JOIN SellerModel
+	//      ON SellerModel.seller_id=OrderModel.seller_id
+	// WHERE (UserModel.user_id>=65)
+	// GROUP BY UserModel.user_name
+	// HAVING SUM (OrderModel.fee)>=40.5
+	// LIMIT ~0 OFFSET 3
+
 	// result4 = [(73, "July_73", 23.25),
 	//            (74, "July_74", 24.25)]
 
@@ -340,31 +420,33 @@ int main ()
 		.Take (4)
 		.ToList ();
 
-	// sql = SELECT OrderModel.product_name,
-	//              OrderModel.user_id
-	//       FROM OrderModel
-	//            WHERE (OrderModel.user_id==50)
-	//       UNION
-	//       SELECT UserModel.user_name,
-	//              OrderModel.order_id
-	//       FROM UserModel
-	//            JOIN OrderModel
-	//            ON UserModel.user_id=OrderModel.user_id
-	//            LEFT JOIN SellerModel
-	//            ON SellerModel.seller_id=OrderModel.seller_id
-	//            WHERE (UserModel.user_id>=65)
-	//       LIMIT 4;
+	// Remarks:
+	// SELECT OrderModel.product_name,
+	//        OrderModel.user_id
+	// FROM OrderModel
+	//      WHERE (OrderModel.user_id==50)
+	// UNION
+	// SELECT UserModel.user_name,
+	//        OrderModel.order_id
+	// FROM UserModel
+	//      JOIN OrderModel
+	//      ON UserModel.user_id=OrderModel.user_id
+	//      LEFT JOIN SellerModel
+	//      ON SellerModel.seller_id=OrderModel.seller_id
+	//      WHERE (UserModel.user_id>=65)
+	// LIMIT 4;
+
 	// result5 = [("Item 0", 50),
 	//            ("Item 1", 50),
 	//            ("July_65", 31),
 	//            ("July_65", 32)]
 
-	// ==========
+	// ====================================================
 
 	// Output UserModel Objects
 	auto printUserModeles = [] (const auto &objs)
 	{
-		for (auto& item : objs)
+		for (const auto& item : objs)
 		{
 			std::cout << item.user_id << "\t" << item.credit_count
 				<< "\t" << item.user_name << "\t";
@@ -379,6 +461,7 @@ int main ()
 	};
 
 	// Sec 1
+	std::cout << "\n";
 	printUserModeles (result1);
 
 	// Sec 2
