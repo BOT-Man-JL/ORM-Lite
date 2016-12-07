@@ -597,9 +597,7 @@ ORM Lite uses `static_assert` to Check if the Code is valid:
 - Place **Unsupported Types** into `ORMAP`
   > Only Support Integral, Floating Point and std::string
 
-Note that: Many Compilers will **Keep Compiling**
-even though it sees a failure of `static_assert`;
-So the Error Messages will often appear at the **TOP**;
+Note that: Error Messages will often appear at the **TOP**;
 
 ### Runtime Error
 
