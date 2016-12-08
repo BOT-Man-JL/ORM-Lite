@@ -3,10 +3,18 @@
 ## Requirements
 
 - **C++ 14** Support
-  - MSVC >= 14 (Update 3, VS 2015 Update 3)
+  - MSVC >= 14 (VS 2015 Update 3)
   - gcc >= 5.4
   - Clang >= 3.8
 - **SQLite 3** Dependency
+
+## Mapping Rules
+
+|        SQL Concepts | C++ Concepts | Notes |
+|---------------------|--------------|-------|
+|    Table / Relation |       Object | Deduced by `ORMAP` |
+| Tuple (in `SELECT`) | `std::tuple` | Deduced by `Join` / `Select` |
+|              Column |        Field | Decuced by `Field` |
 
 ## `BOT_ORM` Modules
 
@@ -548,7 +556,8 @@ They will Generate Aggregate Functions as:
 
 ### Composite Field
 
-`CompositeField` could be constructed from normal `Field`;
+`CompositeField` could be constructed from normal `Field`
+and is used by **Constraint Functions**;
 
 ``` cpp
 CompositeField (const Expression::Field<T1> &field1,

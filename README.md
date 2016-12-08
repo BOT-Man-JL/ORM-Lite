@@ -1,6 +1,7 @@
 ﻿# ORM Lite
 
-**ORM Lite** is a C++ [_**Object Relation Mapping** (ORM)_](https://en.wikipedia.org/wiki/Object-relational_mapping) for **SQLite3**,
+**ORM Lite** is a C++ [_**Object Relation Mapping** (ORM)_](https://en.wikipedia.org/wiki/Object-relational_mapping)
+for **SQLite3** (currently 😂),
 written in Modern C++ style.
 
 |  Platform  | MSVC 2015 | gcc 5.4 & Clang 3.8 |
@@ -9,13 +10,11 @@ written in Modern C++ style.
 
 ## Features
 
-- Easy to Use
-- Light Weight
-- Compile-time Overhead
+- [Easy to Use](Sample.cpp)
+- [Header Only](src/ORMLite.h)
+- Compile-time Templates
 - Strong Typed
-- Header Only
 - User Friendly Compile Error Prompt
-- Fluent Interface
 
 ## Documentation
 
@@ -25,10 +24,11 @@ written in Modern C++ style.
 
 ## Planned Features
 
+- Support More Databases (Looking for a Better Driver recently...)
 - Customized Primary Key (Hard to Design an Elegant Interface for it...)
 - Blob (Hard to be Serialized to Script...)
 - Date/Time Types (Weak Typed in SQL...)
-- Subquery (Too Complicated...)
+- Subquery (Too Complicated... the Interface would be)
 
 Feel free to [Issue](https://github.com/BOT-Man-JL/ORM-Lite/issues/new),
 if you have any idea. 😎

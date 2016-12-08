@@ -2,6 +2,8 @@
 
 Here is a **short tour** for this **Amazing** ORM 😉
 
+The full code is in [Sample.cpp](../Sample.cpp).
+
 ## Preparation
 
 Before we start, Include **src** into your Project:
@@ -74,6 +76,8 @@ struct OrderModel
 
 ## Field Extracting
 
+- `FieldExtractor`
+
 ``` cpp
 // Define more Query Helper Objects and their Field Extractor
 UserModel user;
@@ -88,12 +92,18 @@ auto field = FieldExtractor { user, seller, order };
 
 ## Working on *Database* with *ORMapper*
 
+- `ORMapper`
+
 ``` cpp
 // Open a Connection with 'Sample.db'
 ORMapper mapper ("Sample.db");
 ```
 
 ## Create or Drop Tables
+
+- `ORMapper.CreateTbl`
+- `ORMapper.DropTbl`
+- `Expression`
 
 ``` cpp
 // Create Table with Constraints
@@ -153,9 +163,9 @@ mapper.DropTbl (OrderModel {});
 
 | user_id| user_name| credit_count|    age|  salary|  title|
 |--------|----------|-------------|-------|--------|-------|
-|       0|      John|          0.2|     21|  `null`| `null`|
+|       0|      John|          0.2|     21|  1000.0| `null`|
 |       1|      Jack|          0.4| `null`|    3.14| `null`|
-|       2|      Jess|          0.6| `null`|  `null`|    Dr.|
+|       2|      Jess|          0.6| `null`|  1000.0|    Dr.|
 |     ...|       ...|          ...|    ...|     ...|    ...|
 
 #### Seller Model
@@ -171,6 +181,13 @@ mapper.DropTbl (OrderModel {});
 |      ...|     ...|       ...|          ...| ...|
 
 ## Basic CRUD
+
+- `ORMapper.Insert` (Create)
+- `ORMapper.Query`  (Read)
+- `ORMapper.Update` (Update)
+- `ORMapper.Delete` (Delete)
+- `ORMapper.Transaction`
+- `Table Constraints`
 
 ``` cpp
 std::vector<UserModel> initObjs =
@@ -215,6 +232,8 @@ catch (const std::exception &ex)
 
 // Select All to List
 auto result1 = mapper.Query (UserModel {}).ToList ();
+
+// decltype (result1) == std::list<UserModel>
 // result1 = [{ 0, 0.2, "John", 21,   1000, null  },
 //            { 1, 0.4, "Jack", null, null, "St." }]
 
@@ -232,6 +251,9 @@ catch (const std::exception &ex)
 ```
 
 ## Batch Operations
+
+- `ORMapper.InsertRange`
+- `ORMapper.UpdateRange`
 
 ``` cpp
 std::vector<UserModel> dataToSeed;
@@ -259,6 +281,14 @@ mapper.Transaction ([&] () {
 
 ## Single-Table Query
 
+- `Expression`
+- `Aggregate`
+- `Queryable.Where`
+- `Queryable.OrderBy`
+- `Queryable.Take`
+- `Queryable.Skip`
+- `Queryable.Select`
+
 ``` cpp
 // Select by Condition
 auto result2 = mapper.Query (UserModel {})
@@ -280,6 +310,7 @@ auto result2 = mapper.Query (UserModel {})
 // ORDER BY age DESC, user_id
 // LIMIT 3 OFFSET 1
 
+// decltype (result2) == std::vector<UserModel>
 // result2 = [{ 89, 17.8, "July_89", 34, null, "Mr. 19" },
 //            { 86, 17.2, "July_86", 33, null, "Mr. 16" },
 //            { 87, 17.4, "July_87", 33, null, "Mr. 17" }]
@@ -304,7 +335,15 @@ auto count = mapper.Query (UserModel {})
 // WHERE (user_name NOT LIKE 'July%')
 
 // count = 2
+```
 
+## Update / Delete by Statement
+
+- `Expression`
+- `ORMapper.Update`
+- `ORMapper.Delete`
+
+``` cpp
 // Update by Condition
 mapper.Update (
     UserModel {},
@@ -325,6 +364,15 @@ mapper.Delete (UserModel {},
 ```
 
 ## Multi-Table Query
+
+- `Expression`
+- `Aggregate`
+- `Queryable.Join`
+- `Queryable.LeftJoin`
+- `Queryable.Select`
+- `Queryable.GroupBy`
+- `Queryable.Having`
+- `Queryable.Union`
 
 ``` cpp
 mapper.Transaction ([&] ()
@@ -354,7 +402,6 @@ auto joinedQuery = mapper.Query (UserModel {})
     .Where (field (user.user_id) >= 65);
 
 // Get Result to List
-// Results are Nullable-Tuples
 auto result3 = joinedQuery.ToList ();
 
 // Remarks:
@@ -365,6 +412,7 @@ auto result3 = joinedQuery.ToList ();
 //               ON SellerModel.seller_id=OrderModel.seller_id
 // WHERE (UserModel.user_id>=65)
 
+// decltype (result3) == std::list<std::tuple<Nullable<..>, ..>>
 // result3 = [(65, "July_65", 13, null, null, null,
 //             31, 65, 57, "Item 30", 15,
 //             57, "Seller 7", 3.14),
@@ -374,7 +422,6 @@ auto result3 = joinedQuery.ToList ();
 //            ... ]
 
 // Group & Having ~
-// Results are Nullable-Tuples
 auto result4 = joinedQuery
     .Select (field (order.user_id),
              field (user.user_name),
@@ -398,6 +445,7 @@ auto result4 = joinedQuery
 // HAVING SUM (OrderModel.fee)>=40.5
 // LIMIT ~0 OFFSET 3
 
+// decltype (result4) == std::list<std::tuple<Nullable<..>, ..>>
 // result4 = [(73, "July_73", 23.25),
 //            (74, "July_74", 24.25)]
 
@@ -429,8 +477,13 @@ auto result5 = mapper.Query (OrderModel {})
 //      WHERE (UserModel.user_id>=65)
 // LIMIT 4;
 
+// decltype (result5) == std::list<std::tuple<Nullable<..>, ..>>
 // result5 = [("Item 0", 50),
 //            ("Item 1", 50),
 //            ("July_65", 31),
 //            ("July_65", 32)]
 ```
+
+## Wrapping Up
+
+This little ORM is very cool, enjoy it. 😇

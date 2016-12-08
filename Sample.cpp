@@ -222,6 +222,8 @@ int main ()
 
 	// Select All to List
 	auto result1 = mapper.Query (UserModel {}).ToList ();
+
+	// decltype (result1) == std::list<UserModel>
 	// result1 = [{ 0, 0.2, "John", 21,   1000, null  },
 	//            { 1, 0.4, "Jack", null, null, "St." }]
 
@@ -287,6 +289,7 @@ int main ()
 	// ORDER BY age DESC, user_id
 	// LIMIT 3 OFFSET 1
 
+	// decltype (result2) == std::vector<UserModel>
 	// result2 = [{ 89, 17.8, "July_89", 34, null, "Mr. 19" },
 	//            { 86, 17.2, "July_86", 33, null, "Mr. 16" },
 	//            { 87, 17.4, "July_87", 33, null, "Mr. 17" }]
@@ -311,6 +314,10 @@ int main ()
 	// WHERE (user_name NOT LIKE 'July%')
 
 	// count = 2
+
+	/*
+		## Update / Delete by Statement
+	*/
 
 	// Update by Condition
 	mapper.Update (
@@ -361,7 +368,6 @@ int main ()
 		.Where (field (user.user_id) >= 65);
 
 	// Get Result to List
-	// Results are Nullable-Tuples
 	auto result3 = joinedQuery.ToList ();
 
 	// Remarks:
@@ -372,6 +378,7 @@ int main ()
 	//               ON SellerModel.seller_id=OrderModel.seller_id
 	// WHERE (UserModel.user_id>=65)
 
+	// decltype (result3) == std::list<std::tuple<Nullable<..>, ..>>
 	// result3 = [(65, "July_65", 13, null, null, null,
 	//             31, 65, 57, "Item 30", 15,
 	//             57, "Seller 7", 3.14),
@@ -381,7 +388,6 @@ int main ()
 	//            ... ]
 
 	// Group & Having ~
-	// Results are Nullable-Tuples
 	auto result4 = joinedQuery
 		.Select (field (order.user_id),
 				 field (user.user_name),
@@ -405,6 +411,7 @@ int main ()
 	// HAVING SUM (OrderModel.fee)>=40.5
 	// LIMIT ~0 OFFSET 3
 
+	// decltype (result4) == std::list<std::tuple<Nullable<..>, ..>>
 	// result4 = [(73, "July_73", 23.25),
 	//            (74, "July_74", 24.25)]
 
@@ -436,6 +443,7 @@ int main ()
 	//      WHERE (UserModel.user_id>=65)
 	// LIMIT 4;
 
+	// decltype (result5) == std::list<std::tuple<Nullable<..>, ..>>
 	// result5 = [("Item 0", 50),
 	//            ("Item 1", 50),
 	//            ("July_65", 31),
