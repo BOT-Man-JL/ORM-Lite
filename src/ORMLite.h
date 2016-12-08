@@ -233,24 +233,19 @@ namespace BOT_ORM_Impl
 	};
 
 	// Checking Injection
-	// https://stackoverflow.com/questions/87372/check-if-a-class-has-a-member-function-of-a-given-signature
-
 	template<typename T> class HasInjected
 	{
-		template<typename U> struct SFINAE {};
-		template<typename U> static constexpr std::true_type Test (
-			SFINAE<decltype (U::__TableName)>*)
-		{
-			return std::true_type {};
-		}
-		template<typename U> static constexpr std::false_type Test (...)
-		{
-			return std::false_type {};
-		}
+		template <typename...> struct void_t_Tester { using type = void; };
+		template <typename... _Types>
+		using void_t = typename void_t_Tester<_Types...>::type;
+
+		template<typename, typename = void_t<>>
+		struct Test : std::false_type {};
+		template<typename U>
+		struct Test <U, void_t<decltype (U::__TableName)>>
+			: std::true_type {};
 	public:
-		static constexpr bool value =
-			decltype (Test<std::remove_reference_t<
-					  std::remove_cv_t<T>>> (nullptr))::value;
+		static constexpr bool value = Test<T>::value;
 	};
 
 	// Helper - Serialize
