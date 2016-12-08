@@ -484,6 +484,6 @@ int main ()
 	PrintHelper::PrintTuples (result4);
 	PrintHelper::PrintTuples (result5);
 
-	std::cin.get ();
+	//std::cin.get ();
 	return 0;
 }

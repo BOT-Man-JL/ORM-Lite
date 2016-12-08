@@ -318,50 +318,6 @@ namespace BOT_ORM_Impl
 			property = nullptr;
 	}
 
-	// Helper - Get TypeString
-
-	template <typename T>
-	const char *TypeString (const T &)
-	{
-		constexpr static const char *typeStr =
-			(std::is_integral<T>::value &&
-			 !std::is_same<std::remove_cv_t<T>, char>::value &&
-			 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
-			 !std::is_same<std::remove_cv_t<T>, char16_t>::value &&
-			 !std::is_same<std::remove_cv_t<T>, char32_t>::value &&
-			 !std::is_same<std::remove_cv_t<T>, unsigned char>::value)
-			? "integer not null"
-			: (std::is_floating_point<T>::value)
-			? "real not null"
-			: (std::is_same<std::remove_cv_t<T>, std::string>::value)
-			? "text not null"
-			: nullptr;
-
-		static_assert (typeStr != nullptr, BAD_TYPE);
-		return typeStr;
-	}
-
-	template <typename T>
-	const char *TypeString (const BOT_ORM::Nullable<T> &)
-	{
-		constexpr static const char *typeStr =
-			(std::is_integral<T>::value &&
-			 !std::is_same<std::remove_cv_t<T>, char>::value &&
-			 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
-			 !std::is_same<std::remove_cv_t<T>, char16_t>::value &&
-			 !std::is_same<std::remove_cv_t<T>, char32_t>::value &&
-			 !std::is_same<std::remove_cv_t<T>, unsigned char>::value)
-			? "integer"
-			: (std::is_floating_point<T>::value)
-			? "real"
-			: (std::is_same<std::remove_cv_t<T>, std::string>::value)
-			? "text"
-			: nullptr;
-
-		static_assert (typeStr != nullptr, BAD_TYPE);
-		return typeStr;
-	}
-
 	// Injected Helper
 
 	struct InjectedHelper
@@ -760,66 +716,75 @@ namespace BOT_ORM
 				"(" + refered.fields + ")" };
 		}
 	};
+
+	template <typename T>
+	class Queryable;
 }
 
 namespace BOT_ORM_Impl
 {
-	template <typename T>
-	using Nullable = BOT_ORM::Nullable<T>;
-
-	template <typename T>
-	using Selectable = BOT_ORM::Expression::Selectable<T>;
-
-	// To Nullable
-	// Get Nullable Value Wrappers for non-nullable Types
-	template <typename T>
-	inline auto FieldToNullable (const T &val)
-	{ return Nullable<T> (val); }
-
-	template <typename T>
-	inline auto FieldToNullable (const Nullable<T> &val)
-	{ return val; }
-
-	template <typename TupleType, size_t N>
-	struct TupleHelper
-	{
-		// Tuple Nullable Cater
-		static inline auto ToNullable (const TupleType &tuple)
-		{
-			return std::tuple_cat (
-				TupleHelper<TupleType, N - 1>::ToNullable (tuple),
-				std::make_tuple (FieldToNullable (std::get<N - 1> (tuple)))
-			);
-		}
-
-		// Tuple Visitor
-		template <typename Fn>
-		static inline void Visit (TupleType &tuple, Fn fn)
-		{
-			TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
-			fn (std::get<N - 1> (tuple));
-		}
-	};
-
-	template <typename TupleType>
-	struct TupleHelper <TupleType, 1>
-	{
-		static inline auto ToNullable (const TupleType &tuple)
-		{
-			return std::make_tuple (
-				FieldToNullable (std::get<0> (tuple)));
-		}
-
-		template <typename Fn>
-		static inline void Visit (TupleType &tuple, Fn fn)
-		{
-			fn (std::get<0> (tuple));
-		}
-	};
+	// Why Remove QueryableHelper from Query?
+	// Query is a template but the Helper can be shared...
 
 	class QueryableHelper
 	{
-	public:
+		template <typename T>
+		using Nullable = BOT_ORM::Nullable<T>;
+
+		template <typename T>
+		using Selectable = BOT_ORM::Expression::Selectable<T>;
+
+	protected:
+		template <typename T>
+		friend class BOT_ORM::Queryable;
+
+		// To Nullable
+		// Get Nullable Value Wrappers for non-nullable Types
+		template <typename T>
+		static inline auto FieldToNullable (const T &val)
+		{ return Nullable<T> (val); }
+
+		template <typename T>
+		static inline auto FieldToNullable (const Nullable<T> &val)
+		{ return val; }
+
+		template <typename TupleType, size_t N>
+		struct TupleHelper
+		{
+			// Tuple Nullable Cater
+			static inline auto ToNullable (const TupleType &tuple)
+			{
+				return std::tuple_cat (
+					TupleHelper<TupleType, N - 1>::ToNullable (tuple),
+					std::make_tuple (FieldToNullable (std::get<N - 1> (tuple)))
+				);
+			}
+
+			// Tuple Visitor
+			template <typename Fn>
+			static inline void Visit (TupleType &tuple, Fn fn)
+			{
+				TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
+				fn (std::get<N - 1> (tuple));
+			}
+		};
+
+		template <typename TupleType>
+		struct TupleHelper <TupleType, 1>
+		{
+			static inline auto ToNullable (const TupleType &tuple)
+			{
+				return std::make_tuple (
+					FieldToNullable (std::get<0> (tuple)));
+			}
+
+			template <typename Fn>
+			static inline void Visit (TupleType &tuple, Fn fn)
+			{
+				fn (std::get<0> (tuple));
+			}
+		};
+
 		// Flaten Arguments into Tuple
 		template <typename C>
 		static inline auto JoinToTuple (const C &arg)
@@ -838,10 +803,9 @@ namespace BOT_ORM_Impl
 			// TupleHelper::ToNullable is not necessary
 			return t;
 		}
-
 		template <typename Arg, typename... Args>
 		static inline auto JoinToTuple (const Arg &arg,
-								 const Args & ... args)
+										const Args & ... args)
 		{
 			return std::tuple_cat (JoinToTuple (arg),
 								   JoinToTuple (args...));
@@ -1167,7 +1131,8 @@ namespace BOT_ORM
 								[&] (int, char **argv, char **)
 			{
 				size_t index = 0;
-				BOT_ORM_Impl::TupleHelper<QueryResult, sizeof... (Args)>
+				BOT_ORM_Impl::QueryableHelper::TupleHelper
+					<QueryResult, sizeof... (Args)>
 					::Visit (copy, [&argv, &index] (auto &val)
 				{
 					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
@@ -1223,7 +1188,7 @@ namespace BOT_ORM
 			{
 				fieldFixes.emplace (fields[index++],
 									std::string (" ") +
-									BOT_ORM_Impl::TypeString (val));
+									_TypeString (val));
 				return true;
 			});
 			fieldFixes[fields[0]] += " primary key";
@@ -1401,6 +1366,48 @@ namespace BOT_ORM
 
 	protected:
 		BOT_ORM_Impl::SQLConnector _connector;
+
+		template <typename T>
+		static inline const char *_TypeString (const T &)
+		{
+			constexpr static const char *typeStr =
+				(std::is_integral<T>::value &&
+				 !std::is_same<std::remove_cv_t<T>, char>::value &&
+				 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
+				 !std::is_same<std::remove_cv_t<T>, char16_t>::value &&
+				 !std::is_same<std::remove_cv_t<T>, char32_t>::value &&
+				 !std::is_same<std::remove_cv_t<T>, unsigned char>::value)
+				? "integer not null"
+				: (std::is_floating_point<T>::value)
+				? "real not null"
+				: (std::is_same<std::remove_cv_t<T>, std::string>::value)
+				? "text not null"
+				: nullptr;
+
+			static_assert (typeStr != nullptr, BAD_TYPE);
+			return typeStr;
+		}
+
+		template <typename T>
+		static inline const char *_TypeString (const BOT_ORM::Nullable<T> &)
+		{
+			constexpr static const char *typeStr =
+				(std::is_integral<T>::value &&
+				 !std::is_same<std::remove_cv_t<T>, char>::value &&
+				 !std::is_same<std::remove_cv_t<T>, wchar_t>::value &&
+				 !std::is_same<std::remove_cv_t<T>, char16_t>::value &&
+				 !std::is_same<std::remove_cv_t<T>, char32_t>::value &&
+				 !std::is_same<std::remove_cv_t<T>, unsigned char>::value)
+				? "integer"
+				: (std::is_floating_point<T>::value)
+				? "real"
+				: (std::is_same<std::remove_cv_t<T>, std::string>::value)
+				? "text"
+				: nullptr;
+
+			static_assert (typeStr != nullptr, BAD_TYPE);
+			return typeStr;
+		}
 
 		void _GetConstraints (
 			std::string &,
