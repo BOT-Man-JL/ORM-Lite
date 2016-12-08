@@ -233,15 +233,15 @@ namespace BOT_ORM_Impl
 	};
 
 	// Checking Injection
-	template<typename T> class HasInjected
+	template <typename T> class HasInjected
 	{
 		template <typename...> struct void_t_Tester { using type = void; };
 		template <typename... _Types>
 		using void_t = typename void_t_Tester<_Types...>::type;
 
-		template<typename, typename = void_t<>>
+		template <typename, typename = void_t<>>
 		struct Test : std::false_type {};
-		template<typename U>
+		template <typename U>
 		struct Test <U, void_t<decltype (U::__TableName)>>
 			: std::true_type {};
 	public:

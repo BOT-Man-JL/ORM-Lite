@@ -213,7 +213,7 @@ int main ()
 	{
 		// If any statement Failed, throw an exception
 
-		std::cerr << ex.what () << std::endl;
+		std::cout << ex.what () << std::endl;
 		// SQL error: 'UNIQUE constraint failed: UserModel.id'
 
 		// Remarks:
@@ -235,7 +235,7 @@ int main ()
 	}
 	catch (const std::exception &ex)
 	{
-		std::cerr << ex.what () << std::endl;
+		std::cout << ex.what () << std::endl;
 		// SQL error: 'CHECK constraint failed: SellerModel'
 	}
 
