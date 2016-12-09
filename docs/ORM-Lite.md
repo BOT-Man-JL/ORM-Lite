@@ -16,7 +16,7 @@
 | Tuple (in `SELECT`) | `std::tuple` | Deduced by `Join` / `Select` |
 |              Column |        Field | Decuced by `Field` |
 
-## `BOT_ORM` Modules
+## `BOT_ORM`
 
 ``` cpp
 #include "ORMLite.h"
@@ -26,7 +26,7 @@ using namespace BOT_ORM::Expression;
 
 Macro `ORMAP` in `ORMLite.h`
 
-- `ORMAP (TableName, field1, field2, ...);`
+- `ORMAP (TableName, PrimaryKey, ...);`
 
 Modules under `namespace BOT_ORM`
 
@@ -58,7 +58,7 @@ Static Modules under `class BOT_ORM::Constraint`
 - `BOT_ORM::Constraint::Unique`
 - `BOT_ORM::Constraint::Reference`
 
-## Macro `ORMAP`
+## `ORMAP (TableName, PrimaryKey, ...)`
 
 Before we use ORM Lite, we should **Inject** some code into the Class;
 
@@ -79,7 +79,7 @@ struct MyClass
 };
 ```
 
-In this Sample, `ORMAP ("TableName", ...)` specifies that:
+In this Sample, `ORMAP ("TableName", field1, ...)` specifies that:
 - Class `MyClass` will be mapped into Table `TableName`;
 - `field1, field2, field3, field4, field5, field6` will be mapped
   into `INTEGER field1 NOT NULL`, `REAL field2 NOT NULL`,
@@ -89,6 +89,8 @@ In this Sample, `ORMAP ("TableName", ...)` specifies that:
   of the Table;
 
 Note that:
+- You should Pass **at least 2** Params into this Macro
+  (TableName and PrimaryKey), otherwise it will Not Compile...;
 - Currently Only Support
   - T such that `std::is_integral<T>::value == true`
     and **NOT** `char` or `*char_t`
@@ -303,6 +305,8 @@ Remarks:
 - Delete Entry in Table `MyClass` with the Same **Primary Key**;
 - Delete Where `whereExpr` for Table `MyClass`
   (`Expression` will be described later);
+- This function will **NOT** throw a `std::runtime_error`
+  even if there is nothing to delete;
 
 SQL:
 
