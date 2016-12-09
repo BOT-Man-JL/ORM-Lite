@@ -23,7 +23,7 @@
 
 // Public Macro
 
-#define ORMAP(_TABLE_NAME_, _PK_, ...)                    \
+#define ORMAP(_TABLE_NAME_, ...)                          \
 private:                                                  \
 friend class BOT_ORM::ORMapper;                           \
 friend class BOT_ORM::FieldExtractor;                     \
@@ -32,8 +32,14 @@ friend class BOT_ORM::Queryable;                          \
 friend class BOT_ORM_Impl::QueryableHelper;               \
 template <typename T>                                     \
 friend class BOT_ORM_Impl::HasInjected;                   \
-auto &__PrimaryKey () { return _PK_; }                    \
-const auto &__PrimaryKey () const { return _PK_; }        \
+auto &__PrimaryKey ()                                     \
+{                                                         \
+return BOT_ORM_Impl::InjectedHelper::First (__VA_ARGS__); \
+}                                                         \
+auto &__PrimaryKey () const                               \
+{                                                         \
+return BOT_ORM_Impl::InjectedHelper::First (__VA_ARGS__); \
+}                                                         \
 template <typename FN>                                    \
 void __Accept (FN fn)                                     \
 {                                                         \
@@ -46,13 +52,13 @@ void __Accept (FN fn) const                               \
 }                                                         \
 auto __Tuple () const                                     \
 {                                                         \
-    return std::make_tuple (_PK_, __VA_ARGS__);           \
+    return std::make_tuple (__VA_ARGS__);                 \
 }                                                         \
 static const std::vector<std::string> &__FieldNames ()    \
 {                                                         \
     static const std::vector<std::string> _fieldNames {   \
         BOT_ORM_Impl::InjectedHelper::ExtractFieldName (  \
-        #_PK_ "," #__VA_ARGS__) };                        \
+            #__VA_ARGS__) };                              \
     return _fieldNames;                                   \
 }                                                         \
 constexpr static const char *__TableName =  _TABLE_NAME_; \
@@ -337,8 +343,14 @@ namespace BOT_ORM_Impl
 			return ret;
 		};
 
-		template <typename Fn, typename... Args>
-		static inline void Visit (Fn fn, Args & ... args)
+		template <typename Arg, typename... Args>
+		static inline auto &First (Arg &arg, Args & ...)
+		{
+			return arg;
+		}
+
+		template <typename Fn, typename Arg, typename... Args>
+		static inline void Visit (Fn fn, Arg &, Args & ... args)
 		{
 			_Visit (fn, args...);
 		}
