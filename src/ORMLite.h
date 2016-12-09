@@ -447,8 +447,8 @@ namespace BOT_ORM
 				: Selectable<T> (std::move (function), nullptr) {}
 
 			Aggregate (std::string function, const Field<T> &field)
-				: Selectable<T> { function + "(" + field.prefixStr +
-				"." + field.fieldName + ")", nullptr } {}
+				: Selectable<T> (function + "(" + field.prefixStr +
+				"." + field.fieldName + ")", nullptr) {}
 		};
 
 		// Expr
