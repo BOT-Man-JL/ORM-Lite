@@ -12,8 +12,7 @@ written in Modern C++ style.
 
 - [Easy to Use](Sample.cpp)
 - [Header Only](src/ORMLite.h)
-- Compile-time Templates
-- Strong Typed
+- Powerful Compile-time **Type Deduction**
 - User Friendly Compile Error Prompt
 
 ## Documentation

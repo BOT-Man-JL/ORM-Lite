@@ -235,10 +235,12 @@ void InsertRange (const Container<MyClass> &entities, bool withId = true);
 
 Remarks:
 - Insert `entity` / `entities` into Table for `MyClass`;
-- If `withId` is `false`, it will insert the `entity` with
-  `NULL` for the **Primary Key**;
+- If `withId` is `false`, it will insert the `entity`
+  without **Primary Key**;
   - Note that: **Primary Key** is recommended to be **Integral**
-    in this case (Floating Point / String may failed);
+    in this case (**INT PK** would be `AUTOINCREMENT`,
+    Floating Point / String may **Failed**);
+- **NULL** Fields will **NOT** be Set;
 - `entities` must **SUPPORT** `forward_iterator`;
 
 SQL:
@@ -271,6 +273,7 @@ Remarks:
   with the Same **Primary Key**;
 - Update Set `setExpr` Where `whereExpr` for Table `MyClass`
   (`Expressions` will be described later);
+- **NULL** Fields will also be Set;
 - `entities` must **SUPPORT** `forward_iterator`;
 
 SQL:

@@ -487,3 +487,5 @@ auto result5 = mapper.Query (OrderModel {})
 ## Wrapping Up
 
 This little ORM is very cool, enjoy it. 😇
+
+See the **[Full Document Here](ORM-Lite.md)**.
