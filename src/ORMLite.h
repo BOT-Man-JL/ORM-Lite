@@ -1278,7 +1278,7 @@ namespace BOT_ORM
 				if (_GetUpdate (osTmp, entity))
 				{
 					os << osTmp.str ();
-					osTmp.seekp (std::streampos (0));
+					osTmp.str (std::string {});  // Flush the previous one
 				}
 			auto sql = os.str ();
 			if (!sql.empty ()) _connector.Execute (sql);
