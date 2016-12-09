@@ -25,6 +25,9 @@
 
 #define ORMAP(_TABLE_NAME_, _PK_, ...)                    \
 private:                                                  \
+static_assert (std::tuple_size<decltype (                 \
+std::make_tuple (_PK_, __VA_ARGS__))>::value > 1,         \
+"ORMAP Accepts more than 2 Arguments");                   \
 friend class BOT_ORM::ORMapper;                           \
 friend class BOT_ORM::FieldExtractor;                     \
 template <typename T>                                     \
@@ -33,7 +36,7 @@ friend class BOT_ORM_Impl::QueryableHelper;               \
 template <typename T>                                     \
 friend class BOT_ORM_Impl::HasInjected;                   \
 auto &__PrimaryKey () { return _PK_; }                    \
-auto &__PrimaryKey () const { return _PK_; }              \
+const auto &__PrimaryKey () const { return _PK_; }        \
 template <typename FN>                                    \
 void __Accept (FN fn)                                     \
 {                                                         \
@@ -617,11 +620,13 @@ namespace BOT_ORM
 	class Constraint
 	{
 	protected:
-		std::string field;
 		std::string constraint;
+		std::string field;
 
-		Constraint (std::string _field, std::string _constraint)
-			: field (_field), constraint (_constraint) {}
+		Constraint (std::string &&_constraint,
+					std::string _field = std::string {})
+			: constraint (_constraint), field (std::move (_field))
+		{}
 
 		friend class ORMapper;
 
@@ -667,29 +672,26 @@ namespace BOT_ORM
 		{
 			std::ostringstream os;
 			BOT_ORM_Impl::SerializeValue (os << " default ", value);
-			return Constraint { field.fieldName, os.str () };
+			return Constraint { os.str (), field.fieldName };
 		}
 
 		static inline Constraint Check (
 			const Expression::Expr &expr)
 		{
-			return Constraint { "",
-				"check (" + expr.ToString (false) + ")" };
+			return Constraint { "check (" + expr.ToString (false) + ")" };
 		}
 
 		template <typename T>
 		static inline Constraint Unique (
 			const Expression::Field<T> &field)
 		{
-			return Constraint { "",
-				"unique (" + field.fieldName + ")" };
+			return Constraint { "unique (" + field.fieldName + ")" };
 		}
 
 		static inline Constraint Unique (
 			const CompositeField &fields)
 		{
-			return Constraint { "",
-				"unique (" + fields.fields + ")" };
+			return Constraint { "unique (" + fields.fields + ")" };
 		}
 
 		template <typename T>
@@ -697,7 +699,7 @@ namespace BOT_ORM
 			const Expression::Field<T> &field,
 			const Expression::Field<T> &refered)
 		{
-			return Constraint { "",
+			return Constraint {
 				std::string ("foreign key (") + field.fieldName +
 				") references " + refered.prefixStr +
 				"(" + refered.fieldName + ")" };
@@ -707,7 +709,7 @@ namespace BOT_ORM
 			const CompositeField &field,
 			const CompositeField &refered)
 		{
-			return Constraint { "",
+			return Constraint {
 				std::string ("foreign key (") + field.fields +
 				") references " + refered.table +
 				"(" + refered.fields + ")" };
@@ -870,12 +872,12 @@ namespace BOT_ORM
 				   std::string sqlFrom,
 				   std::string sqlSelect = "select ",
 				   std::string sqlTarget = "*",
-				   std::string sqlWhere = "",
-				   std::string sqlGroupBy = "",
-				   std::string sqlHaving = "",
-				   std::string sqlOrderBy = "",
-				   std::string sqlLimit = "",
-				   std::string sqlOffset = "")
+				   std::string sqlWhere = std::string {},
+				   std::string sqlGroupBy = std::string {},
+				   std::string sqlHaving = std::string {},
+				   std::string sqlOrderBy = std::string {},
+				   std::string sqlLimit = std::string {},
+				   std::string sqlOffset = std::string {})
 			:
 			_connector (connector),
 			_queryHelper (std::move (queryHelper)),
