@@ -1222,8 +1222,8 @@ namespace BOT_ORM
 			Insert (const C &entity, bool withId = true)
 		{
 			std::ostringstream os;
-			if (_GetInsert (os, entity, withId))
-				_connector.Execute (os.str ());
+			_GetInsert (os, entity, withId);
+			_connector.Execute (os.str ());
 		}
 
 		template <typename In, typename C = typename In::value_type>
@@ -1237,15 +1237,15 @@ namespace BOT_ORM
 		std::enable_if_t<BOT_ORM_Impl::HasInjected<C>::value>
 			InsertRange (const In &entities, bool withId = true)
 		{
-			std::ostringstream os, osTmp;
+			std::ostringstream os;
+			auto anyEntity = false;
 			for (const auto &entity : entities)
-				if (_GetInsert (osTmp, entity, withId))
-				{
-					os << osTmp.str ();
-					osTmp.seekp (std::streampos (0));
-				}
-			auto sql = os.str ();
-			if (!sql.empty ()) _connector.Execute (sql);
+			{
+				_GetInsert (os, entity, withId);
+				anyEntity = true;
+			}
+			if (anyEntity)
+				_connector.Execute (os.str ());
 		}
 
 		template <typename C>
@@ -1422,7 +1422,7 @@ namespace BOT_ORM
 		}
 
 		template <typename C>
-		bool _GetInsert (std::ostream &os, const C &entity, bool withId)
+		void _GetInsert (std::ostream &os, const C &entity, bool withId)
 		{
 			const auto &fieldNames = C::__FieldNames ();
 			std::ostringstream osVal;
@@ -1454,14 +1454,19 @@ namespace BOT_ORM
 				index++;
 			});
 
-			if (!anyField) return false;
-
-			os.seekp (os.tellp () - std::streamoff (1));
-			osVal.seekp (osVal.tellp () - std::streamoff (1));
+			if (anyField)
+			{
+				os.seekp (os.tellp () - std::streamoff (1));
+				osVal.seekp (osVal.tellp () - std::streamoff (1));
+			}
+			else  // Fix for No Field for Insert...
+			{
+				os << fieldNames[0];
+				osVal << "null";
+			}
 
 			osVal << ");";  // Enable Seekp...
 			os << ") values (" << osVal.str ();
-			return true;
 		}
 
 		template <typename C>
@@ -1485,7 +1490,8 @@ namespace BOT_ORM
 				anyField = true;
 			});
 
-			if (!anyField) return false;
+			if (!anyField)     // 'os' is ill-formed
+				return false;  // Only Primary Key in ORMAP
 
 			os.seekp (os.tellp () - std::streamoff (1));
 
