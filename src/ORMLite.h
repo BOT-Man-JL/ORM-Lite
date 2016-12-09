@@ -406,7 +406,7 @@ namespace BOT_ORM
 		{
 			Field (std::string fieldName,
 				   const char *tableName)
-				: Selectable<T> { std::move (fieldName), tableName } {}
+				: Selectable<T> (std::move (fieldName), tableName) {}
 
 			inline SetExpr operator = (T value)
 			{
@@ -424,7 +424,7 @@ namespace BOT_ORM
 		{
 			NullableField (std::string fieldName,
 						   const char *tableName)
-				: Field<T> { std::move (fieldName), tableName } {}
+				: Field<T> (std::move (fieldName), tableName) {}
 
 			inline SetExpr operator = (T value)
 			{
@@ -444,7 +444,7 @@ namespace BOT_ORM
 		struct Aggregate : public Selectable<T>
 		{
 			Aggregate (std::string function)
-				: Selectable<T> { std::move (function), nullptr } {}
+				: Selectable<T> (std::move (function), nullptr) {}
 
 			Aggregate (std::string function, const Field<T> &field)
 				: Selectable<T> { function + "(" + field.prefixStr +
