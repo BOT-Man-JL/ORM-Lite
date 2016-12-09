@@ -25,9 +25,6 @@
 
 #define ORMAP(_TABLE_NAME_, _PK_, ...)                    \
 private:                                                  \
-static_assert (std::tuple_size<decltype (                 \
-std::make_tuple (_PK_, __VA_ARGS__))>::value > 1,         \
-"ORMAP Accepts more than 2 Arguments");                   \
 friend class BOT_ORM::ORMapper;                           \
 friend class BOT_ORM::FieldExtractor;                     \
 template <typename T>                                     \
@@ -333,7 +330,7 @@ namespace BOT_ORM_Impl
 					tmpStr += ch;
 				else if (ch == ',')
 				{
-					ret.push_back (tmpStr);
+					if (!tmpStr.empty ()) ret.push_back (tmpStr);
 					tmpStr.clear ();
 				}
 			}
@@ -349,16 +346,10 @@ namespace BOT_ORM_Impl
 	protected:
 		template <typename Fn, typename T, typename... Args>
 		static inline void _Visit (Fn fn, T &property, Args & ... args)
-		{
-			_Visit (fn, property);
-			_Visit (fn, args...);
-		}
+		{ fn (property); _Visit (fn, args...); }
 
-		template <typename Fn, typename T>
-		static inline void _Visit (Fn fn, T &property)
-		{
-			fn (property);
-		}
+		template <typename Fn>
+		static inline void _Visit (Fn fn) {}
 	};
 }
 
@@ -1231,8 +1222,8 @@ namespace BOT_ORM
 			Insert (const C &entity, bool withId = true)
 		{
 			std::ostringstream os;
-			_GetInsert (os, entity, withId);
-			_connector.Execute (os.str ());
+			if (_GetInsert (os, entity, withId))
+				_connector.Execute (os.str ());
 		}
 
 		template <typename In, typename C = typename In::value_type>
@@ -1246,10 +1237,15 @@ namespace BOT_ORM
 		std::enable_if_t<BOT_ORM_Impl::HasInjected<C>::value>
 			InsertRange (const In &entities, bool withId = true)
 		{
-			std::ostringstream os;
+			std::ostringstream os, osTmp;
 			for (const auto &entity : entities)
-				_GetInsert (os, entity, withId);
-			_connector.Execute (os.str ());
+				if (_GetInsert (osTmp, entity, withId))
+				{
+					os << osTmp.str ();
+					osTmp.seekp (std::streampos (0));
+				}
+			auto sql = os.str ();
+			if (!sql.empty ()) _connector.Execute (sql);
 		}
 
 		template <typename C>
@@ -1263,8 +1259,8 @@ namespace BOT_ORM
 			Update (const C &entity)
 		{
 			std::ostringstream os;
-			_GetUpdate (os, entity);
-			_connector.Execute (os.str ());
+			if (_GetUpdate (os, entity))
+				_connector.Execute (os.str ());
 		}
 
 		template <typename In, typename C = typename In::value_type>
@@ -1277,10 +1273,15 @@ namespace BOT_ORM
 		std::enable_if_t<BOT_ORM_Impl::HasInjected<C>::value>
 			UpdateRange (const In &entities)
 		{
-			std::ostringstream os;
+			std::ostringstream os, osTmp;
 			for (const auto &entity : entities)
-				_GetUpdate (os, entity);
-			_connector.Execute (os.str ());
+				if (_GetUpdate (osTmp, entity))
+				{
+					os << osTmp.str ();
+					osTmp.seekp (std::streampos (0));
+				}
+			auto sql = os.str ();
+			if (!sql.empty ()) _connector.Execute (sql);
 		}
 
 		template <typename C>
@@ -1421,11 +1422,14 @@ namespace BOT_ORM
 		}
 
 		template <typename C>
-		void _GetInsert (std::ostream &os, const C &entity, bool withId)
+		bool _GetInsert (std::ostream &os, const C &entity, bool withId)
 		{
 			const auto &fieldNames = C::__FieldNames ();
 			std::ostringstream osVal;
 			os << "insert into " << std::string (C::__TableName) << "(";
+
+			// Avoid Bad Eating of ,
+			bool anyField = false;
 
 			// Priamry Key
 			if (withId &&
@@ -1433,50 +1437,64 @@ namespace BOT_ORM
 			{
 				os << fieldNames[0] << ",";
 				osVal << ",";
+				anyField = true;
 			}
 
 			// The Rest
 			size_t index = 1;
-			entity.__Accept ([&osVal, &os, &index, &fieldNames] (auto &val)
+			entity.__Accept (
+				[&osVal, &os, &index, &anyField, &fieldNames] (auto &val)
 			{
 				if (BOT_ORM_Impl::SerializeValue (osVal, val))
 				{
 					os << fieldNames[index] << ",";
 					osVal << ",";
+					anyField = true;
 				}
 				index++;
 			});
+
+			if (!anyField) return false;
 
 			os.seekp (os.tellp () - std::streamoff (1));
 			osVal.seekp (osVal.tellp () - std::streamoff (1));
 
 			osVal << ");";  // Enable Seekp...
 			os << ") values (" << osVal.str ();
+			return true;
 		}
 
 		template <typename C>
-		void _GetUpdate (std::ostream &os, const C &entity) const
+		bool _GetUpdate (std::ostream &os, const C &entity) const
 		{
 			const auto &fieldNames = C::__FieldNames ();
 			os << "update " << C::__TableName << " set ";
 
+			// Avoid Bad Eating of ,
+			bool anyField = false;
+
 			// The Rest
 			size_t index = 1;
-			entity.__Accept ([&os, &index, &fieldNames] (auto &val)
+			entity.__Accept (
+				[&os, &index, &anyField, &fieldNames] (auto &val)
 			{
 				os << fieldNames[index++] << "=";
 				if (!BOT_ORM_Impl::SerializeValue (os, val))
 					os << "null";
 				os << ",";
+				anyField = true;
 			});
 
-			// Primary Key
-			os.seekp (os.tellp () - std::streamoff (1));
-			os << " where " << fieldNames[0] << "=";
+			if (!anyField) return false;
 
+			os.seekp (os.tellp () - std::streamoff (1));
+
+			// Primary Key
+			os << " where " << fieldNames[0] << "=";
 			if (!BOT_ORM_Impl::SerializeValue (os, entity.__PrimaryKey ()))
 				os << "null";
 			os << ";";
+			return true;
 		}
 	};
 
@@ -1484,7 +1502,7 @@ namespace BOT_ORM
 
 	class FieldExtractor
 	{
-		using pair_type = std::pair<std::string, const char *>;
+		using pair_type = std::pair<const std::string &, const char *>;
 
 		template <typename C>
 		std::enable_if_t<!BOT_ORM_Impl::HasInjected<C>::value>
