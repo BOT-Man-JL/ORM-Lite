@@ -740,6 +740,29 @@ namespace BOT_ORM_Impl
 		template <typename T>
 		friend class BOT_ORM::Queryable;
 
+		// #1 Tuple Visitor
+		// http://stackoverflow.com/questions/26902633/how-to-iterate-over-a-tuple-in-c-11/26902803#26902803
+
+		// Apply 'Fn' to each of element of Tuple
+		template <typename Fn, typename TupleType, std::size_t... I>
+		static inline void TupleVisit_Impl (
+			TupleType &tuple, Fn fn, std::index_sequence<I...>)
+		{
+			// C++ 14 Unpacking Tricks :-)
+			using expander = int[];
+			(void) expander { 0, ((void) fn (std::get<I> (tuple)), 0)... };
+		}
+		// Produce the 'index_sequence' for 'tuple'
+		template <typename Fn, typename TupleType>
+		static inline void TupleVisit (TupleType &tuple, Fn fn)
+		{
+			constexpr auto size = std::tuple_size<TupleType>::value;
+			return TupleVisit_Impl (tuple, fn,
+									std::make_index_sequence<size> {});
+		}
+
+		// #2 Join To Tuple
+
 		// Type To Nullable
 		// Get Nullable Type Wrappers for Non-nullable Types
 		template <typename T> struct TypeToNullable
@@ -758,7 +781,7 @@ namespace BOT_ORM_Impl
 		// Apply 'TypeToNullable' to each element of Tuple
 		template <typename... Args>
 		static inline auto TupleToNullable (
-			const std::tuple<Args...> &tuple)
+			const std::tuple<Args...> &)
 		{
 			// C++ 14 Unpacking Tricks :-)
 			// Expand each of 'Args'
@@ -768,75 +791,58 @@ namespace BOT_ORM_Impl
 			> {};
 		}
 
-		template <typename TupleType, size_t N>
-		struct TupleHelper
-		{
-			// Tuple Visitor
-			template <typename Fn>
-			static inline void Visit (TupleType &tuple, Fn fn)
-			{
-				TupleHelper<TupleType, N - 1>::Visit (tuple, fn);
-				fn (std::get<N - 1> (tuple));
-			}
-		};
-
-		template <typename TupleType>
-		struct TupleHelper <TupleType, 1>
-		{
-			template <typename Fn>
-			static inline void Visit (TupleType &tuple, Fn fn)
-			{
-				fn (std::get<0> (tuple));
-			}
-		};
-
-		// Flaten Arguments into Tuple
+		// QueryResult To Nullable
 		template <typename C>
-		static inline auto JoinToTuple (const C &arg)
+		static inline auto QueryResultToTuple (const C &arg)
 		{
 			// Injected friend
 			return TupleToNullable (arg.__Tuple ());
 		}
 		template <typename... Args>
-		static inline auto JoinToTuple (const std::tuple<Args...>& t)
+		static inline auto QueryResultToTuple (
+			const std::tuple<Args...>& t)
 		{
-			// TupleToNullable is not necessary:
-			// Only Joined Result is a tuple
+			// TupleToNullable is not necessary: Nullable already...
 			return t;
 		}
-		template <typename Arg, typename... Args>
-		static inline auto JoinToTuple (const Arg &arg,
-										const Args & ... args)
+
+		// Construct Tuple from QueryResult List
+		template <typename... Args>
+		static inline auto JoinToTuple (const Args & ... args)
 		{
-			return std::tuple_cat (JoinToTuple (arg),
-								   JoinToTuple (args...));
+			return decltype (std::tuple_cat (
+				QueryResultToTuple (args)...
+			)) {};
 		}
 
-		// Return Select Target Tuple from Selectable List
+		// #3 Select To Tuple
+
+		// Selectable To Tuple
 		template <typename T>
-		static inline auto SelectToTuple (const Selectable<T> &)
+		static inline auto SelectableToTuple (const Selectable<T> &)
 		{
-			return std::make_tuple (Nullable<T> {});
+			// Notes: Only 'const Selectable<T> &' will overload...
+			return Nullable<T> {};
 		}
 
-		template <typename T, typename... Args>
-		static inline auto SelectToTuple (const Selectable<T> &arg,
-										  const Args & ... args)
+		// Construct Tuple from Selectable<T> List
+		template <typename... Args>
+		static inline auto SelectToTuple (const Args & ... args)
 		{
-			return std::tuple_cat (SelectToTuple (arg),
-								   SelectToTuple (args...));
+			return std::tuple <
+				decltype (SelectableToTuple (args))...
+			> {};
 		}
+
+		// #4 Field To SQL
 
 		// Return Field Strings for GroupBy, OrderBy and Select
 		template <typename T>
 		static inline std::string FieldToSql (const Selectable<T> &op)
 		{
-			if (op.prefixStr)
-				return op.prefixStr + ("." + op.fieldName);
-			else
-				return op.fieldName;
+			if (op.prefixStr) return op.prefixStr + ("." + op.fieldName);
+			else return op.fieldName;
 		}
-
 		template <typename T, typename... Args>
 		static inline std::string FieldToSql (const Selectable<T> &arg,
 											  const Args & ... args)
@@ -1132,12 +1138,10 @@ namespace BOT_ORM
 								[&] (int, char **argv, char **)
 			{
 				size_t index = 0;
-				BOT_ORM_Impl::QueryableHelper::TupleHelper
-					<QueryResult, sizeof... (Args)>
-					::Visit (copy, [&argv, &index] (auto &val)
+				BOT_ORM_Impl::QueryableHelper::TupleVisit (
+					copy, [&argv, &index] (auto &val)
 				{
 					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
-					return true;
 				});
 				out.push_back (copy);
 			});
