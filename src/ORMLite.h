@@ -448,7 +448,7 @@ namespace BOT_ORM
 
 			Aggregate (std::string function, const Field<T> &field)
 				: Selectable<T> (function + "(" + field.prefixStr +
-				"." + field.fieldName + ")", nullptr) {}
+								 "." + field.fieldName + ")", nullptr) {}
 		};
 
 		// Expr
@@ -740,28 +740,46 @@ namespace BOT_ORM_Impl
 		template <typename T>
 		friend class BOT_ORM::Queryable;
 
-		// To Nullable
-		// Get Nullable Value Wrappers for non-nullable Types
+		// Type To Nullable
+		// Get Nullable Type Wrappers for Non-nullable Types
+		template <typename T> struct TypeToNullable
+		{
+			using type = Nullable<T>;
+		};
+		template <typename T> struct TypeToNullable <Nullable<T>>
+		{
+			using type = Nullable<T>;
+		};
 		template <typename T>
-		static inline auto FieldToNullable (const T &val)
-		{ return Nullable<T> (val); }
+		using TypeToNullable_t = typename TypeToNullable <
+			std::remove_cv_t<std::remove_reference_t<T>> >::type;
 
-		template <typename T>
-		static inline auto FieldToNullable (const Nullable<T> &val)
-		{ return val; }
+		// Tuple To Nullable Impl
+		// Apply 'TypeToNullable' to each element of Tuple
+		template <typename TupleType, std::size_t... I>
+		static inline auto TupleToNullable_Impl (const TupleType &,
+												 std::index_sequence<I...>)
+		{
+			// C++ 14 Unpacking Tricks :-)
+			// Apply 'I' to each of 'tuple_element' as a sequence
+			return std::tuple <
+				TypeToNullable_t<std::tuple_element_t<I, TupleType>>...
+			> {};
+		}
+
+		// Tuple To Nullable
+		// Produce the 'index_sequence' for 'tuple'
+		template <typename TupleType>
+		static inline auto TupleToNullable (const TupleType &tuple)
+		{
+			return TupleToNullable_Impl (
+				tuple,
+				std::make_index_sequence<std::tuple_size<TupleType>::value> {});
+		}
 
 		template <typename TupleType, size_t N>
 		struct TupleHelper
 		{
-			// Tuple Nullable Cater
-			static inline auto ToNullable (const TupleType &tuple)
-			{
-				return std::tuple_cat (
-					TupleHelper<TupleType, N - 1>::ToNullable (tuple),
-					std::make_tuple (FieldToNullable (std::get<N - 1> (tuple)))
-				);
-			}
-
 			// Tuple Visitor
 			template <typename Fn>
 			static inline void Visit (TupleType &tuple, Fn fn)
@@ -774,12 +792,6 @@ namespace BOT_ORM_Impl
 		template <typename TupleType>
 		struct TupleHelper <TupleType, 1>
 		{
-			static inline auto ToNullable (const TupleType &tuple)
-			{
-				return std::make_tuple (
-					FieldToNullable (std::get<0> (tuple)));
-			}
-
 			template <typename Fn>
 			static inline void Visit (TupleType &tuple, Fn fn)
 			{
@@ -792,17 +804,13 @@ namespace BOT_ORM_Impl
 		static inline auto JoinToTuple (const C &arg)
 		{
 			// Injected friend
-
-			using TupleType = decltype (arg.__Tuple ());
-			constexpr size_t size = std::tuple_size<TupleType>::value;
-
-			return TupleHelper<TupleType, size>::ToNullable (
-				arg.__Tuple ());
+			return TupleToNullable (arg.__Tuple ());
 		}
 		template <typename... Args>
 		static inline auto JoinToTuple (const std::tuple<Args...>& t)
 		{
-			// TupleHelper::ToNullable is not necessary
+			// TupleToNullable is not necessary:
+			// Only Joined Result is a tuple
 			return t;
 		}
 		template <typename Arg, typename... Args>
