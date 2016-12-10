@@ -10,16 +10,15 @@ written in Modern C++ style.
 
 ## Features
 
-- [Easy to Use](Sample.cpp)
-- [Header Only](src/ORMLite.h)
-- Powerful Compile-time **Type Deduction**
-- User Friendly Compile Error Prompt
+- **Easy** to Use
+- **Header Only** [(src/ORMLite.h)](src/ORMLite.h)
+- **Powerful** Compile-time **Type Deduction**
 
 ## Documentation
 
-#### [Get Started Here](docs/Get-Started.md) (Strongly Recommended) 😉
+#### [Sample](docs/Get-Started.md) (Get Started Here) 😉
 
-#### [Full Documents Here](docs/ORM-Lite.md) 😊
+#### [Full Document](docs/ORM-Lite.md) 😊
 
 ## Planned Features
 
