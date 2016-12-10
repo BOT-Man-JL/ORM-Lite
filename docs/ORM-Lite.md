@@ -173,6 +173,9 @@ ORMapper (const string &connectionString);
 Remarks:
 - Construct a **O/R Mapper** to connect to `connectionString`;
 - For SQLite, the `connectionString` is the **database name**;
+- The `ORMapper` **Keeps** the **Connection**
+  and **Shares** the **Connection** with `Queryable`;
+- **Disconnecting** at all related `ORMapper`/`Queryable` destructied;
 
 ### Transaction
 
@@ -326,7 +329,8 @@ Queryable<MyClass> Query (MyClass queryHelper);
 Remarks:
 - Return new `Queryable` object with `QueryResult` is `MyClass`;
 - `MyClass` **MUST** be **Copy Constructible**
-  to Construct `queryHelper`;
+  to Construct a `queryHelper`;
+- The `ORMapper` **Shares** the **Connection** with `Queryable`;
 
 ## `BOT_ORM::Queryable<QueryResult>`
 
@@ -342,6 +346,7 @@ Remarks:
 - `QueryResult` specifies the **Row Type** of Query Result;
 - `Select` will Get the one-or-zero-row Result for `agg` immediately;
 - `ToVector` / `ToList` returns the Collection of `QueryResult`;
+- The results are from the **Connection** of `Queryable`;
 - If the Result is `null` for `NOT Nullable` Field,
   it will throw `std::runtime_error`;
 - `Expression` will be described later;
@@ -368,6 +373,7 @@ Remarks:
 - `OrderBy` will **Append** `field` to Condition,
   while Other functions will **Set** `DISTINCT`,
   `expr`, `field` or `count` to Condition;
+- New `Queryable` **Shares** the **Connection** of `this`;
 - `Expression` will be described later;
 
 ### Construct New `QueryResult`
@@ -394,7 +400,8 @@ Remarks:
     all `Nullable<T>`, where `T` is the Supported Types of `ORMAP`
     (NOT `std::tuple` or `MyClass`);
   - `onExpr` specifies the `ON` Expression for `JOIN`;
-- All Functions will pass the **Conditions** of `this` to the new one;
+- All Functions will copy the **Conditions** of `this` to the new one;
+- New `Queryable` **Shares** the **Connection** of `this`;
 - `Expression` will be described later;
 
 ### Compound Select
@@ -411,6 +418,7 @@ Remarks:
   for `this` and `queryable`;
 - All Functions will only **Inherit Conditions**
   `OrderBy` and `Limit` from `this`;
+- New `Queryable` **Shares** the **Connection** of `this`;
 
 ### Query SQL
 
