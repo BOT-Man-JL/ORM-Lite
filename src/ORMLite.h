@@ -754,27 +754,18 @@ namespace BOT_ORM_Impl
 		using TypeToNullable_t = typename TypeToNullable <
 			std::remove_cv_t<std::remove_reference_t<T>> >::type;
 
-		// Tuple To Nullable Impl
+		// Tuple To Nullable
 		// Apply 'TypeToNullable' to each element of Tuple
-		template <typename TupleType, std::size_t... I>
-		static inline auto TupleToNullable_Impl (const TupleType &,
-												 std::index_sequence<I...>)
+		template <typename... Args>
+		static inline auto TupleToNullable (
+			const std::tuple<Args...> &tuple)
 		{
 			// C++ 14 Unpacking Tricks :-)
-			// Apply 'I' to each of 'tuple_element' as a sequence
-			return std::tuple <
-				TypeToNullable_t<std::tuple_element_t<I, TupleType>>...
+			// Expand each of 'Args'
+			// with 'TypeToNullable_t<...>' as a sequence
+			return std::tuple<
+				TypeToNullable_t<Args>...
 			> {};
-		}
-
-		// Tuple To Nullable
-		// Produce the 'index_sequence' for 'tuple'
-		template <typename TupleType>
-		static inline auto TupleToNullable (const TupleType &tuple)
-		{
-			return TupleToNullable_Impl (
-				tuple,
-				std::make_index_sequence<std::tuple_size<TupleType>::value> {});
 		}
 
 		template <typename TupleType, size_t N>
