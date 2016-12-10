@@ -57,7 +57,6 @@ struct ModelD
 
 int main ()
 {
-	// Open a Connection with *Test.db*
 	ORMapper mapper ("Test.db");
 
 	// Create Brand New Tables
@@ -140,6 +139,18 @@ int main ()
 		.Select (field (md.d_int))
 		.ToList ().front ();
 	assert (std::get<0> (firstTuple).Value () == firstIdExpected);
+
+	//
+	// Case: Scope of Mapper
+	//
+
+	Queryable<ModelA> *queryable;
+	{
+		ORMapper mapper2 ("Test.db");
+		queryable = new Queryable<ModelA> { mapper2.Query (ModelA {}) };
+	}
+	assert (queryable->ToList ().size () == 1);
+	delete queryable;
 
 	std::cout << "Test Passing" << std::endl;
 	return 0;

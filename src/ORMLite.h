@@ -7,18 +7,33 @@
 #ifndef BOT_ORM_H
 #define BOT_ORM_H
 
-#include <functional>
+// Container
+#include <tuple>
 #include <vector>
 #include <list>
 #include <string>
-#include <tuple>
 #include <unordered_map>
-#include <cctype>
-#include <thread>
+
+// Serialization
 #include <sstream>
+
+// Type Traits
 #include <type_traits>
+
+// std::nullptr_t
 #include <cstddef>
 
+// std::shared_ptr
+#include <memory>
+
+// for Field Name Extractor
+#include <cctype>
+
+// for SQL Connector
+#include <thread>
+#include <functional>
+
+// SQLite 3 Dependency
 #include "sqlite3.h"
 
 // Public Macro
@@ -179,8 +194,7 @@ namespace BOT_ORM_Impl
 	public:
 		SQLConnector (const std::string &fileName)
 		{
-			auto rc = sqlite3_open (fileName.c_str (), &db);
-			if (rc)
+			if (sqlite3_open (fileName.c_str (), &db))
 			{
 				sqlite3_close (db);
 				throw std::runtime_error (
@@ -236,8 +250,7 @@ namespace BOT_ORM_Impl
 
 	private:
 		sqlite3 *db;
-		static void _callback (int argc, char **argv, char **azColName)
-		{ return; }
+		static inline void _callback (int, char **, char **) { return; }
 	};
 
 	// Checking Injection
@@ -859,7 +872,7 @@ namespace BOT_ORM
 	class Queryable
 	{
 	protected:
-		BOT_ORM_Impl::SQLConnector &_connector;
+		std::shared_ptr<BOT_ORM_Impl::SQLConnector> _connector;
 		QueryResult _queryHelper;
 
 		std::string _sqlFrom;
@@ -874,19 +887,20 @@ namespace BOT_ORM
 		std::string _sqlLimit;
 		std::string _sqlOffset;
 
-		Queryable (BOT_ORM_Impl::SQLConnector &connector,
-				   QueryResult queryHelper,
-				   std::string sqlFrom,
-				   std::string sqlSelect = "select ",
-				   std::string sqlTarget = "*",
-				   std::string sqlWhere = std::string {},
-				   std::string sqlGroupBy = std::string {},
-				   std::string sqlHaving = std::string {},
-				   std::string sqlOrderBy = std::string {},
-				   std::string sqlLimit = std::string {},
-				   std::string sqlOffset = std::string {})
+		Queryable (
+			std::shared_ptr<BOT_ORM_Impl::SQLConnector> connector,
+			QueryResult queryHelper,
+			std::string sqlFrom,
+			std::string sqlSelect = "select ",
+			std::string sqlTarget = "*",
+			std::string sqlWhere = std::string {},
+			std::string sqlGroupBy = std::string {},
+			std::string sqlHaving = std::string {},
+			std::string sqlOrderBy = std::string {},
+			std::string sqlLimit = std::string {},
+			std::string sqlOffset = std::string {})
 			:
-			_connector (connector),
+			_connector (std::move (connector)),
 			_queryHelper (std::move (queryHelper)),
 			_sqlFrom (std::move (sqlFrom)),
 			_sqlSelect (std::move (sqlSelect)),
@@ -1019,9 +1033,9 @@ namespace BOT_ORM
 		Nullable<T> Select (const Expression::Aggregate<T> &agg) const
 		{
 			Nullable<T> ret;
-			_connector.Execute (_sqlSelect + agg.fieldName +
-								_GetFromSql () + _GetLimit () + ";",
-								[&] (int argc, char **argv, char **)
+			_connector->Execute (_sqlSelect + agg.fieldName +
+								 _GetFromSql () + _GetLimit () + ";",
+								 [&] (int argc, char **argv, char **)
 			{
 				BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
 			});
@@ -1052,18 +1066,16 @@ namespace BOT_ORM
 
 		// Return a new Queryable Object
 		template <typename... Args>
-		auto _NewQuery (std::string sqlTarget,
-						std::string sqlFrom,
-						std::tuple<Args...> &&newQueryHelper) const
+		inline auto _NewQuery (std::string sqlTarget,
+							   std::string sqlFrom,
+							   std::tuple<Args...> &&newQueryHelper) const
 		{
-			return Queryable<std::tuple<Args...>>
-			{
+			return Queryable<std::tuple<Args...>> (
 				_connector, newQueryHelper,
-					std::move (sqlFrom),
-					_sqlSelect, std::move (sqlTarget),
-					_sqlWhere, _sqlGroupBy, _sqlHaving,
-					_sqlOrderBy, _sqlLimit, _sqlOffset
-			};
+				std::move (sqlFrom),
+				_sqlSelect, std::move (sqlTarget),
+				_sqlWhere, _sqlGroupBy, _sqlHaving,
+				_sqlOrderBy, _sqlLimit, _sqlOffset);
 		}
 
 		// Return a new Join Queryable Object
@@ -1113,9 +1125,9 @@ namespace BOT_ORM
 		void _Select (const C &, Out &out) const
 		{
 			auto copy = _queryHelper;
-			_connector.Execute (_sqlSelect + _sqlTarget +
-								_GetFromSql () + _GetLimit () + ";",
-								[&] (int, char **argv, char **)
+			_connector->Execute (_sqlSelect + _sqlTarget +
+								 _GetFromSql () + _GetLimit () + ";",
+								 [&] (int, char **argv, char **)
 			{
 				size_t index = 1;
 				BOT_ORM_Impl::DeserializeValue (copy.__PrimaryKey (), argv[0]);
@@ -1132,9 +1144,9 @@ namespace BOT_ORM
 		void _Select (const std::tuple<Args...> &, Out &out) const
 		{
 			auto copy = _queryHelper;
-			_connector.Execute (_sqlSelect + _sqlTarget +
-								_GetFromSql () + _GetLimit () + ";",
-								[&] (int, char **argv, char **)
+			_connector->Execute (_sqlSelect + _sqlTarget +
+								 _GetFromSql () + _GetLimit () + ";",
+								 [&] (int, char **argv, char **)
 			{
 				size_t index = 0;
 				BOT_ORM_Impl::QueryableHelper::TupleVisit (
@@ -1153,9 +1165,10 @@ namespace BOT_ORM
 	{
 	public:
 		ORMapper (const std::string &connectionString)
-			: _connector (connectionString)
+			: _connector (std::make_shared<BOT_ORM_Impl::SQLConnector> (
+				connectionString))
 		{
-			_connector.Execute ("PRAGMA foreign_keys = ON;");
+			_connector->Execute ("PRAGMA foreign_keys = ON;");
 		}
 
 		template <typename Fn>
@@ -1163,13 +1176,13 @@ namespace BOT_ORM
 		{
 			try
 			{
-				_connector.Execute ("begin transaction;");
+				_connector->Execute ("begin transaction;");
 				fn ();
-				_connector.Execute ("commit transaction;");
+				_connector->Execute ("commit transaction;");
 			}
 			catch (...)
 			{
-				_connector.Execute ("rollback transaction;");
+				_connector->Execute ("rollback transaction;");
 				throw;
 			}
 		}
@@ -1205,9 +1218,9 @@ namespace BOT_ORM
 			strFmt += std::move (tableFixes);
 			strFmt.pop_back ();
 
-			_connector.Execute ("create table " +
-								std::string (C::__TableName) +
-								"(" + strFmt + ");");
+			_connector->Execute ("create table " +
+								 std::string (C::__TableName) +
+								 "(" + strFmt + ");");
 		}
 
 		template <typename C>
@@ -1220,9 +1233,9 @@ namespace BOT_ORM
 		std::enable_if_t<BOT_ORM_Impl::HasInjected<C>::value>
 			DropTbl (const C &)
 		{
-			_connector.Execute ("drop table " +
-								std::string (C::__TableName) +
-								";");
+			_connector->Execute ("drop table " +
+								 std::string (C::__TableName) +
+								 ";");
 		}
 
 		template <typename C>
@@ -1237,7 +1250,7 @@ namespace BOT_ORM
 		{
 			std::ostringstream os;
 			_GetInsert (os, entity, withId);
-			_connector.Execute (os.str ());
+			_connector->Execute (os.str ());
 		}
 
 		template <typename In, typename C = typename In::value_type>
@@ -1259,7 +1272,7 @@ namespace BOT_ORM
 				anyEntity = true;
 			}
 			if (anyEntity)
-				_connector.Execute (os.str ());
+				_connector->Execute (os.str ());
 		}
 
 		template <typename C>
@@ -1274,7 +1287,7 @@ namespace BOT_ORM
 		{
 			std::ostringstream os;
 			if (_GetUpdate (os, entity))
-				_connector.Execute (os.str ());
+				_connector->Execute (os.str ());
 		}
 
 		template <typename In, typename C = typename In::value_type>
@@ -1295,7 +1308,7 @@ namespace BOT_ORM
 					osTmp.str (std::string {});  // Flush the previous one
 				}
 			auto sql = os.str ();
-			if (!sql.empty ()) _connector.Execute (sql);
+			if (!sql.empty ()) _connector->Execute (sql);
 		}
 
 		template <typename C>
@@ -1312,11 +1325,11 @@ namespace BOT_ORM
 					const Expression::SetExpr &setExpr,
 					const Expression::Expr &whereExpr)
 		{
-			_connector.Execute ("update " +
-								std::string (C::__TableName) +
-								" set " + setExpr.ToString () +
-								" where " +
-								whereExpr.ToString (false) + ";");
+			_connector->Execute ("update " +
+								 std::string (C::__TableName) +
+								 " set " + setExpr.ToString () +
+								 " where " +
+								 whereExpr.ToString (false) + ";");
 		}
 
 		template <typename C>
@@ -1335,7 +1348,7 @@ namespace BOT_ORM
 			BOT_ORM_Impl::SerializeValue (os, entity.__PrimaryKey ());
 			os << ";";
 
-			_connector.Execute (os.str ());
+			_connector->Execute (os.str ());
 		}
 
 		template <typename C>
@@ -1350,10 +1363,10 @@ namespace BOT_ORM
 			Delete (const C &,
 					const Expression::Expr &whereExpr)
 		{
-			_connector.Execute ("delete from " +
-								std::string (C::__TableName) +
-								" where " +
-								whereExpr.ToString (false) + ";");
+			_connector->Execute ("delete from " +
+								 std::string (C::__TableName) +
+								 " where " +
+								 whereExpr.ToString (false) + ";");
 		}
 
 		template <typename C>
@@ -1366,13 +1379,13 @@ namespace BOT_ORM
 		std::enable_if_t<BOT_ORM_Impl::HasInjected<C>::value, Queryable<C>>
 			Query (C queryHelper)
 		{
-			return Queryable<C> { _connector,
-				std::move (queryHelper),
-				std::string (" from ") + C::__TableName };
+			return Queryable<C> (_connector,
+								 std::move (queryHelper),
+								 std::string (" from ") + C::__TableName);
 		}
 
 	protected:
-		BOT_ORM_Impl::SQLConnector _connector;
+		std::shared_ptr<BOT_ORM_Impl::SQLConnector> _connector;
 
 		template <typename T>
 		static inline const char *_TypeString (const T &)
