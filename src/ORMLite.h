@@ -172,7 +172,7 @@ namespace BOT_ORM
 
 namespace BOT_ORM_Impl
 {
-	// Naive SQL Driver ... (Todo: Improved Later)
+	// Naive SQL Driver (Todo: Improved Later)
 
 	class SQLConnector
 	{
@@ -352,16 +352,10 @@ namespace BOT_ORM_Impl
 		template <typename Fn, typename Arg, typename... Args>
 		static inline void Visit (Fn fn, Arg &, Args & ... args)
 		{
-			_Visit (fn, args...);
+			// Unpacking Tricks :-)
+			using expander = int[];
+			(void) expander { 0, ((void) fn (args), 0)... };
 		}
-
-	protected:
-		template <typename Fn, typename T, typename... Args>
-		static inline void _Visit (Fn fn, T &property, Args & ... args)
-		{ fn (property); _Visit (fn, args...); }
-
-		template <typename Fn>
-		static inline void _Visit (Fn fn) {}
 	};
 }
 
@@ -639,19 +633,13 @@ namespace BOT_ORM
 			std::string fields;
 			const char *table;
 
-			template <typename T>
-			CompositeField (const Expression::Field<T> &field)
+			template <typename... Fields>
+			CompositeField (const Fields & ... args)
 				: table (nullptr)
 			{
-				Extract (field);
-			}
-
-			template <typename T, typename... Args>
-			CompositeField (const Expression::Field<T> &field,
-							const Args & ... args)
-				: CompositeField (args...)
-			{
-				Extract (field);
+				// Unpacking Tricks :-)
+				using expander = int[];
+				(void) expander { 0, (Extract (args), 0)... };
 			}
 
 		private:
@@ -726,7 +714,7 @@ namespace BOT_ORM
 namespace BOT_ORM_Impl
 {
 	// Why Remove QueryableHelper from Query?
-	// Query is a template but the Helper can be shared...
+	// Query is a template but the Helper can be shared
 
 	class QueryableHelper
 	{
@@ -741,17 +729,26 @@ namespace BOT_ORM_Impl
 		friend class BOT_ORM::Queryable;
 
 		// #1 Tuple Visitor
+
+		// About 'using expander = int[]'
 		// http://stackoverflow.com/questions/26902633/how-to-iterate-over-a-tuple-in-c-11/26902803#26902803
+		// - To avoid the unspecified order,
+		//   brace-enclosed initializer lists can be used,
+		//   which guarantee strict left-to-right order of evaluation.
+		// - To avoid the need for a not void return type,
+		//   the comma operator can be used to
+		//   always yield 1 in each expansion element.
 
 		// Apply 'Fn' to each of element of Tuple
 		template <typename Fn, typename TupleType, std::size_t... I>
 		static inline void TupleVisit_Impl (
 			TupleType &tuple, Fn fn, std::index_sequence<I...>)
 		{
-			// C++ 14 Unpacking Tricks :-)
+			// Unpacking Tricks :-)
 			using expander = int[];
 			(void) expander { 0, ((void) fn (std::get<I> (tuple)), 0)... };
 		}
+
 		// Produce the 'index_sequence' for 'tuple'
 		template <typename Fn, typename TupleType>
 		static inline void TupleVisit (TupleType &tuple, Fn fn)
@@ -783,7 +780,7 @@ namespace BOT_ORM_Impl
 		static inline auto TupleToNullable (
 			const std::tuple<Args...> &)
 		{
-			// C++ 14 Unpacking Tricks :-)
+			// Unpacking Tricks :-)
 			// Expand each of 'Args'
 			// with 'TypeToNullable_t<...>' as a sequence
 			return std::tuple<
@@ -802,7 +799,7 @@ namespace BOT_ORM_Impl
 		static inline auto QueryResultToTuple (
 			const std::tuple<Args...>& t)
 		{
-			// TupleToNullable is not necessary: Nullable already...
+			// TupleToNullable is not necessary: Nullable already
 			return t;
 		}
 
@@ -810,6 +807,7 @@ namespace BOT_ORM_Impl
 		template <typename... Args>
 		static inline auto JoinToTuple (const Args & ... args)
 		{
+			// Unpacking Tricks :-)
 			return decltype (std::tuple_cat (
 				QueryResultToTuple (args)...
 			)) {};
@@ -829,6 +827,7 @@ namespace BOT_ORM_Impl
 		template <typename... Args>
 		static inline auto SelectToTuple (const Args & ... args)
 		{
+			// Unpacking Tricks :-)
 			return std::tuple <
 				decltype (SelectableToTuple (args))...
 			> {};
@@ -1417,13 +1416,13 @@ namespace BOT_ORM
 			return typeStr;
 		}
 
-		void _GetConstraints (
+		static void _GetConstraints (
 			std::string &,
 			std::unordered_map<std::string, std::string> &)
 		{}
 
 		template <typename... Args>
-		void _GetConstraints (
+		static void _GetConstraints (
 			std::string &tableFixes,
 			std::unordered_map<std::string, std::string> &fieldFixes,
 			const Constraint &constraint,
@@ -1437,7 +1436,7 @@ namespace BOT_ORM
 		}
 
 		template <typename C>
-		void _GetInsert (std::ostream &os, const C &entity, bool withId)
+		static void _GetInsert (std::ostream &os, const C &entity, bool withId)
 		{
 			const auto &fieldNames = C::__FieldNames ();
 			std::ostringstream osVal;
@@ -1485,7 +1484,7 @@ namespace BOT_ORM
 		}
 
 		template <typename C>
-		bool _GetUpdate (std::ostream &os, const C &entity) const
+		static bool _GetUpdate (std::ostream &os, const C &entity)
 		{
 			const auto &fieldNames = C::__FieldNames ();
 			os << "update " << C::__TableName << " set ";
@@ -1536,7 +1535,7 @@ namespace BOT_ORM
 			Extract (const C &helper)
 		{
 			// Why Place these local vars here:
-			// Walk around gcc/clang 'undefined reference' HELL...
+			// Walk around gcc/clang 'undefined reference' HELL
 			const auto &fieldNames = C::__FieldNames ();
 			constexpr auto tableName = C::__TableName;
 
@@ -1555,12 +1554,13 @@ namespace BOT_ORM
 		}
 
 	public:
-		template <typename Arg>
-		FieldExtractor (const Arg &arg) { Extract (arg); }
-
-		template <typename Arg, typename... Args>
-		FieldExtractor (const Arg &arg, const Args & ... args)
-			: FieldExtractor (args...) { Extract (arg); }
+		template <typename... Classes>
+		FieldExtractor (const Classes & ... args)
+		{
+			// Unpacking Tricks :-)
+			using expander = int[];
+			(void) expander { 0, (Extract (args), 0)... };
+		}
 
 		template <typename T>
 		inline Expression::Field<T> operator () (
