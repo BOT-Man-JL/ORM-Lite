@@ -91,15 +91,15 @@ int main ()
 	//mapper.Update (int ());
 	////mapper.UpdateRange (int ());
 	//mapper.UpdateRange (std::vector<int> ());
-	//mapper.Update (int (), SetExpr { "" }, Expr { Selectable<int> {}, "" });
+	//mapper.Update (int (), SetExpr { "" }, Expr { Selectable<int> {"", nullptr}, "" });
 	//mapper.Delete (int ());
-	//mapper.Delete (int (), Expr { Selectable<int> {}, "" });
+	//mapper.Delete (int (), Expr { Selectable<int> {"", nullptr}, "" });
 	//mapper.Query (int ());
 	//FieldExtractor { int (), double () };
 	//mapper.Query (ModelA {})
-	//	.Join (int (), Expr { Selectable<int> {}, "" });
+	//	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
 	//mapper.Query (ModelA {})
-	//	.LeftJoin (int (), Expr { Selectable<int> {}, "" });
+	//	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
 
 	//
 	// Case: Only One Field Mapping
