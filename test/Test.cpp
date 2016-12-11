@@ -96,10 +96,10 @@ int main ()
 	//mapper.Delete (int (), Expr { Selectable<int> {"", nullptr}, "" });
 	//mapper.Query (int ());
 	//FieldExtractor { int (), double () };
-	//mapper.Query (ModelA {})
-	//	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
-	//mapper.Query (ModelA {})
-	//	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
+	////mapper.Query (ModelA {})
+	////	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
+	////mapper.Query (ModelA {})
+	////	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
 
 	//
 	// Case: Only One Field Mapping
