@@ -1380,8 +1380,12 @@ namespace BOT_ORM
 
 			// Primary Key
 			BOT_ORM_Impl::InjectionHelper::Visit (
-				entity, [&os] (const auto &primaryKey, const auto & ...)
+				entity, [&os] (const auto &primaryKey, const auto & ... dummy)
 			{
+				// Why 'dummy'?
+				// It's an issue of gcc 5.4:
+				//   'template argument deduction/substitution failed'
+				//   if no 'dummy' literal (WTF) !!!
 				if (!BOT_ORM_Impl::SerializeValue (os, primaryKey))
 					os << "null";
 			});
@@ -1565,23 +1569,22 @@ namespace BOT_ORM
 				entity, [&os, &entity] (
 					const auto &primaryKey, const auto & ... args)
 			{
+				if (sizeof... (args) == 0)
+					return false;
+
 				const auto &fieldNames =
 					BOT_ORM_Impl::InjectionHelper::FieldNames (entity);
 				os << "update "
 					<< BOT_ORM_Impl::InjectionHelper::TableName (entity)
 					<< " set ";
 
-				// Avoid Bad Eating of ,
-				bool anyField = false;
-
-				auto serializeField = [&fieldNames, &os, &anyField] (
+				auto serializeField = [&fieldNames, &os] (
 					const auto &val, size_t index)
 				{
 					os << fieldNames[index] << "=";
 					if (!BOT_ORM_Impl::SerializeValue (os, val))
 						os << "null";
 					os << ",";
-					anyField = true;
 				};
 
 				// The Rest
@@ -1593,9 +1596,6 @@ namespace BOT_ORM
 				{
 					0, (serializeField (args, index++), 0)...
 				};
-
-				if (!anyField)     // 'os' is ill-formed
-					return false;  // Only Primary Key in ORMAP
 
 				os.seekp (os.tellp () - std::streamoff (1));
 
@@ -1632,17 +1632,15 @@ namespace BOT_ORM
 		std::enable_if_t<HasInjected<C>::value>
 			Extract (const C &helper)
 		{
-			// Why Place these local vars here:
-			// Walk around gcc/clang 'undefined reference' HELL
-			const auto &fieldNames =
-				BOT_ORM_Impl::InjectionHelper::FieldNames (helper);
-			const auto &tableName =
-				BOT_ORM_Impl::InjectionHelper::TableName (helper);
-
 			BOT_ORM_Impl::InjectionHelper::Visit (
-				helper, [this, &fieldNames, &tableName] (
+				helper, [this, &helper] (
 					const auto & ... args)
 			{
+				const auto &fieldNames =
+					BOT_ORM_Impl::InjectionHelper::FieldNames (helper);
+				const auto &tableName =
+					BOT_ORM_Impl::InjectionHelper::TableName (helper);
+
 				size_t index = 0;
 				// Unpacking Tricks :-)
 				using expander = int[];
