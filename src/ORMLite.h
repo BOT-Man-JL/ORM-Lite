@@ -338,6 +338,7 @@ namespace BOT_ORM_Impl
 			return obj.__Accept (fn);
 		}
 
+		// Field Name Proxy
 		template <typename C>
 		static inline const std::vector<std::string> &FieldNames (const C &)
 		{
@@ -345,6 +346,7 @@ namespace BOT_ORM_Impl
 			return fieldNames;
 		}
 
+		// Table Name Proxy
 		template <typename C>
 		static inline const std::string &TableName (const C &)
 		{
@@ -651,7 +653,7 @@ namespace BOT_ORM
 				if (fieldName.empty ())
 					fieldName = field.fieldName;
 				else
-					fieldName = fieldName.fieldName + "," + fieldName;
+					fieldName = field.fieldName + "," + fieldName;
 			}
 		};
 
@@ -857,6 +859,10 @@ namespace BOT_ORM
 	template <typename QueryResult>
 	class Queryable
 	{
+		template <typename C>
+		using HasInjected =
+			BOT_ORM_Impl::InjectionHelper::HasInjected<C>;
+
 	protected:
 		std::shared_ptr<BOT_ORM_Impl::SQLConnector> _connector;
 		QueryResult _queryHelper;
@@ -994,19 +1000,17 @@ namespace BOT_ORM
 		template <typename C>
 		inline auto Join (const C &queryHelper2,
 						  const Expression::Expr &onExpr,
-						  std::enable_if_t<!BOT_ORM_Impl::
-						  InjectionHelper::HasInjected<C>::value>
+						  std::enable_if_t<
+						  !HasInjected<C>::value>
 						  * = nullptr) const
 		{
-			static_assert (
-				BOT_ORM_Impl::InjectionHelper::HasInjected<C>::value,
-				NO_ORMAP);
+			static_assert (HasInjected<C>::value, NO_ORMAP);
 		}
 		template <typename C>
 		inline auto Join (const C &queryHelper2,
 						  const Expression::Expr &onExpr,
-						  std::enable_if_t<BOT_ORM_Impl::
-						  InjectionHelper::HasInjected<C>::value>
+						  std::enable_if_t<
+						  HasInjected<C>::value>
 						  * = nullptr) const
 		{
 			return _NewJoinQuery (queryHelper2, onExpr, " join ");
@@ -1016,19 +1020,17 @@ namespace BOT_ORM
 		template <typename C>
 		inline auto LeftJoin (const C &queryHelper2,
 							  const Expression::Expr &onExpr,
-							  std::enable_if_t<!BOT_ORM_Impl::
-							  InjectionHelper::HasInjected<C>::value>
+							  std::enable_if_t<
+							  !HasInjected<C>::value>
 							  * = nullptr) const
 		{
-			static_assert (
-				BOT_ORM_Impl::InjectionHelper::HasInjected<C>::value,
-				NO_ORMAP);
+			static_assert (HasInjected<C>::value, NO_ORMAP);
 		}
 		template <typename C>
 		inline auto LeftJoin (const C &queryHelper2,
 							  const Expression::Expr &onExpr,
-							  std::enable_if_t<BOT_ORM_Impl::
-							  InjectionHelper::HasInjected<C>::value>
+							  std::enable_if_t<
+							  HasInjected<C>::value>
 							  * = nullptr) const
 		{
 			return _NewJoinQuery (queryHelper2, onExpr, " left join ");
@@ -1142,7 +1144,8 @@ namespace BOT_ORM
 					(void) expander
 					{
 						0, (BOT_ORM_Impl::DeserializeValue (
-							args, argv[index++]), 0)...
+							args, argv[index++]
+						), 0)...
 					};
 				});
 				out.push_back (copy);
@@ -1174,12 +1177,14 @@ namespace BOT_ORM
 	class ORMapper
 	{
 		template <typename C>
-		using HasInjected = BOT_ORM_Impl::InjectionHelper::HasInjected<C>;
+		using HasInjected =
+			BOT_ORM_Impl::InjectionHelper::HasInjected<C>;
 
 	public:
 		ORMapper (const std::string &connectionString)
-			: _connector (std::make_shared<BOT_ORM_Impl::SQLConnector> (
-				connectionString))
+			: _connector (
+				std::make_shared<BOT_ORM_Impl::SQLConnector> (
+					connectionString))
 		{
 			_connector->Execute ("PRAGMA foreign_keys = ON;");
 		}
@@ -1212,6 +1217,7 @@ namespace BOT_ORM
 		{
 			const auto &fieldNames =
 				BOT_ORM_Impl::InjectionHelper::FieldNames (entity);
+
 			std::unordered_map<std::string, std::string> fieldFixes;
 
 			BOT_ORM_Impl::InjectionHelper::Visit (
@@ -1223,7 +1229,8 @@ namespace BOT_ORM
 				(void) expander
 				{
 					0, (fieldFixes.emplace (
-						fieldNames[index++], _TypeString (args)), 0)...
+						fieldNames[index++], _TypeString (args)
+					), 0)...
 				};
 			});
 			fieldFixes[fieldNames[0]] += " primary key";
@@ -1371,6 +1378,7 @@ namespace BOT_ORM
 				<< BOT_ORM_Impl::InjectionHelper::TableName (entity)
 				<< " where " << fieldNames[0] << "=";
 
+			// Primary Key
 			BOT_ORM_Impl::InjectionHelper::Visit (
 				entity, [&os] (const auto &primaryKey, const auto & ...)
 			{
@@ -1524,13 +1532,13 @@ namespace BOT_ORM
 				}
 
 				// The Rest
-				size_t index = 0;
+				size_t index = 1;
 
 				// Unpacking Tricks :-)
 				using expander = int[];
 				(void) expander
 				{
-					0, (serializeField (args, ++index), 0)...
+					0, (serializeField (args, index++), 0)...
 				};
 
 				if (anyField)
@@ -1566,7 +1574,7 @@ namespace BOT_ORM
 				// Avoid Bad Eating of ,
 				bool anyField = false;
 
-				auto serialzeField = [&fieldNames, &os, &anyField] (
+				auto serializeField = [&fieldNames, &os, &anyField] (
 					const auto &val, size_t index)
 				{
 					os << fieldNames[index] << "=";
@@ -1577,12 +1585,13 @@ namespace BOT_ORM
 				};
 
 				// The Rest
-				size_t index = 0;
+				size_t index = 1;
+
 				// Unpacking Tricks :-)
 				using expander = int[];
 				(void) expander
 				{
-					0, (serialzeField (args, ++index), 0)...
+					0, (serializeField (args, index++), 0)...
 				};
 
 				if (!anyField)     // 'os' is ill-formed
@@ -1594,6 +1603,7 @@ namespace BOT_ORM
 				os << " where " << fieldNames[0] << "=";
 				if (!BOT_ORM_Impl::SerializeValue (os, primaryKey))
 					os << "null";
+
 				os << ";";
 				return true;
 			});
@@ -1609,7 +1619,8 @@ namespace BOT_ORM
 			const std::string &>;
 
 		template <typename C>
-		using HasInjected = BOT_ORM_Impl::InjectionHelper::HasInjected<C>;
+		using HasInjected =
+			BOT_ORM_Impl::InjectionHelper::HasInjected<C>;
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
