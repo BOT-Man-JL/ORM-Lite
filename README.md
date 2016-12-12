@@ -4,9 +4,8 @@
 for **SQLite3** (currently 😂),
 written in Modern C++ style.
 
-|  Platform  | MSVC 2015 | gcc 5.4 & Clang 3.8 |
-|------------|-----------|---------------------|
-| **Master** |[![Build status - VC](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)|[![Build status - gcc/clang](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)|
+[![Build status - VC](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)
+[![Build status - gcc/clang](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)
 
 ## Features
 

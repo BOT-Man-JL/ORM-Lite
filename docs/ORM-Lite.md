@@ -8,7 +8,7 @@
   - Clang >= 3.8
 - **SQLite 3** Dependency
 
-## Mapping Rules
+## Mapping
 
 |        SQL Concepts | C++ Concepts | Notes |
 |---------------------|--------------|-------|
