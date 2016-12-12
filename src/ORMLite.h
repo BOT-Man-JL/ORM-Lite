@@ -180,24 +180,41 @@ namespace BOT_ORM_Impl
 			sqlite3_close (db);
 		}
 
-		// Don't throw in callback
-		void Execute (const std::string &cmd,
-					  std::function<void (int argc, char **argv,
-										  char **azColName) noexcept>
-					  callback = _callback)
+		void Execute (const std::string &cmd)
 		{
-			const size_t MAX_TRIAL = 16;
 			char *zErrMsg = 0;
 			int rc;
 
-			auto callbackWrapper = [] (void *fn, int argc, char **argv,
-									   char **azColName)
+			for (size_t iTry = 0; iTry < MAX_TRIAL; iTry++)
 			{
-				static_cast<std::function
-					<void (int argc,
-						   char **argv,
-						   char **azColName) noexcept> *>
-						   (fn)->operator()(argc, argv, azColName);
+				rc = sqlite3_exec (db, cmd.c_str (),
+								   nullptr, nullptr, &zErrMsg);
+				if (rc != SQLITE_BUSY)
+					break;
+
+				std::this_thread::sleep_for (
+					std::chrono::microseconds (20));
+			}
+
+			if (rc != SQLITE_OK)
+			{
+				auto errStr = std::string ("SQL error: '") + zErrMsg
+					+ "' at '" + cmd + "'";
+				sqlite3_free (zErrMsg);
+				throw std::runtime_error (errStr);
+			}
+		}
+
+		void Execute (const std::string &cmd,
+					  std::function<void (char **) noexcept> callback)
+		{
+			char *zErrMsg = 0;
+			int rc;
+
+			auto callbackWrapper = [] (void *fn, int, char **argv, char **)
+			{
+				static_cast<std::function<void (char **argv) noexcept> *>
+					(fn)->operator()(argv);
 				return 0;
 			};
 
@@ -208,7 +225,8 @@ namespace BOT_ORM_Impl
 				if (rc != SQLITE_BUSY)
 					break;
 
-				std::this_thread::sleep_for (std::chrono::microseconds (20));
+				std::this_thread::sleep_for (
+					std::chrono::microseconds (20));
 			}
 
 			if (rc != SQLITE_OK)
@@ -222,7 +240,7 @@ namespace BOT_ORM_Impl
 
 	private:
 		sqlite3 *db;
-		static inline void _callback (int, char **, char **) { return; }
+		constexpr static size_t MAX_TRIAL = 16;
 	};
 
 	// Helper - Serialize
@@ -1053,7 +1071,7 @@ namespace BOT_ORM
 			Nullable<T> ret;
 			_connector->Execute (_sqlSelect + agg.fieldName +
 								 _GetFromSql () + _GetLimit () + ";",
-								 [&] (int argc, char **argv, char **)
+								 [&] (char **argv)
 			{
 				BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
 			});
@@ -1133,10 +1151,10 @@ namespace BOT_ORM
 			auto copy = _queryHelper;
 			_connector->Execute (_sqlSelect + _sqlTarget +
 								 _GetFromSql () + _GetLimit () + ";",
-								 [&] (int, char **argv, char **)
+								 [&] (char **argv)
 			{
 				BOT_ORM_Impl::InjectionHelper::Visit (
-					copy, [&argv] (auto & ... args)
+					copy, [argv] (auto & ... args)
 				{
 					size_t index = 0;
 					// Unpacking Tricks :-)
@@ -1159,11 +1177,11 @@ namespace BOT_ORM
 			auto copy = _queryHelper;
 			_connector->Execute (_sqlSelect + _sqlTarget +
 								 _GetFromSql () + _GetLimit () + ";",
-								 [&] (int, char **argv, char **)
+								 [&] (char **argv)
 			{
 				size_t index = 0;
 				BOT_ORM_Impl::QueryableHelper::TupleVisit (
-					copy, [&argv, &index] (auto &val)
+					copy, [argv, &index] (auto &val)
 				{
 					BOT_ORM_Impl::DeserializeValue (val, argv[index++]);
 				});
@@ -1380,12 +1398,14 @@ namespace BOT_ORM
 
 			// Primary Key
 			BOT_ORM_Impl::InjectionHelper::Visit (
-				entity, [&os] (const auto &primaryKey, const auto & ... dummy)
+				entity, [&os] (const auto &primaryKey,
+							   const auto & ... dummy)
 			{
 				// Why 'dummy'?
 				// It's an issue of gcc 5.4:
 				//   'template argument deduction/substitution failed'
 				//   if no 'dummy' literal (WTF) !!!
+				(void) dummy;
 				if (!BOT_ORM_Impl::SerializeValue (os, primaryKey))
 					os << "null";
 			});
