@@ -187,8 +187,7 @@ namespace BOT_ORM_Impl
 
 			for (size_t iTry = 0; iTry < MAX_TRIAL; iTry++)
 			{
-				rc = sqlite3_exec (db, cmd.c_str (),
-								   nullptr, nullptr, &zErrMsg);
+				rc = sqlite3_exec (db, cmd.c_str (), 0, 0, &zErrMsg);
 				if (rc != SQLITE_BUSY)
 					break;
 
@@ -205,8 +204,8 @@ namespace BOT_ORM_Impl
 			}
 		}
 
-		void Execute (const std::string &cmd,
-					  std::function<void (char **) noexcept> callback)
+		void ExecuteCallback (const std::string &cmd,
+							  std::function<void (char **) noexcept> callback)
 		{
 			char *zErrMsg = 0;
 			int rc;
@@ -1069,9 +1068,9 @@ namespace BOT_ORM
 		Nullable<T> Select (const Expression::Aggregate<T> &agg) const
 		{
 			Nullable<T> ret;
-			_connector->Execute (_sqlSelect + agg.fieldName +
-								 _GetFromSql () + _GetLimit () + ";",
-								 [&] (char **argv)
+			_connector->ExecuteCallback (_sqlSelect + agg.fieldName +
+										 _GetFromSql () + _GetLimit () + ";",
+										 [&] (char **argv)
 			{
 				BOT_ORM_Impl::DeserializeValue (ret, argv[0]);
 			});
@@ -1149,9 +1148,9 @@ namespace BOT_ORM
 		void _Select (const C &, Out &out) const
 		{
 			auto copy = _queryHelper;
-			_connector->Execute (_sqlSelect + _sqlTarget +
-								 _GetFromSql () + _GetLimit () + ";",
-								 [&] (char **argv)
+			_connector->ExecuteCallback (_sqlSelect + _sqlTarget +
+										 _GetFromSql () + _GetLimit () + ";",
+										 [&] (char **argv)
 			{
 				BOT_ORM_Impl::InjectionHelper::Visit (
 					copy, [argv] (auto & ... args)
@@ -1175,9 +1174,9 @@ namespace BOT_ORM
 		void _Select (const std::tuple<Args...> &, Out &out) const
 		{
 			auto copy = _queryHelper;
-			_connector->Execute (_sqlSelect + _sqlTarget +
-								 _GetFromSql () + _GetLimit () + ";",
-								 [&] (char **argv)
+			_connector->ExecuteCallback (_sqlSelect + _sqlTarget +
+										 _GetFromSql () + _GetLimit () + ";",
+										 [&] (char **argv)
 			{
 				size_t index = 0;
 				BOT_ORM_Impl::QueryableHelper::TupleVisit (
@@ -1405,7 +1404,6 @@ namespace BOT_ORM
 				// It's an issue of gcc 5.4:
 				//   'template argument deduction/substitution failed'
 				//   if no 'dummy' literal (WTF) !!!
-				(void) dummy;
 				if (!BOT_ORM_Impl::SerializeValue (os, primaryKey))
 					os << "null";
 			});
