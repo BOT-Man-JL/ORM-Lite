@@ -55,6 +55,15 @@ struct ModelD
 	ORMAP ("ModelD", d_int);
 };
 
+struct ModelE
+{
+	ModelD dd;
+	char ch;
+
+	// Invalid Injection
+	ORMAP ("ModelE", dd, ch);
+};
+
 int main ()
 {
 	ORMapper mapper ("Test.db");
@@ -78,7 +87,7 @@ int main ()
 	initTable (ModelD {});
 
 	//
-	// Case: Not Compile
+	// Case: Not Compile - NO ORMAP
 	//
 
 	//mapper.CreateTbl (int ());
@@ -100,6 +109,15 @@ int main ()
 	////	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
 	////mapper.Query (ModelA {})
 	////	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
+
+	//
+	// Case: Not Compile - Not Support Field
+	//
+
+	//mapper.Insert (ModelE {});
+	//mapper.Update (ModelE {});
+	//mapper.Delete (ModelE {});
+	//mapper.Query (ModelE {}).ToList ();
 
 	//
 	// Case: Only One Field Mapping
