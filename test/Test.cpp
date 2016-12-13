@@ -114,6 +114,7 @@ int main ()
 	// Case: Not Compile - Not Support Field
 	//
 
+	//mapper.CreateTbl (ModelE {});
 	//mapper.Insert (ModelE {});
 	//mapper.Update (ModelE {});
 	//mapper.Delete (ModelE {});
