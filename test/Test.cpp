@@ -11,6 +11,8 @@
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
 
+#define TESTDB "Test.db"
+
 struct ModelA
 {
 	int a_int;
@@ -66,110 +68,146 @@ struct ModelE
 
 int main ()
 {
-	ORMapper mapper ("Test.db");
+	ORMapper mapper (TESTDB);
 
 	// Create Brand New Tables
-	auto initTable = [&mapper] (const auto &model)
 	{
-		try
+		auto initTable = [&mapper] (const auto &model)
 		{
-			mapper.CreateTbl (model);
-		}
-		catch (...)
-		{
-			mapper.DropTbl (model);
-			mapper.CreateTbl (model);
-		}
-	};
-	initTable (ModelA {});
-	initTable (ModelB {});
-	initTable (ModelC {});
-	initTable (ModelD {});
+			try
+			{
+				mapper.CreateTbl (model);
+			}
+			catch (...)
+			{
+				mapper.DropTbl (model);
+				mapper.CreateTbl (model);
+			}
+		};
+		initTable (ModelA {});
+		initTable (ModelB {});
+		initTable (ModelC {});
+		initTable (ModelD {});
+	}
 
 	//
 	// Case: Not Compile - NO ORMAP
 	//
-
-	//mapper.CreateTbl (int ());
-	//mapper.DropTbl (int ());
-	//mapper.Insert (int ());
-	//mapper.Insert (int (), false);
-	////mapper.InsertRange (int ());
-	//mapper.InsertRange (std::vector<int> ());
-	//mapper.InsertRange (std::vector<int> (), false);
-	//mapper.Update (int ());
-	////mapper.UpdateRange (int ());
-	//mapper.UpdateRange (std::vector<int> ());
-	//mapper.Update (int (), SetExpr { "" }, Expr { Selectable<int> {"", nullptr}, "" });
-	//mapper.Delete (int ());
-	//mapper.Delete (int (), Expr { Selectable<int> {"", nullptr}, "" });
-	//mapper.Query (int ());
-	//FieldExtractor { int (), double () };
-	////mapper.Query (ModelA {})
-	////	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
-	////mapper.Query (ModelA {})
-	////	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
+	{
+		//mapper.CreateTbl (int ());
+		//mapper.DropTbl (int ());
+		//mapper.Insert (int ());
+		//mapper.Insert (int (), false);
+		////mapper.InsertRange (int ());
+		//mapper.InsertRange (std::vector<int> ());
+		//mapper.InsertRange (std::vector<int> (), false);
+		//mapper.Update (int ());
+		////mapper.UpdateRange (int ());
+		//mapper.UpdateRange (std::vector<int> ());
+		//mapper.Update (int (), SetExpr { "" }, Expr { Selectable<int> {"", nullptr}, "" });
+		//mapper.Delete (int ());
+		//mapper.Delete (int (), Expr { Selectable<int> {"", nullptr}, "" });
+		//mapper.Query (int ());
+		//FieldExtractor { int (), double () };
+		////mapper.Query (ModelA {})
+		////	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
+		////mapper.Query (ModelA {})
+		////	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
+	}
 
 	//
 	// Case: Not Compile - Not Support Field
 	//
-
-	//mapper.CreateTbl (ModelE {});
-	//mapper.Insert (ModelE {});
-	//mapper.Update (ModelE {});
-	//mapper.Delete (ModelE {});
-	//mapper.Query (ModelE {}).ToList ();
+	{
+		//mapper.CreateTbl (ModelE {});
+		//mapper.Insert (ModelE {});
+		//mapper.Update (ModelE {});
+		//mapper.Delete (ModelE {});
+		//mapper.Query (ModelE {}).ToList ();
+	}
 
 	//
 	// Case: Only One Field Mapping
 	//
+	{
+		ModelA ma;
+		ModelD md;
+		auto field = FieldExtractor { ma, md };
 
-	ModelA ma;
-	ModelD md;
-	auto field = FieldExtractor { ma, md };
+		mapper.Insert (ModelD { 0 });
+		mapper.Insert (ModelD { 0 }, false);
+		mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
+		mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } }, false);
+		mapper.Update (ModelD { 0 });
+		mapper.UpdateRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
+		mapper.Update (ModelD {}, field (md.d_int) = 6, field (md.d_int) == 0);  // 0 -> 6
+		mapper.Delete (ModelD { 1 });
+		mapper.Delete (ModelD {}, field (md.d_int) == 0);  // No such one
 
-	mapper.Insert (ModelD { 0 });
-	mapper.Insert (ModelD { 0 }, false);
-	mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
-	mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } }, false);
-	mapper.Update (ModelD { 0 });
-	mapper.UpdateRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
-	mapper.Update (ModelD {}, field (md.d_int) = 6, field (md.d_int) == 0);  // 0 -> 6
-	mapper.Delete (ModelD { 1 });
-	mapper.Delete (ModelD {}, field (md.d_int) == 0);  // No such one
+		constexpr auto countExpected = 5;
+		constexpr auto firstIdExpected = 2;
+		constexpr auto lastIdExpected = 6;
+		// Expected: 2, 3, 4, 5, 6
 
-	constexpr auto countExpected = 5;
-	constexpr auto firstIdExpected = 2;
-	constexpr auto lastIdExpected = 6;
-	// Expected: 2, 3, 4, 5, 6
-
-	assert (mapper.Query (ModelD {})
-			.Select (Count ()).Value () == countExpected);
-	assert (mapper.Query (ModelD {})
-			.LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
-			.Select (Count ()).Value () == countExpected);
-	mapper.Insert (ModelA {}, false);
-	assert (mapper.Query (ModelD {}).Select (field (md.d_int))
-			.Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))
-			.ToList ().size () == countExpected + 1);
-	assert (mapper.Query (ModelD {})
-			.ToVector ()[countExpected - 1].d_int == lastIdExpected);
-	auto firstTuple = mapper.Query (ModelD {})
-		.Select (field (md.d_int))
-		.ToList ().front ();
-	assert (std::get<0> (firstTuple).Value () == firstIdExpected);
+		assert (mapper.Query (ModelD {})
+				.Select (Count ()).Value () == countExpected);
+		assert (mapper.Query (ModelD {})
+				.LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
+				.Select (Count ()).Value () == countExpected);
+		mapper.Insert (ModelA {}, false);
+		assert (mapper.Query (ModelD {}).Select (field (md.d_int))
+				.Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))
+				.ToList ().size () == countExpected + 1);
+		assert (mapper.Query (ModelD {})
+				.ToVector ()[countExpected - 1].d_int == lastIdExpected);
+		auto firstTuple = mapper.Query (ModelD {})
+			.Select (field (md.d_int))
+			.ToList ().front ();
+		assert (std::get<0> (firstTuple).Value () == firstIdExpected);
+	}
 
 	//
 	// Case: Scope of Mapper
 	//
-
-	Queryable<ModelA> *queryable;
 	{
-		ORMapper mapper2 ("Test.db");
-		queryable = new Queryable<ModelA> { mapper2.Query (ModelA {}) };
+		Queryable<ModelA> *queryable;
+		{
+			ORMapper mapper2 ("Test.db");
+			queryable = new Queryable<ModelA> { mapper2.Query (ModelA {}) };
+		}
+		assert (queryable->ToList ().size () == 1);
+		delete queryable;
 	}
-	assert (queryable->ToList ().size () == 1);
-	delete queryable;
+
+	//
+	// Case: Not Code First Cases
+	//
+	{
+		mapper.DropTbl (ModelD {});
+		{
+			sqlite3 *db;
+			sqlite3_open (TESTDB, &db);
+			auto rc = sqlite3_exec (
+				db,
+				"CREATE TABLE ModelD (d_int INTEGER,d_str TEXT);"
+				"INSERT INTO ModelD values (1, 'John');",
+				0, 0, 0);
+			sqlite3_close (db);
+
+			std::string exMsg;
+			try
+			{
+				mapper.Query (ModelD {}).ToList ();
+			}
+			catch (const std::exception &ex)
+			{
+				exMsg = ex.what ();
+			}
+			assert (exMsg == "SQL error: 'Bad Column Count' at 'select * from ModelD;'");
+		}
+		mapper.DropTbl (ModelD {});
+		mapper.CreateTbl (ModelD {});
+	}
 
 	std::cout << "Test Passing" << std::endl;
 	return 0;

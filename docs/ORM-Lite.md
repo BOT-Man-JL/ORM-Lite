@@ -632,10 +632,13 @@ with the **Error Message** if Failed:
   > SQL error: Can't open database `<connectionString>`
 - Failed at Executing **Query** Script
   > SQL error: `<ErrorMessage>` at `<Generated SQL Script>`
-- Pass a **Non-Member** Var of Registered Object to Field **Extractor**
-  > No Such Field for current Extractor
+- Query Result's **Column Count** does **NOT Match** the Expected Count
+  (happening in **NOT** *Code First* Cases...)
+  > SQL error: Bad Column Count at `<Generated SQL Script>`
 - Get `NULL` from Query while the Expected **Field** is **NOT NULL**
   (happening in **NOT** *Code First* Cases...)
-  > Get Null Value for NOT Nullable Type
+  > SQL error: Get Null Value at `<Generated SQL Script>`
+- Pass a **Non-Member** Var of Registered Object to Field **Extractor**
+  > No Such Field for current Extractor
 - **Composite** Fields from **NOT** the Same Tables
   > Fields are NOT from the Same Table

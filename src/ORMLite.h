@@ -54,8 +54,11 @@ constexpr static const char *__TableName =  _TABLE_NAME_; \
 
 #define NO_ORMAP "Please Inject the Class with 'ORMAP' first"
 #define BAD_TYPE "Only Support Integral, Floating Point and std::string"
+
+#define BAD_COLUMN_COUNT "Bad Column Count"
+#define NULL_DESERIALIZE "Get Null Value"
+
 #define NO_FIELD "No Such Field for current Extractor"
-#define NULL_DESERIALIZE "Get Null Value for NOT Nullable Type"
 #define NOT_SAME_TABLE "Fields are NOT from the Same Table"
 
 // Nullable Template
@@ -166,13 +169,10 @@ namespace BOT_ORM_Impl
 	public:
 		SQLConnector (const std::string &fileName)
 		{
-			if (sqlite3_open (fileName.c_str (), &db))
-			{
-				sqlite3_close (db);
+			if (sqlite3_open (fileName.c_str (), &db) != SQLITE_OK)
 				throw std::runtime_error (
 					std::string ("SQL error: Can't open database '")
 					+ sqlite3_errmsg (db) + "'");
-			}
 		}
 
 		~SQLConnector ()
@@ -205,22 +205,18 @@ namespace BOT_ORM_Impl
 		}
 
 		void ExecuteCallback (const std::string &cmd,
-							  std::function<void (char **) noexcept> callback)
+							  std::function<void (int, char **)>
+							  callback)
 		{
 			char *zErrMsg = 0;
 			int rc;
 
-			auto callbackWrapper = [] (void *fn, int, char **argv, char **)
-			{
-				static_cast<std::function<void (char **argv) noexcept> *>
-					(fn)->operator()(argv);
-				return 0;
-			};
+			auto callbackParam = std::make_pair (&callback, std::string {});
 
 			for (size_t iTry = 0; iTry < MAX_TRIAL; iTry++)
 			{
-				rc = sqlite3_exec (db, cmd.c_str (), callbackWrapper,
-								   &callback, &zErrMsg);
+				rc = sqlite3_exec (db, cmd.c_str (), CallbackWrapper,
+								   &callbackParam, &zErrMsg);
 				if (rc != SQLITE_BUSY)
 					break;
 
@@ -228,7 +224,14 @@ namespace BOT_ORM_Impl
 					std::chrono::microseconds (20));
 			}
 
-			if (rc != SQLITE_OK)
+			if (rc == SQLITE_ABORT)
+			{
+				auto errStr = "SQL error: '" + callbackParam.second +
+					"' at '" + cmd + "'";
+				sqlite3_free (zErrMsg);
+				throw std::runtime_error (errStr);
+			}
+			else if (rc != SQLITE_OK)
 			{
 				auto errStr = std::string ("SQL error: '") + zErrMsg
 					+ "' at '" + cmd + "'";
@@ -240,6 +243,26 @@ namespace BOT_ORM_Impl
 	private:
 		sqlite3 *db;
 		constexpr static size_t MAX_TRIAL = 16;
+
+		static int CallbackWrapper (
+			void *callbackParam, int argc, char **argv, char **)
+		{
+			auto pParam = static_cast<std::pair<
+				std::function<void (int, char **)> *,
+				std::string
+			>*>(callbackParam);
+
+			try
+			{
+				pParam->first->operator()(argc, argv);
+				return 0;
+			}
+			catch (const std::exception &ex)
+			{
+				pParam->second = ex.what ();
+				return 1;
+			}
+		}
 	};
 
 	// Helper - Field Type Checker
@@ -1119,8 +1142,11 @@ namespace BOT_ORM
 			Nullable<T> ret;
 			_connector->ExecuteCallback (_sqlSelect + agg.fieldName +
 										 _GetFromSql () + _GetLimit () + ";",
-										 [&] (char **argv)
+										 [&] (int argc, char **argv)
 			{
+				if (argc != 1)
+					throw std::runtime_error (BAD_COLUMN_COUNT);
+
 				BOT_ORM_Impl::DeserializationHelper::
 					Deserialize (ret, argv[0]);
 			});
@@ -1200,8 +1226,15 @@ namespace BOT_ORM
 			auto copy = _queryHelper;
 			_connector->ExecuteCallback (_sqlSelect + _sqlTarget +
 										 _GetFromSql () + _GetLimit () + ";",
-										 [&] (char **argv)
+										 [&] (int argc, char **argv)
 			{
+				BOT_ORM_Impl::InjectionHelper::Visit (
+					copy, [argc] (auto & ... args)
+				{
+					if (sizeof... (args) != argc)
+						throw std::runtime_error (BAD_COLUMN_COUNT);
+				});
+
 				BOT_ORM_Impl::InjectionHelper::Visit (
 					copy, [argv] (auto & ... args)
 				{
@@ -1225,8 +1258,11 @@ namespace BOT_ORM
 			auto copy = _queryHelper;
 			_connector->ExecuteCallback (_sqlSelect + _sqlTarget +
 										 _GetFromSql () + _GetLimit () + ";",
-										 [&] (char **argv)
+										 [&] (int argc, char **argv)
 			{
+				if (std::tuple_size<QueryResult>::value != argc)
+					throw std::runtime_error (BAD_COLUMN_COUNT);
+
 				size_t index = 0;
 				BOT_ORM_Impl::QueryableHelper::TupleVisit (
 					copy, [argv, &index] (auto &val)
@@ -1713,7 +1749,9 @@ namespace BOT_ORM
 // Clear Intra Macros
 #undef NO_ORMAP
 #undef BAD_TYPE
+
 #undef NO_FIELD
+#undef BAD_COLUMN_COUNT
 #undef NULL_DESERIALIZE
 #undef NOT_SAME_TABLE
 
