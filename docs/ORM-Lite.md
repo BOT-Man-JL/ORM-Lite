@@ -337,14 +337,14 @@ Remarks:
 ### Retrieve Results
 
 ``` cpp
-Nullable<T> Select (const Expression::Aggregate<T> &agg) const;
+Nullable<T> Aggregate (const Expression::Aggregate<T> &agg) const;
 std::vector<QueryResult> ToVector () const;
 std::list<QueryResult> ToList () const;
 ```
 
 Remarks:
 - `QueryResult` specifies the **Row Type** of Query Result;
-- `Select` will Get the one-or-zero-row Result for `agg` immediately;
+- `Aggregate` will Get the one-or-zero-row Result for `agg`;
 - `ToVector` / `ToList` returns the Collection of `QueryResult`;
 - The results are from the **Connection** of `Queryable`;
 - If the Result is `null` for `NOT Nullable` Field,

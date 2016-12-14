@@ -216,7 +216,9 @@ try
     mapper.Transaction ([&] ()
     {
         mapper.Delete (initObjs[0]);  // OK
-        mapper.Insert (UserModel { 1, "Joke", 0 });  // Failed
+        mapper.Insert (UserModel {
+            1, "Joke", 0, nullptr, nullptr, nullptr
+        });  // Failed
     });
 }
 catch (const std::exception &ex)
@@ -258,8 +260,10 @@ catch (const std::exception &ex)
 ``` cpp
 std::vector<UserModel> dataToSeed;
 for (int i = 50; i < 100; i++)
-    dataToSeed.emplace_back (
-        UserModel { i, "July_" + std::to_string (i), i * 0.2 });
+    dataToSeed.emplace_back (UserModel {
+        i, "July_" + std::to_string (i), i * 0.2,
+        nullptr, nullptr, nullptr
+});
 
 // Insert by Batch Insert
 mapper.Transaction ([&] () {
@@ -318,7 +322,7 @@ auto result2 = mapper.Query (UserModel {})
 // Calculate Aggregate Function
 auto avg = mapper.Query (UserModel {})
     .Where (field (user.user_name) & std::string ("July%"))
-    .Select (Avg (field (user.credit_count)));
+    .Aggregate (Avg (field (user.credit_count)));
 
 // Remarks:
 // SELECT AVG (credit_count) FROM UserModel
@@ -328,7 +332,7 @@ auto avg = mapper.Query (UserModel {})
 
 auto count = mapper.Query (UserModel {})
     .Where (field (user.user_name) | std::string ("July%"))
-    .Select (Count ());
+    .Aggregate (Count ());
 
 // Remarks:
 // SELECT COUNT (*) FROM UserModel

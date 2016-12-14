@@ -151,10 +151,10 @@ int main ()
 		// Expected: 2, 3, 4, 5, 6
 
 		assert (mapper.Query (ModelD {})
-				.Select (Count ()).Value () == countExpected);
+				.Aggregate (Count ()).Value () == countExpected);
 		assert (mapper.Query (ModelD {})
 				.LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
-				.Select (Count ()).Value () == countExpected);
+				.Aggregate (Count ()).Value () == countExpected);
 		mapper.Insert (ModelA {}, false);
 		assert (mapper.Query (ModelD {}).Select (field (md.d_int))
 				.Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))

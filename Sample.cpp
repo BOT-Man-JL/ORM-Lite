@@ -301,7 +301,7 @@ int main ()
 	// Calculate Aggregate Function
 	auto avg = mapper.Query (UserModel {})
 		.Where (field (user.user_name) & std::string ("July%"))
-		.Select (Avg (field (user.credit_count)));
+		.Aggregate (Avg (field (user.credit_count)));
 
 	// Remarks:
 	// SELECT AVG (credit_count) FROM UserModel
@@ -311,7 +311,7 @@ int main ()
 
 	auto count = mapper.Query (UserModel {})
 		.Where (field (user.user_name) | std::string ("July%"))
-		.Select (Count ());
+		.Aggregate (Count ());
 
 	// Remarks:
 	// SELECT COUNT (*) FROM UserModel

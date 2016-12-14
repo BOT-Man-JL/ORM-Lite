@@ -1137,7 +1137,7 @@ namespace BOT_ORM
 
 		// Get Result
 		template <typename T>
-		Nullable<T> Select (const Expression::Aggregate<T> &agg) const
+		Nullable<T> Aggregate (const Expression::Aggregate<T> &agg) const
 		{
 			Nullable<T> ret;
 			_connector->ExecuteCallback (_sqlSelect + agg.fieldName +
@@ -1221,7 +1221,7 @@ namespace BOT_ORM
 
 		// Select for Normal Objects
 		template <typename C, typename Out>
-		void _Select (const C &, Out &out) const
+		inline void _Select (const C &, Out &out) const
 		{
 			auto copy = _queryHelper;
 			_connector->ExecuteCallback (_sqlSelect + _sqlTarget +
@@ -1253,14 +1253,14 @@ namespace BOT_ORM
 
 		// Select for Tuples
 		template <typename Out, typename... Args>
-		void _Select (const std::tuple<Args...> &, Out &out) const
+		inline void _Select (const std::tuple<Args...> &, Out &out) const
 		{
 			auto copy = _queryHelper;
 			_connector->ExecuteCallback (_sqlSelect + _sqlTarget +
 										 _GetFromSql () + _GetLimit () + ";",
 										 [&] (int argc, char **argv)
 			{
-				if (std::tuple_size<QueryResult>::value != argc)
+				if (sizeof... (Args) != argc)
 					throw std::runtime_error (BAD_COLUMN_COUNT);
 
 				size_t index = 0;
