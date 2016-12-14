@@ -1323,7 +1323,7 @@ namespace BOT_ORM
 			auto addTypeStr = [&fieldNames, &fieldFixes] (
 				const auto &arg, size_t index)
 			{
-				// Why addTypeStr:
+				// Why addTypeStr?
 				// Walkaround the 'undefined reference' in gcc/clang
 				constexpr const char *typeStr = BOT_ORM_Impl::TypeString<
 					std::remove_cv_t<std::remove_reference_t<decltype(arg)>>
@@ -1478,10 +1478,19 @@ namespace BOT_ORM
 				entity, [&os] (const auto &primaryKey,
 							   const auto & ... dummy)
 			{
+				auto eatdummy = [] (const auto &) {};
+				(void) eatdummy;
+
 				// Why 'dummy'?
-				// It's an issue of gcc 5.4:
-				//   'template argument deduction/substitution failed'
-				//   if no 'dummy' literal (WTF) !!!
+				// Walkaround 'template argument deduction/substitution failed' on gcc 5.4
+				using expander = int[];
+				(void) expander
+				{
+					// Why '(void *) &dummy'?
+					// Walkaround 'fatal error c1001: an internal error has occurred in the compiler.' on MSVC 14
+					0, (eatdummy (dummy), 0)...
+				};
+
 				if (!BOT_ORM_Impl::SerializationHelper::
 					Serialize (os, primaryKey))
 					os << "null";
@@ -1597,6 +1606,7 @@ namespace BOT_ORM
 				{
 					0, (serializeField (args, index++), 0)...
 				};
+				(void) serializeField;
 
 				if (anyField)
 				{
@@ -1650,6 +1660,7 @@ namespace BOT_ORM
 				{
 					0, (serializeField (args, index++), 0)...
 				};
+				(void) serializeField;
 
 				os.seekp (os.tellp () - std::streamoff (1));
 

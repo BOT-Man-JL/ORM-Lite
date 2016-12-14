@@ -1,16 +1,17 @@
 
 TARGET = Test
 SOURCES=Test.cpp ../src/sqlite3.c
+WARNINGFLAGS = -Wall -W
 CPPFLAGS = -std=c++14
 LINKS = -lstdc++ -lpthread -ldl
 
 OBJS = $(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(SOURCES)))
 
 %.o: %.c
-	$(CC) -c $< -o $@ $(LINKS)
+	$(CC) -c $< -o $@ $(WARNINGFLAGS) $(LINKS)
 
 %.o: %.cpp
-	$(CC) -c $< -o $@ $(LINKS) $(CPPFLAGS)
+	$(CC) -c $< -o $@ $(WARNINGFLAGS) $(LINKS) $(CPPFLAGS)
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LINKS)

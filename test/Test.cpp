@@ -187,7 +187,7 @@ int main ()
 		{
 			sqlite3 *db;
 			sqlite3_open (TESTDB, &db);
-			auto rc = sqlite3_exec (
+			sqlite3_exec (
 				db,
 				"CREATE TABLE ModelD (d_int INTEGER,d_str TEXT);"
 				"INSERT INTO ModelD values (1, 'John');",

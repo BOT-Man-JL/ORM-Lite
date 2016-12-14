@@ -206,7 +206,9 @@ int main ()
 		mapper.Transaction ([&] ()
 		{
 			mapper.Delete (initObjs[0]);  // OK
-			mapper.Insert (UserModel { 1, "Joke", 0 });  // Failed
+			mapper.Insert (UserModel {
+				1, "Joke", 0, nullptr, nullptr, nullptr
+			});  // Failed
 		});
 	}
 	catch (const std::exception &ex)
@@ -245,8 +247,10 @@ int main ()
 
 	std::vector<UserModel> dataToSeed;
 	for (int i = 50; i < 100; i++)
-		dataToSeed.emplace_back (
-			UserModel { i, "July_" + std::to_string (i), i * 0.2 });
+		dataToSeed.emplace_back (UserModel {
+			i, "July_" + std::to_string (i), i * 0.2,
+			nullptr, nullptr, nullptr
+	});
 
 	// Insert by Batch Insert
 	mapper.Transaction ([&] () {
