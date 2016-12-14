@@ -314,7 +314,7 @@ namespace BOT_ORM_Impl
 		template <typename T>
 		static inline
 			std::enable_if_t<TypeString<T>::typeStr == nullptr, bool>
-			Serialize (std::ostream &os, const T &value)
+			Serialize (std::ostream &, const T &)
 		{}
 		template <typename T>
 		static inline
@@ -348,7 +348,7 @@ namespace BOT_ORM_Impl
 	{
 		template <typename T>
 		static inline std::enable_if_t<TypeString<T>::typeStr == nullptr>
-			Deserialize (T &property, const char *value)
+			Deserialize (T &, const char *)
 		{}
 		template <typename T>
 		static inline std::enable_if_t<TypeString<T>::typeStr != nullptr>
@@ -1091,8 +1091,8 @@ namespace BOT_ORM
 
 		// Join
 		template <typename C>
-		inline auto Join (const C &queryHelper2,
-						  const Expression::Expr &onExpr,
+		inline auto Join (const C &,
+						  const Expression::Expr &,
 						  std::enable_if_t<
 						  !HasInjected<C>::value>
 						  * = nullptr) const
@@ -1109,8 +1109,8 @@ namespace BOT_ORM
 
 		// Left Join
 		template <typename C>
-		inline auto LeftJoin (const C &queryHelper2,
-							  const Expression::Expr &onExpr,
+		inline auto LeftJoin (const C &,
+							  const Expression::Expr &,
 							  std::enable_if_t<
 							  !HasInjected<C>::value>
 							  * = nullptr) const
@@ -1310,11 +1310,12 @@ namespace BOT_ORM
 
 		template <typename C, typename... Args>
 		std::enable_if_t<!HasInjected<C>::value>
-			CreateTbl (const C &entity, const Args & ... args)
+			CreateTbl (const C &, const Args & ...)
 		{}
 		template <typename C, typename... Args>
 		std::enable_if_t<HasInjected<C>::value>
-			CreateTbl (const C &entity, const Args & ... args)
+			CreateTbl (const C &entity,
+					   const Args & ... constraints)
 		{
 			const auto &fieldNames =
 				BOT_ORM_Impl::InjectionHelper::FieldNames (entity);
@@ -1330,6 +1331,7 @@ namespace BOT_ORM
 				>::typeStr;
 				fieldFixes.emplace (fieldNames[index], typeStr);
 			};
+			(void) addTypeStr;
 
 			BOT_ORM_Impl::InjectionHelper::Visit (
 				entity, [&addTypeStr] (const auto & ... args)
@@ -1345,7 +1347,7 @@ namespace BOT_ORM
 			fieldFixes[fieldNames[0]] += " primary key";
 
 			std::string tableFixes;
-			_GetConstraints (tableFixes, fieldFixes, args...);
+			_GetConstraints (tableFixes, fieldFixes, constraints...);
 
 			std::string strFmt;
 			for (const auto &field : fieldNames)
@@ -1361,7 +1363,7 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			DropTbl (const C &entity)
+			DropTbl (const C &)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1375,7 +1377,7 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			Insert (const C &entity, bool withId = true)
+			Insert (const C &, bool = true)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1388,7 +1390,7 @@ namespace BOT_ORM
 
 		template <typename In, typename C = typename In::value_type>
 		std::enable_if_t<!HasInjected<C>::value>
-			InsertRange (const In &entities, bool withId = true)
+			InsertRange (const In &, bool = true)
 		{}
 		template <typename In, typename C = typename In::value_type>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1407,7 +1409,7 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			Update (const C &entity)
+			Update (const C &)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1420,7 +1422,7 @@ namespace BOT_ORM
 
 		template <typename In, typename C = typename In::value_type>
 		std::enable_if_t<!HasInjected<C>::value>
-			UpdateRange (const In &entities)
+			UpdateRange (const In &)
 		{}
 		template <typename In, typename C = typename In::value_type>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1439,9 +1441,9 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			Update (const C &entity,
-					const Expression::SetExpr &setExpr,
-					const Expression::Expr &whereExpr)
+			Update (const C &,
+					const Expression::SetExpr &,
+					const Expression::Expr &)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1459,7 +1461,7 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			Delete (const C &entity)
+			Delete (const C &)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1478,6 +1480,8 @@ namespace BOT_ORM
 				entity, [&os] (const auto &primaryKey,
 							   const auto & ... dummy)
 			{
+				// Why 'eatdummy'?
+				// Walkaround 'fatal error c1001: an internal error has occurred in the compiler.' on MSVC 14
 				auto eatdummy = [] (const auto &) {};
 				(void) eatdummy;
 
@@ -1486,8 +1490,6 @@ namespace BOT_ORM
 				using expander = int[];
 				(void) expander
 				{
-					// Why '(void *) &dummy'?
-					// Walkaround 'fatal error c1001: an internal error has occurred in the compiler.' on MSVC 14
 					0, (eatdummy (dummy), 0)...
 				};
 
@@ -1502,8 +1504,8 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			Delete (const C &entity,
-					const Expression::Expr &whereExpr)
+			Delete (const C &,
+					const Expression::Expr &)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>
@@ -1519,7 +1521,7 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value, Queryable<C>>
-			Query (C queryHelper)
+			Query (C)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value, Queryable<C>>
@@ -1690,7 +1692,7 @@ namespace BOT_ORM
 
 		template <typename C>
 		std::enable_if_t<!HasInjected<C>::value>
-			Extract (const C &helper)
+			Extract (const C &)
 		{}
 		template <typename C>
 		std::enable_if_t<HasInjected<C>::value>

@@ -95,6 +95,7 @@ int main ()
 	//
 	{
 		//mapper.CreateTbl (int ());
+		//mapper.CreateTbl (int (), Constraint::Unique (Field<int> {"", nullptr}));
 		//mapper.DropTbl (int ());
 		//mapper.Insert (int ());
 		//mapper.Insert (int (), false);
