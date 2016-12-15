@@ -104,6 +104,7 @@ Note that:
   (otherwise SQLite 3 will Generate a Column for `ROWID` Implicitly)
 - Field Names MUST **NOT** be SQL Keywords (SQL Constraint);
 - `std::string` Value MUST **NOT** contain `\0` (SQL Constraint);
+- `std::string` Value can be **utf-8** to support **Locale**;
 - `ORMAP (...)` will **auto** Inject some **private members**;
   - `__Accept ()` to Implement **Visitor Pattern**;
   - `__Tuple ()` to **Flatten** data to tuple;
