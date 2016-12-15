@@ -212,6 +212,17 @@ int main ()
 		mapper.CreateTbl (ModelD {});
 	}
 
+	//
+	// Case: Chinese Chars
+	//
+	{
+		mapper.DropTbl (ModelA {});
+		mapper.CreateTbl (ModelA {});
+		mapper.Insert (ModelA { 0, "ÄãºÃ", 3.14, nullptr, nullptr, nullptr }, false);
+		auto chinese = mapper.Query (ModelA {}).ToList ().front ().a_string;
+		assert (chinese == "ÄãºÃ");
+	}
+
 	std::cout << "Test Passing" << std::endl;
 	return 0;
 }
