@@ -1,4 +1,4 @@
-
+ï»¿
 // Unit Test of ORM Lite
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
@@ -218,11 +218,11 @@ int main ()
 	{
 		mapper.DropTbl (ModelA {});
 		mapper.CreateTbl (ModelA {});
-		mapper.Insert (ModelA { 0, "ÄãºÃ", 3.14, nullptr, nullptr, nullptr }, false);
-		mapper.Insert (ModelA { 0, u8"ÊÀ½ç", 7.28, nullptr, nullptr, nullptr }, false);
+		mapper.Insert (ModelA { 0, "ä½ å¥½", 3.14, nullptr, nullptr, nullptr }, false);
+		mapper.Insert (ModelA { 0, u8"ä¸–ç•Œ", 7.28, nullptr, nullptr, nullptr }, false);
 		auto chinese = mapper.Query (ModelA {}).ToVector ();
-		assert (chinese[0].a_string == "ÄãºÃ" &&
-				chinese[1].a_string == u8"ÊÀ½ç");
+		assert (chinese[0].a_string == "ä½ å¥½" &&
+				chinese[1].a_string == u8"ä¸–ç•Œ");
 	}
 
 	std::cout << "Test Passing" << std::endl;
