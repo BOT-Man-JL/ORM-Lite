@@ -71,6 +71,7 @@ int main ()
 	ORMapper mapper (TESTDB);
 
 	// Create Brand New Tables
+	auto initTables = [&mapper] ()
 	{
 		auto initTable = [&mapper] (const auto &model)
 		{
@@ -88,7 +89,8 @@ int main ()
 		initTable (ModelB {});
 		initTable (ModelC {});
 		initTable (ModelD {});
-	}
+	};
+	initTables ();
 
 	//
 	// Case: Not Compile - NO ORMAP

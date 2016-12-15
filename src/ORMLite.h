@@ -1003,45 +1003,76 @@ namespace BOT_ORM
 
 	public:
 		// Distinct
-		inline Queryable Distinct () const
+		inline Queryable Distinct () const &
 		{
 			auto ret = *this;
 			ret._sqlSelect = "select distinct ";
 			return ret;
 		}
+		inline Queryable Distinct () &&
+		{
+			(*this)._sqlSelect = "select distinct ";
+			return std::move (*this);
+		}
 
 		// Where
-		inline Queryable Where (const Expression::Expr &expr) const
+		inline Queryable Where (const Expression::Expr &expr) const &
 		{
 			auto ret = *this;
 			ret._sqlWhere = " where (" + expr.ToString (true) + ")";
 			return ret;
 		}
+		inline Queryable Where (const Expression::Expr &expr) &&
+		{
+			(*this)._sqlWhere = " where (" + expr.ToString (true) + ")";
+			return std::move (*this);
+		}
 
 		// Group By
 		template <typename T>
-		inline Queryable GroupBy (const Expression::Field<T> &field) const
+		inline Queryable GroupBy (const Expression::Field<T> &field) const &
 		{
 			auto ret = *this;
 			ret._sqlGroupBy = " group by " +
 				BOT_ORM_Impl::QueryableHelper::FieldToSql (field);
 			return ret;
 		}
-		inline Queryable Having (const Expression::Expr &expr) const
+		template <typename T>
+		inline Queryable GroupBy (const Expression::Field<T> &field) &&
+		{
+			(*this)._sqlGroupBy = " group by " +
+				BOT_ORM_Impl::QueryableHelper::FieldToSql (field);
+			return std::move (*this);
+		}
+
+		// Having
+		inline Queryable Having (const Expression::Expr &expr) const &
 		{
 			auto ret = *this;
 			ret._sqlHaving = " having " + expr.ToString (true);
 			return ret;
 		}
+		inline Queryable Having (const Expression::Expr &expr) &&
+		{
+			(*this)._sqlHaving = " having " + expr.ToString (true);
+			return std::move (*this);
+		}
 
-		// Limit and Offset
-		inline Queryable Take (size_t count) const
+		// Limit
+		inline Queryable Take (size_t count) const &
 		{
 			auto ret = *this;
 			ret._sqlLimit = " limit " + std::to_string (count);
 			return ret;
 		}
-		inline Queryable Skip (size_t count) const
+		inline Queryable Take (size_t count) &&
+		{
+			(*this)._sqlLimit = " limit " + std::to_string (count);
+			return std::move (*this);
+		}
+
+		// Offset
+		inline Queryable Skip (size_t count) const &
 		{
 			auto ret = *this;
 			if (ret._sqlLimit.empty ())
@@ -1049,11 +1080,18 @@ namespace BOT_ORM
 			ret._sqlOffset = " offset " + std::to_string (count);
 			return ret;
 		}
+		inline Queryable Skip (size_t count) &&
+		{
+			if ((*this)._sqlLimit.empty ())
+				(*this)._sqlLimit = " limit ~0";  // ~0 is a trick :-)
+			(*this)._sqlOffset = " offset " + std::to_string (count);
+			return std::move (*this);
+		}
 
 		// Order By
 		template <typename T>
 		inline Queryable OrderBy (
-			const Expression::Field<T> &field) const
+			const Expression::Field<T> &field) const &
 		{
 			auto ret = *this;
 			if (ret._sqlOrderBy.empty ())
@@ -1065,8 +1103,22 @@ namespace BOT_ORM
 			return ret;
 		}
 		template <typename T>
+		inline Queryable OrderBy (
+			const Expression::Field<T> &field) &&
+		{
+			if ((*this)._sqlOrderBy.empty ())
+				(*this)._sqlOrderBy = " order by " +
+				BOT_ORM_Impl::QueryableHelper::FieldToSql (field);
+			else
+				(*this)._sqlOrderBy += "," +
+				BOT_ORM_Impl::QueryableHelper::FieldToSql (field);
+			return std::move (*this);
+		}
+
+		// Order By Desc
+		template <typename T>
 		inline Queryable OrderByDescending (
-			const Expression::Field<T> &field) const
+			const Expression::Field<T> &field) const &
 		{
 			auto ret = *this;
 			if (ret._sqlOrderBy.empty ())
@@ -1076,6 +1128,18 @@ namespace BOT_ORM
 				ret._sqlOrderBy += "," +
 				BOT_ORM_Impl::QueryableHelper::FieldToSql (field) + " desc";
 			return ret;
+		}
+		template <typename T>
+		inline Queryable OrderByDescending (
+			const Expression::Field<T> &field) &&
+		{
+			if ((*this)._sqlOrderBy.empty ())
+				(*this)._sqlOrderBy = " order by " +
+				BOT_ORM_Impl::QueryableHelper::FieldToSql (field) + " desc";
+			else
+				(*this)._sqlOrderBy += "," +
+				BOT_ORM_Impl::QueryableHelper::FieldToSql (field) + " desc";
+			return std::move (*this);
 		}
 
 		// Select
@@ -1177,9 +1241,10 @@ namespace BOT_ORM
 
 		// Return a new Queryable Object
 		template <typename... Args>
-		inline auto _NewQuery (std::string sqlTarget,
-							   std::string sqlFrom,
-							   std::tuple<Args...> &&newQueryHelper) const
+		inline Queryable<std::tuple<Args...>> _NewQuery (
+			std::string sqlTarget,
+			std::string sqlFrom,
+			std::tuple<Args...> &&newQueryHelper) const
 		{
 			return Queryable<std::tuple<Args...>> (
 				_connector, newQueryHelper,
@@ -1205,8 +1270,8 @@ namespace BOT_ORM
 		}
 
 		// Return a new Compound Queryable Object
-		auto _NewCompoundQuery (const Queryable &queryable,
-								std::string compoundStr) const
+		Queryable _NewCompoundQuery (const Queryable &queryable,
+									 std::string compoundStr) const
 		{
 			auto ret = *this;
 			ret._sqlFrom = ret._GetFromSql () +
