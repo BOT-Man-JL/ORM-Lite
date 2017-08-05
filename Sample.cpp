@@ -278,7 +278,7 @@ int main ()
         .Where (
             field (user.user_name) & std::string ("July%") &&
             (field (user.age) >= 32 &&
-             field (user.title) != nullptr)
+                field (user.title) != nullptr)
         )
         .OrderByDescending (field (user.age))
         .OrderBy (field (user.user_id))
@@ -336,7 +336,7 @@ int main ()
 
     // Delete by Condition
     mapper.Delete (UserModel {},
-                   field (user.user_id) >= 90);
+        field (user.user_id) >= 90);
 
     // Remarks:
     // DELETE FROM UserModel WHERE (id >= 90)
@@ -364,11 +364,11 @@ int main ()
     // Join Tables for Query
     auto joinedQuery = mapper.Query (UserModel {})
         .Join (OrderModel {},
-               field (user.user_id) ==
-               field (order.user_id))
+            field (user.user_id) ==
+            field (order.user_id))
         .LeftJoin (SellerModel {},
-                   field (seller.seller_id) ==
-                   field (order.seller_id))
+            field (seller.seller_id) ==
+            field (order.seller_id))
         .Where (field (user.user_id) >= 65);
 
     // Get Result to List
@@ -394,8 +394,8 @@ int main ()
     // Group & Having ~
     auto result4 = joinedQuery
         .Select (field (order.user_id),
-                 field (user.user_name),
-                 Avg (field (order.fee)))
+            field (user.user_name),
+            Avg (field (order.fee)))
         .GroupBy (field (user.user_name))
         .Having (Sum (field (order.fee)) >= 40.5)
         .Skip (3)

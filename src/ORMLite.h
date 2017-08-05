@@ -71,19 +71,19 @@ namespace BOT_ORM
     {
         template <typename T2>
         friend bool operator== (const Nullable<T2> &op1,
-                                const Nullable<T2> &op2);
+            const Nullable<T2> &op2);
         template <typename T2>
         friend bool operator== (const Nullable<T2> &op,
-                                const T2 &value);
+            const T2 &value);
         template <typename T2>
         friend bool operator== (const T2 &value,
-                                const Nullable<T2> &op);
+            const Nullable<T2> &op);
         template <typename T2>
         friend bool operator== (const Nullable<T2> &op,
-                                std::nullptr_t);
+            std::nullptr_t);
         template <typename T2>
         friend bool operator== (std::nullptr_t,
-                                const Nullable<T2> &op);
+            const Nullable<T2> &op);
     public:
         // Default or Null Construction
         Nullable ()
@@ -128,7 +128,7 @@ namespace BOT_ORM
     // == varialbe
     template <typename T2>
     inline bool operator== (const Nullable<T2> &op1,
-                            const Nullable<T2> &op2)
+        const Nullable<T2> &op2)
     {
         return op1.m_hasValue == op2.m_hasValue &&
             (!op1.m_hasValue || op1.m_value == op2.m_value);
@@ -137,13 +137,13 @@ namespace BOT_ORM
     // == value
     template <typename T2>
     inline bool operator== (const Nullable<T2> &op,
-                            const T2 &value)
+        const T2 &value)
     {
         return op.m_hasValue && op.m_value == value;
     }
     template <typename T2>
     inline bool operator== (const T2 &value,
-                            const Nullable<T2> &op)
+        const Nullable<T2> &op)
     {
         return op.m_hasValue && op.m_value == value;
     }
@@ -151,13 +151,13 @@ namespace BOT_ORM
     // == nullptr
     template <typename T2>
     inline bool operator== (const Nullable<T2> &op,
-                            std::nullptr_t)
+        std::nullptr_t)
     {
         return !op.m_hasValue;
     }
     template <typename T2>
     inline bool operator== (std::nullptr_t,
-                            const Nullable<T2> &op)
+        const Nullable<T2> &op)
     {
         return !op.m_hasValue;
     }
@@ -210,8 +210,8 @@ namespace BOT_ORM_Impl
         }
 
         void ExecuteCallback (const std::string &cmd,
-                              std::function<void (int, char **)>
-                              callback)
+            std::function<void (int, char **)>
+            callback)
         {
             char *zErrMsg = 0;
             int rc;
@@ -221,7 +221,7 @@ namespace BOT_ORM_Impl
             for (size_t iTry = 0; iTry < MAX_TRIAL; iTry++)
             {
                 rc = sqlite3_exec (db, cmd.c_str (), CallbackWrapper,
-                                   &callbackParam, &zErrMsg);
+                    &callbackParam, &zErrMsg);
                 if (rc != SQLITE_BUSY)
                     break;
 
@@ -277,11 +277,11 @@ namespace BOT_ORM_Impl
     {
         constexpr static const char *typeStr =
             (std::is_integral<T>::value &&
-             !std::is_same<T, char>::value &&
-             !std::is_same<T, wchar_t>::value &&
-             !std::is_same<T, char16_t>::value &&
-             !std::is_same<T, char32_t>::value &&
-             !std::is_same<T, unsigned char>::value)
+                !std::is_same<T, char>::value &&
+                !std::is_same<T, wchar_t>::value &&
+                !std::is_same<T, char16_t>::value &&
+                !std::is_same<T, char32_t>::value &&
+                !std::is_same<T, unsigned char>::value)
             ? " integer not null"
             : (std::is_floating_point<T>::value)
             ? " real not null"
@@ -297,11 +297,11 @@ namespace BOT_ORM_Impl
     {
         constexpr static const char *typeStr =
             (std::is_integral<T>::value &&
-             !std::is_same<T, char>::value &&
-             !std::is_same<T, wchar_t>::value &&
-             !std::is_same<T, char16_t>::value &&
-             !std::is_same<T, char32_t>::value &&
-             !std::is_same<T, unsigned char>::value)
+                !std::is_same<T, char>::value &&
+                !std::is_same<T, wchar_t>::value &&
+                !std::is_same<T, char16_t>::value &&
+                !std::is_same<T, char32_t>::value &&
+                !std::is_same<T, unsigned char>::value)
             ? " integer"
             : (std::is_floating_point<T>::value)
             ? " real"
@@ -331,7 +331,7 @@ namespace BOT_ORM_Impl
         }
 
         static inline bool Serialize (std::ostream &os,
-                                      const std::string &value)
+            const std::string &value)
         {
             os << "'" << value << "'";
             return true;
@@ -364,7 +364,7 @@ namespace BOT_ORM_Impl
         }
 
         static inline void Deserialize (std::string &property,
-                                        const char *value)
+            const char *value)
         {
             if (value) property = value;
             else throw std::runtime_error (NULL_DESERIALIZE);
@@ -489,7 +489,7 @@ namespace BOT_ORM
             const std::string *tableName;
 
             Selectable (std::string _fieldName,
-                        const std::string *_tableName)
+                const std::string *_tableName)
                 : fieldName (std::move (_fieldName)), tableName (_tableName)
             {}
         };
@@ -500,7 +500,7 @@ namespace BOT_ORM
         struct Field : public Selectable<T>
         {
             Field (std::string _fieldName,
-                   const std::string *_tableName)
+                const std::string *_tableName)
                 : Selectable<T> (std::move (_fieldName), _tableName) {}
 
             inline SetExpr operator = (T value)
@@ -518,7 +518,7 @@ namespace BOT_ORM
         struct NullableField : public Field<T>
         {
             NullableField (std::string _fieldName,
-                           const std::string *_tableName)
+                const std::string *_tableName)
                 : Field<T> (std::move (_fieldName), _tableName) {}
 
             inline SetExpr operator = (T value)
@@ -545,8 +545,8 @@ namespace BOT_ORM
 
             Aggregate (std::string function, const Field<T> &field)
                 : Selectable<T> (std::move (function) + "(" +
-                                 *(field.tableName) + "." +
-                                 field.fieldName + ")", nullptr)
+                    *(field.tableName) + "." +
+                    field.fieldName + ")", nullptr)
             {}
         };
 
@@ -556,13 +556,13 @@ namespace BOT_ORM
         {
             template <typename T>
             Expr (const Selectable<T> &field,
-                  std::string op_val)
+                std::string op_val)
                 : exprs { { field.fieldName + op_val, field.tableName } }
             {}
 
             template <typename T>
             Expr (const Selectable<T> &field,
-                  std::string op, T value)
+                std::string op, T value)
             {
                 std::ostringstream os;
                 BOT_ORM_Impl::SerializationHelper::
@@ -572,8 +572,8 @@ namespace BOT_ORM
 
             template <typename T>
             Expr (const Field<T> &field1,
-                  std::string op,
-                  const Field<T> &field2)
+                std::string op,
+                const Field<T> &field2)
                 : exprs
             {
                 { field1.fieldName, field1.tableName },
@@ -613,7 +613,7 @@ namespace BOT_ORM
                 ret.exprs.emplace_front ("(", nullptr);
                 ret.exprs.emplace_back (std::move (logOp), nullptr);
                 ret.exprs.splice (ret.exprs.cend (),
-                                  std::move (rigthExprs));
+                    std::move (rigthExprs));
                 ret.exprs.emplace_back (")", nullptr);
                 return ret;
             }
@@ -712,13 +712,13 @@ namespace BOT_ORM
         // String Field & / | std::string
 
         inline Expr operator & (const Field<std::string> &field,
-                                std::string val)
+            std::string val)
         {
             return Expr (field, " like ", std::move (val));
         }
 
         inline Expr operator | (const Field<std::string> &field,
-                                std::string val)
+            std::string val)
         {
             return Expr (field, " not like ", std::move (val));
         }
@@ -770,7 +770,7 @@ namespace BOT_ORM
         std::string field;
 
         Constraint (std::string &&_constraint,
-                    std::string _field = std::string {})
+            std::string _field = std::string {})
             : constraint (_constraint), field (std::move (_field))
         {}
 
@@ -911,7 +911,7 @@ namespace BOT_ORM_Impl
         {
             constexpr auto size = std::tuple_size<TupleType>::value;
             return TupleVisit_Impl (tuple, fn,
-                                    std::make_index_sequence<size> {});
+                std::make_index_sequence<size> {});
         }
 
         // #2 Join To Tuple
@@ -1000,7 +1000,7 @@ namespace BOT_ORM_Impl
         }
         template <typename T, typename... Args>
         static inline std::string FieldToSql (const Selectable<T> &arg,
-                                              const Args & ... args)
+            const Args & ... args)
         {
             return FieldToSql (arg) + "," + FieldToSql (args...);
         }
@@ -1218,17 +1218,17 @@ namespace BOT_ORM
         // Join
         template <typename C>
         inline auto Join (const C &,
-                          const Expression::Expr &,
-                          std::enable_if_t<
-                          !HasInjected<C>::value>
-                          * = nullptr) const
+            const Expression::Expr &,
+            std::enable_if_t<
+            !HasInjected<C>::value>
+            * = nullptr) const
         {}
         template <typename C>
         inline auto Join (const C &queryHelper2,
-                          const Expression::Expr &onExpr,
-                          std::enable_if_t<
-                          HasInjected<C>::value>
-                          * = nullptr) const
+            const Expression::Expr &onExpr,
+            std::enable_if_t<
+            HasInjected<C>::value>
+            * = nullptr) const
         {
             return _NewJoinQuery (queryHelper2, onExpr, " join ");
         }
@@ -1236,17 +1236,17 @@ namespace BOT_ORM
         // Left Join
         template <typename C>
         inline auto LeftJoin (const C &,
-                              const Expression::Expr &,
-                              std::enable_if_t<
-                              !HasInjected<C>::value>
-                              * = nullptr) const
+            const Expression::Expr &,
+            std::enable_if_t<
+            !HasInjected<C>::value>
+            * = nullptr) const
         {}
         template <typename C>
         inline auto LeftJoin (const C &queryHelper2,
-                              const Expression::Expr &onExpr,
-                              std::enable_if_t<
-                              HasInjected<C>::value>
-                              * = nullptr) const
+            const Expression::Expr &onExpr,
+            std::enable_if_t<
+            HasInjected<C>::value>
+            * = nullptr) const
         {
             return _NewJoinQuery (queryHelper2, onExpr, " left join ");
         }
@@ -1275,8 +1275,8 @@ namespace BOT_ORM
         {
             Nullable<T> ret;
             _connector->ExecuteCallback (_sqlSelect + agg.fieldName +
-                                         _GetFromSql () + _GetLimit () + ";",
-                                         [&] (int argc, char **argv)
+                _GetFromSql () + _GetLimit () + ";",
+                [&] (int argc, char **argv)
             {
                 if (argc != 1)
                     throw std::runtime_error (BAD_COLUMN_COUNT);
@@ -1331,8 +1331,8 @@ namespace BOT_ORM
         // Return a new Join Queryable Object
         template <typename C>
         inline auto _NewJoinQuery (const C &queryHelper2,
-                                   const Expression::Expr &onExpr,
-                                   std::string joinStr) const
+            const Expression::Expr &onExpr,
+            std::string joinStr) const
         {
             return _NewQuery (
                 _sqlTarget,
@@ -1345,7 +1345,7 @@ namespace BOT_ORM
 
         // Return a new Compound Queryable Object
         Queryable _NewCompoundQuery (const Queryable &queryable,
-                                     std::string compoundStr) const
+            std::string compoundStr) const
         {
             auto ret = *this;
             ret._sqlFrom = ret._GetFromSql () +
@@ -1364,8 +1364,8 @@ namespace BOT_ORM
         {
             auto copy = _queryHelper;
             _connector->ExecuteCallback (_sqlSelect + _sqlTarget +
-                                         _GetFromSql () + _GetLimit () + ";",
-                                         [&] (int argc, char **argv)
+                _GetFromSql () + _GetLimit () + ";",
+                [&] (int argc, char **argv)
             {
                 BOT_ORM_Impl::InjectionHelper::Visit (
                     copy, [argc] (auto & ... args)
@@ -1396,8 +1396,8 @@ namespace BOT_ORM
         {
             auto copy = _queryHelper;
             _connector->ExecuteCallback (_sqlSelect + _sqlTarget +
-                                         _GetFromSql () + _GetLimit () + ";",
-                                         [&] (int argc, char **argv)
+                _GetFromSql () + _GetLimit () + ";",
+                [&] (int argc, char **argv)
             {
                 if (sizeof... (Args) != argc)
                     throw std::runtime_error (BAD_COLUMN_COUNT);
@@ -1454,7 +1454,7 @@ namespace BOT_ORM
         template <typename C, typename... Args>
         std::enable_if_t<HasInjected<C>::value>
             CreateTbl (const C &entity,
-                       const Args & ... constraints)
+                const Args & ... constraints)
         {
             const auto &fieldNames =
                 BOT_ORM_Impl::InjectionHelper::FieldNames (entity);
@@ -1581,14 +1581,14 @@ namespace BOT_ORM
         template <typename C>
         std::enable_if_t<!HasInjected<C>::value>
             Update (const C &,
-                    const Expression::SetExpr &,
-                    const Expression::Expr &)
+                const Expression::SetExpr &,
+                const Expression::Expr &)
         {}
         template <typename C>
         std::enable_if_t<HasInjected<C>::value>
             Update (const C &entity,
-                    const Expression::SetExpr &setExpr,
-                    const Expression::Expr &whereExpr)
+                const Expression::SetExpr &setExpr,
+                const Expression::Expr &whereExpr)
         {
             _connector->Execute (
                 "update " +
@@ -1617,7 +1617,7 @@ namespace BOT_ORM
             // Primary Key
             BOT_ORM_Impl::InjectionHelper::Visit (
                 entity, [&os] (const auto &primaryKey,
-                               const auto & ... dummy)
+                    const auto & ... dummy)
             {
                 // Why 'eatdummy'?
                 // Walkaround 'fatal error c1001: an internal error has occurred in the compiler.' on MSVC 14
@@ -1644,12 +1644,12 @@ namespace BOT_ORM
         template <typename C>
         std::enable_if_t<!HasInjected<C>::value>
             Delete (const C &,
-                    const Expression::Expr &)
+                const Expression::Expr &)
         {}
         template <typename C>
         std::enable_if_t<HasInjected<C>::value>
             Delete (const C &entity,
-                    const Expression::Expr &whereExpr)
+                const Expression::Expr &whereExpr)
         {
             _connector->Execute (
                 "delete from " +

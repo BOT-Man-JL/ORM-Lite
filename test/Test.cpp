@@ -153,16 +153,16 @@ int main ()
         // Expected: 2, 3, 4, 5, 6
 
         assert (mapper.Query (ModelD {})
-                .Aggregate (Count ()).Value () == countExpected);
+            .Aggregate (Count ()).Value () == countExpected);
         assert (mapper.Query (ModelD {})
-                .LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
-                .Aggregate (Count ()).Value () == countExpected);
+            .LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
+            .Aggregate (Count ()).Value () == countExpected);
         mapper.Insert (ModelA {}, false);
         assert (mapper.Query (ModelD {}).Select (field (md.d_int))
-                .Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))
-                .ToList ().size () == countExpected + 1);
+            .Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))
+            .ToList ().size () == countExpected + 1);
         assert (mapper.Query (ModelD {})
-                .ToVector ()[countExpected - 1].d_int == lastIdExpected);
+            .ToVector ()[countExpected - 1].d_int == lastIdExpected);
         auto firstTuple = mapper.Query (ModelD {})
             .Select (field (md.d_int))
             .ToList ().front ();
@@ -222,7 +222,7 @@ int main ()
         mapper.Insert (ModelA { 0, u8"世界", 7.28, nullptr, nullptr, nullptr }, false);
         auto chinese = mapper.Query (ModelA {}).ToVector ();
         assert (chinese[0].a_string == "你好" &&
-                chinese[1].a_string == u8"世界");
+            chinese[1].a_string == u8"世界");
     }
 
     std::cout << "Test Passing" << std::endl;
