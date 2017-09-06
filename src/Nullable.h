@@ -52,12 +52,14 @@ namespace BOT_ORM
         }
 
         // Value Construction
-        Nullable (const T &value)
+        template<typename T2>
+        Nullable (const T2 &value)
             : m_hasValue (true), m_value (value)
         {}
 
         // Value Assignment
-        const Nullable<T> & operator= (const T &value)
+        template<typename T2>
+        const Nullable<T> & operator= (const T2 &value)
         {
             m_hasValue = true;
             m_value = value;
