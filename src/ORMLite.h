@@ -86,7 +86,7 @@ namespace BOT_ORM_Impl
         void Execute (const std::string &cmd)
         {
             char *zErrMsg = 0;
-            int rc;
+            int rc = SQLITE_OK;
 
             for (size_t iTry = 0; iTry < MAX_TRIAL; iTry++)
             {
@@ -112,7 +112,7 @@ namespace BOT_ORM_Impl
             callback)
         {
             char *zErrMsg = 0;
-            int rc;
+            int rc = SQLITE_OK;
 
             auto callbackParam = std::make_pair (&callback, std::string {});
 
