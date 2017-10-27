@@ -350,6 +350,17 @@ namespace BOT_ORM_Impl
             return tableName;
         }
     };
+
+    // Unpacking Tricks :-)
+    // http://stackoverflow.com/questions/26902633/how-to-iterate-over-a-tuple-in-c-11/26902803#26902803
+    // - To avoid the unspecified order,
+    //   brace-enclosed initializer lists can be used,
+    //   which guarantee strict left-to-right order of evaluation.
+    // - To avoid the need for a not void return type,
+    //   the comma operator can be used to
+    //   always yield 1 in each expansion element.
+
+    using Expander = int[];
 }
 
 namespace BOT_ORM
@@ -684,9 +695,7 @@ namespace BOT_ORM
             CompositeField (const Fields & ... args)
                 : tableName (nullptr)
             {
-                // Unpacking Tricks :-)
-                using expander = int[];
-                (void) expander
+                (void) BOT_ORM_Impl::Expander
                 {
                     0, (Extract (args), 0)...
                 };
@@ -781,23 +790,12 @@ namespace BOT_ORM_Impl
 
         // #1 Tuple Visitor
 
-        // About 'using expander = int[]'
-        // http://stackoverflow.com/questions/26902633/how-to-iterate-over-a-tuple-in-c-11/26902803#26902803
-        // - To avoid the unspecified order,
-        //   brace-enclosed initializer lists can be used,
-        //   which guarantee strict left-to-right order of evaluation.
-        // - To avoid the need for a not void return type,
-        //   the comma operator can be used to
-        //   always yield 1 in each expansion element.
-
         // Apply 'Fn' to each of element of Tuple
         template <typename Fn, typename TupleType, std::size_t... I>
         static inline void TupleVisit_Impl (
             TupleType &tuple, Fn fn, std::index_sequence<I...>)
         {
-            // Unpacking Tricks :-)
-            using expander = int[];
-            (void) expander
+            (void) BOT_ORM_Impl::Expander
             {
                 0, ((void) fn (std::get<I> (tuple)), 0)...
             };
@@ -1276,9 +1274,7 @@ namespace BOT_ORM
                     copy, [argv] (auto & ... args)
                 {
                     size_t index = 0;
-                    // Unpacking Tricks :-)
-                    using expander = int[];
-                    (void) expander
+                    (void) BOT_ORM_Impl::Expander
                     {
                         0, (BOT_ORM_Impl::DeserializationHelper::
                             Deserialize (args, argv[index++]), 0)...
@@ -1374,9 +1370,7 @@ namespace BOT_ORM
                 entity, [&addTypeStr] (const auto & ... args)
             {
                 size_t index = 0;
-                // Unpacking Tricks :-)
-                using expander = int[];
-                (void) expander
+                (void) BOT_ORM_Impl::Expander
                 {
                     0, (addTypeStr (args, index++), 0)...
                 };
@@ -1518,14 +1512,15 @@ namespace BOT_ORM
                     const auto & ... dummy)
             {
                 // Why 'eatdummy'?
-                // Walkaround 'fatal error c1001: an internal error has occurred in the compiler.' on MSVC 14
+                // Walkaround 'fatal error c1001:
+                // an internal error has occurred in the compiler.' on MSVC 14
                 auto eatdummy = [] (const auto &) {};
                 (void) eatdummy;
 
                 // Why 'dummy'?
-                // Walkaround 'template argument deduction/substitution failed' on gcc 5.4
-                using expander = int[];
-                (void) expander
+                // Walkaround 'template argument deduction/substitution failed'
+                // on gcc 5.4
+                (void) BOT_ORM_Impl::Expander
                 {
                     0, (eatdummy (dummy), 0)...
                 };
@@ -1639,9 +1634,7 @@ namespace BOT_ORM
                 // The Rest
                 size_t index = 1;
 
-                // Unpacking Tricks :-)
-                using expander = int[];
-                (void) expander
+                (void) BOT_ORM_Impl::Expander
                 {
                     0, (serializeField (args, index++), 0)...
                 };
@@ -1693,9 +1686,7 @@ namespace BOT_ORM
                 // The Rest
                 size_t index = 1;
 
-                // Unpacking Tricks :-)
-                using expander = int[];
-                (void) expander
+                (void) BOT_ORM_Impl::Expander
                 {
                     0, (serializeField (args, index++), 0)...
                 };
@@ -1745,9 +1736,7 @@ namespace BOT_ORM
                     BOT_ORM_Impl::InjectionHelper::TableName (helper);
 
                 size_t index = 0;
-                // Unpacking Tricks :-)
-                using expander = int[];
-                (void) expander
+                (void) BOT_ORM_Impl::Expander
                 {
                     0, (_map.emplace (
                         (const void *) &args,
@@ -1761,9 +1750,7 @@ namespace BOT_ORM
         template <typename... Classes>
         FieldExtractor (const Classes & ... args)
         {
-            // Unpacking Tricks :-)
-            using expander = int[];
-            (void) expander
+            (void) BOT_ORM_Impl::Expander
             {
                 0, (Extract (args), 0)...
             };
