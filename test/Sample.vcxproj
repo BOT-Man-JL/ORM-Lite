@@ -22,7 +22,6 @@
     <ProjectGuid>{AC415D81-EA1D-43F3-A741-60ED85136D48}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>ORMLite</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
