@@ -2,7 +2,7 @@
 
 Here is a **short tour** for this **Amazing** ORM 😉
 
-The full code is in [Sample.cpp](../Sample.cpp).
+The full code is in [sample.cpp](../sample/sample.cpp).
 
 ## Preparation
 
@@ -38,16 +38,16 @@ struct UserModel
 ```
 
 `Nullable<T>` helps us construct `Nullable` Value in C++,
-which is described in the [Document](ORM-Lite.md) 😁
+which is described in the [Document](orm-lite.md) 😁
 
-In this Sample, `ORMAP ("UserModel", ...)` do that:
+In this sample, `ORMAP ("UserModel", ...)` do that:
 - `Class UserModel` will be mapped into `TABLE UserModel`;
 - NOT `Nullable` members will be mapped as `NOT NULL`;
 - `int, double, std::string` will be mapped into
   `INT, REAL, TEXT` respectively;
 - The first entry `id` will be set as the **Primary Key** of the Table;
 
-And then we define and inject other 2 Classes in this Sample:
+And then we define and inject other 2 Classes in this sample:
 
 ``` cpp
 struct SellerModel
@@ -95,8 +95,8 @@ auto field = FieldExtractor { user, seller, order };
 - `ORMapper`
 
 ``` cpp
-// Open a Connection with 'Sample.db'
-ORMapper mapper ("Sample.db");
+// Open a Connection with 'sample.db'
+ORMapper mapper ("sample.db");
 ```
 
 ## Create or Drop Tables
@@ -492,4 +492,4 @@ auto result5 = mapper.Query (OrderModel {})
 
 This little ORM is very cool, enjoy it. 😇
 
-See the **[Full Document Here](ORM-Lite.md)**.
+See the **[Full Document Here](orm-lite.md)**.

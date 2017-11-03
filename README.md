@@ -4,20 +4,21 @@
 for **SQLite3** (currently 😂),
 written in Modern C++ style.
 
-[![Build status - VC](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)
+[![Build status - MSVC](https://ci.appveyor.com/api/projects/status/github/BOT-Man-JL/ORM-Lite?svg=true&branch=master)](https://ci.appveyor.com/project/BOT-Man-JL/ORM-Lite)
 [![Build status - gcc/clang](https://travis-ci.org/BOT-Man-JL/ORM-Lite.svg?branch=master)](https://travis-ci.org/BOT-Man-JL/ORM-Lite)
 
 ## Features
 
 - **Easy** to Use
-- **Header Only** [(src/ORMLite.h)](src/ORMLite.h)
-- **Powerful** Compile-time **Type Deduction**
+- **Header Only**
+  ([src/ormlite.h](src/ormlite.h), [src/nullable.h](src/nullable.h))
+- **Powerful** Compile-time **Type/DSL Deduction**
 
 ## Documentation
 
-#### [Sample](docs/Get-Started.md) (Get Started Here) 😉
+#### [Get Started Here](docs/get-started.md) 😉
 
-#### [Full Document](docs/ORM-Lite.md) 😊
+#### [Full Document](docs/orm-lite.md) 😊
 
 ## Planned Features
 

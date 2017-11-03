@@ -1,5 +1,5 @@
 
-// A Sample of ORM Lite
+// Sample of ORM Lite
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
 
@@ -7,7 +7,7 @@
 #include <iostream>
 #include <tuple>
 
-#include "src/ORMLite.h"
+#include "../src/ormlite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
 
@@ -115,8 +115,8 @@ int main ()
         ## Working on *Database* with *ORMapper*
     */
 
-    // Open a Connection with 'Sample.db'
-    ORMapper mapper ("Sample.db");
+    // Open a Connection with 'sample.db'
+    ORMapper mapper ("sample.db");
 
     /*
         ## Create or Drop Tables

@@ -1,5 +1,5 @@
 ﻿
-// Unit Test of ORM Lite
+// Test of ORM Lite
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
 
@@ -7,11 +7,11 @@
 #include <iostream>
 #include <assert.h>
 
-#include "../src/ORMLite.h"
+#include "../src/ormlite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
 
-#define TESTDB "Test.db"
+#define TESTDB "test.db"
 
 struct ModelA
 {

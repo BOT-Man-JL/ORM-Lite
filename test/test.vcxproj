@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{AC415D81-EA1D-43F3-A741-60ED85136D48}</ProjectGuid>
+    <ProjectGuid>{AD41C840-0ADD-43E1-BF17-60EC79CEEEFC}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>ORMLite</RootNamespace>
+    <RootNamespace>test</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -70,13 +70,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)$(Configuration)\Sample\</OutDir>
-    <IntDir>$(Configuration)\Sample\</IntDir>
+    <OutDir>$(SolutionDir)$(Configuration)\test\</OutDir>
+    <IntDir>$(Configuration)\test\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IntDir>$(Platform)\$(Configuration)\Sample\</IntDir>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Sample\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\test\</IntDir>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\test\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -91,7 +91,6 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/std:c++14 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,12 +145,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\sqlite3.c" />
-    <ClCompile Include="..\..\Sample.cpp" />
+    <ClCompile Include="..\src\sqlite3.c" />
+    <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\ORMLite.h" />
-    <ClInclude Include="..\..\src\sqlite3.h" />
+    <ClInclude Include="..\src\ormlite.h" />
+    <ClInclude Include="..\src\nullable.h" />
+    <ClInclude Include="..\src\sqlite3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

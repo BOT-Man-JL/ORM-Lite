@@ -79,7 +79,7 @@ struct MyClass
 };
 ```
 
-In this Sample, `ORMAP ("TableName", field1, ...)` specifies that:
+In this sample, `ORMAP ("TableName", field1, ...)` specifies that:
 - Class `MyClass` will be mapped into Table `TableName`;
 - `field1, field2, field3, field4, field5, field6` will be mapped
   into `INTEGER field1 NOT NULL`, `REAL field2 NOT NULL`,

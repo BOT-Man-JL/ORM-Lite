@@ -241,12 +241,6 @@ ModelManifest.xml
 # FAKE - F# Make
 .fake/
 
-# ORM Lite
-*.db
-src/sqlite3.c
-src/sqlite3.h
-test/Sample
-
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
@@ -270,3 +264,13 @@ xcuserdata/
 *.moved-aside
 *.xccheckout
 *.xcscmblueprint
+
+# SQLite
+src/sqlite3.c
+src/sqlite3.h
+
+# Make Output
+*.db
+*.o
+sample/sample
+test/test
