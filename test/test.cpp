@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <assert.h>
+#include <time.h>
 
 #include "../src/ormlite.h"
 using namespace BOT_ORM;
@@ -68,6 +69,7 @@ struct ModelE
 
 int main ()
 {
+    auto begTime = time (nullptr);
     ORMapper mapper (TESTDB);
 
     // Create Brand New Tables
@@ -175,7 +177,7 @@ int main ()
     {
         Queryable<ModelA> *queryable;
         {
-            ORMapper mapper2 ("Test.db");
+            ORMapper mapper2 (TESTDB);
             queryable = new Queryable<ModelA> { mapper2.Query (ModelA {}) };
         }
         assert (queryable->ToList ().size () == 1);
@@ -225,6 +227,6 @@ int main ()
             chinese[1].a_string == u8"世界");
     }
 
-    std::cout << "Test Passing" << std::endl;
+    std::cout << "Done in " << time (nullptr) - begTime << " seconds" << std::endl;
     return 0;
 }
