@@ -146,12 +146,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\sqlite3.c" />
-    <ClCompile Include="..\Sample.cpp" />
+    <ClCompile Include="..\..\src\sqlite3.c" />
+    <ClCompile Include="..\..\Sample.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\ORMLite.h" />
-    <ClInclude Include="..\src\sqlite3.h" />
+    <ClInclude Include="..\..\src\ORMLite.h" />
+    <ClInclude Include="..\..\src\sqlite3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
