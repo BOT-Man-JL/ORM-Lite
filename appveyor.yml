@@ -3,14 +3,14 @@ image: Visual Studio 2017
 build_script:
   - ps: Expand-Archive src/sqlite3.h.zip -DestinationPath src
   - ps: Expand-Archive src/sqlite3.c.zip -DestinationPath src
-  - ps: msbuild /verbosity:minimal sample/sample.vcxproj /p:Configuration=Debug;Platform=Win32
-  - ps: msbuild /verbosity:minimal sample/sample.vcxproj /p:Configuration=Debug;Platform=x64
-  - ps: msbuild /verbosity:minimal sample/sample.vcxproj /p:Configuration=Release;Platform=Win32
-  - ps: msbuild /verbosity:minimal sample/sample.vcxproj /p:Configuration=Release;Platform=x64
-  - ps: msbuild /verbosity:minimal test/test.vcxproj /p:Configuration=Debug;Platform=Win32
-  - ps: msbuild /verbosity:minimal test/test.vcxproj /p:Configuration=Debug;Platform=x64
-  - ps: msbuild /verbosity:minimal test/test.vcxproj /p:Configuration=Release;Platform=Win32
-  - ps: msbuild /verbosity:minimal test/test.vcxproj /p:Configuration=Release;Platform=x64
+  - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Debug;Platform=Win32"
+  - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Debug;Platform=x64"
+  - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Release;Platform=Win32"
+  - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Release;Platform=x64"
+  - ps: msbuild /verbosity:minimal test/test.vcxproj "/p:Configuration=Debug;Platform=Win32"
+  - ps: msbuild /verbosity:minimal test/test.vcxproj "/p:Configuration=Debug;Platform=x64"
+  - ps: msbuild /verbosity:minimal test/test.vcxproj "/p:Configuration=Release;Platform=Win32"
+  - ps: msbuild /verbosity:minimal test/test.vcxproj "/p:Configuration=Release;Platform=x64"
 test_script:
   - ps: sample\Debug\sample\sample.exe
   - ps: sample\Release\sample.exe
