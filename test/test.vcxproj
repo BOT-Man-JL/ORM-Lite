@@ -152,6 +152,7 @@
     <ClInclude Include="..\src\ormlite.h" />
     <ClInclude Include="..\src\nullable.h" />
     <ClInclude Include="..\src\sqlite3.h" />
+    <ClInclude Include="catch.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

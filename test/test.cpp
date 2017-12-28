@@ -3,14 +3,16 @@
 // https://github.com/BOT-Man-JL/ORM-Lite
 // BOT Man, 2016
 
-#include <string>
 #include <iostream>
-#include <assert.h>
-#include <time.h>
+#include <memory>
+#include <string>
 
 #include "../src/ormlite.h"
 using namespace BOT_ORM;
 using namespace BOT_ORM::Expression;
+
+#define CATCH_CONFIG_MAIN
+#include "catch.hpp"
 
 #define TESTDB "test.db"
 
@@ -58,175 +60,194 @@ struct ModelD
     ORMAP ("ModelD", d_int);
 };
 
-struct ModelE
+namespace detail
+{
+    template<typename Model>
+    void ResetTable (const Model &model)
+    {
+        ORMapper mapper (TESTDB);
+
+        try {
+            mapper.CreateTbl (model);
+        }
+        catch (...) {
+            mapper.DropTbl (model);
+            mapper.CreateTbl (model);
+        }
+    }
+}
+
+void ResetTables () {}
+
+template<typename Model, typename ...OtherModels>
+void ResetTables (const Model &model, const OtherModels &...models)
+{
+    detail::ResetTable (model);
+    ResetTables (models...);
+}
+
+TEST_CASE ("create/drop tables")
+{
+    ResetTables (ModelA {}, ModelB {}, ModelC {}, ModelD {});
+
+    ORMapper mapper (TESTDB);
+
+    mapper.DropTbl (ModelA {});
+    mapper.DropTbl (ModelB {});
+    mapper.DropTbl (ModelC {});
+    mapper.DropTbl (ModelD {});
+
+    mapper.CreateTbl (ModelA {});
+    mapper.CreateTbl (ModelB {});
+    mapper.CreateTbl (ModelC {});
+    mapper.CreateTbl (ModelD {});
+}
+
+TEST_CASE ("normal cases")
+{
+    ModelA ma;
+    ModelD md;
+    auto field = FieldExtractor { ma, md };
+
+    ORMapper mapper (TESTDB);
+
+    mapper.Insert (ModelD { 0 });
+    mapper.Insert (ModelD { 0 }, false);
+    mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
+    mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } }, false);
+    mapper.Update (ModelD { 0 });
+    mapper.UpdateRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
+    mapper.Update (ModelD {}, field (md.d_int) = 6, field (md.d_int) == 0);  // 0 -> 6
+    mapper.Delete (ModelD { 1 });
+    mapper.Delete (ModelD {}, field (md.d_int) == 0);  // No such one
+
+    constexpr auto countExpected = 5;
+    constexpr auto firstIdExpected = 2;
+    constexpr auto lastIdExpected = 6;
+    // Expected: 2, 3, 4, 5, 6
+
+    REQUIRE (mapper.Query (ModelD {})
+        .Aggregate (Count ()).Value () == countExpected);
+    REQUIRE (mapper.Query (ModelD {})
+        .LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
+        .Aggregate (Count ()).Value () == countExpected);
+
+    mapper.Insert (ModelA {}, false);
+    REQUIRE (mapper.Query (ModelD {}).Select (field (md.d_int))
+        .Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))
+        .ToList ().size () == countExpected + 1);
+    REQUIRE (mapper.Query (ModelD {})
+        .ToVector ()[countExpected - 1].d_int == lastIdExpected);
+    auto firstTuple = mapper.Query (ModelD {})
+        .Select (field (md.d_int))
+        .ToList ().front ();
+    REQUIRE (std::get<0> (firstTuple).Value () == firstIdExpected);
+}
+
+TEST_CASE ("handle existing table")
+{
+    // before
+    ResetTables (ModelD {});
+    {
+        sqlite3 *db;
+        sqlite3_open (TESTDB, &db);
+        sqlite3_exec (db,
+            "DROP TABLE ModelD;"
+            "CREATE TABLE ModelD (d_int INTEGER, d_str TEXT);"
+            "INSERT INTO ModelD values (1, 'John');",
+            nullptr, nullptr, nullptr);
+        sqlite3_close (db);
+    }
+
+    // test
+    ORMapper mapper (TESTDB);
+    REQUIRE_THROWS_WITH (mapper.Query (ModelD {}).ToList (),
+        "SQL error: 'Bad Column Count' at 'select * from ModelD;'");
+}
+
+TEST_CASE ("chinese characters")
+{
+    // before
+    ResetTables (ModelA {});
+
+    // test
+    ORMapper mapper (TESTDB);
+
+    mapper.Insert (
+        ModelA { 0, "你好", 0, nullptr, nullptr, nullptr }, false);
+    mapper.Insert (
+        ModelA { 0, u8"世界", 0, nullptr, nullptr, nullptr }, false);
+
+    auto chinese = mapper.Query (ModelA {}).ToVector ();
+
+    REQUIRE (chinese.size () == 2);
+    REQUIRE (chinese[0].a_string == "你好");
+    REQUIRE (chinese[1].a_string == u8"世界");
+}
+
+TEST_CASE ("lifetime of mapper")
+{
+    // before
+    ResetTables (ModelA {});
+    {
+        ORMapper mapper (TESTDB);
+        mapper.Insert (ModelA {}, false);
+        mapper.Insert (ModelA {}, false);
+    }
+
+    // test
+    std::unique_ptr<Queryable<ModelA>> queryable;
+    {
+        ORMapper mapper (TESTDB);
+        queryable.reset (new Queryable<ModelA> { mapper.Query (ModelA {}) });
+    }
+    REQUIRE (queryable->ToList ().size () == 2);
+}
+
+using InvalidModel = int;
+
+TEST_CASE ("invalid model", "[not-compile]")
+{
+    ORMapper mapper (TESTDB);
+
+    //mapper.CreateTbl (InvalidModel {});
+    //mapper.CreateTbl (InvalidModel {}, Constraint::Unique (Field<int> {"", nullptr}));
+    //mapper.DropTbl (InvalidModel {});
+
+    //mapper.Insert (InvalidModel {});
+    //mapper.Insert (InvalidModel {}, false);
+    ////mapper.InsertRange (InvalidModel {});
+    //mapper.InsertRange (std::vector<int> {});
+    //mapper.InsertRange (std::vector<int> {}, false);
+    //mapper.Update (InvalidModel {});
+    ////mapper.UpdateRange (InvalidModel {});
+    //mapper.UpdateRange (std::vector<int> {});
+    //mapper.Update (InvalidModel {}, SetExpr { "" }, Expr { Selectable<int> {"", nullptr}, "" });
+    //mapper.Delete (InvalidModel {});
+    //mapper.Delete (InvalidModel {}, Expr { Selectable<int> {"", nullptr}, "" });
+
+    //mapper.Query (InvalidModel {});
+    //FieldExtractor { InvalidModel {}, double () };
+    ////mapper.Query (ModelA {})
+    ////	.Join (InvalidModel {}, Expr { Selectable<int> {"", nullptr}, "" });
+    ////mapper.Query (ModelA {})
+    ////	.LeftJoin (InvalidModel {}, Expr { Selectable<int> {"", nullptr}, "" });
+}
+
+struct SickModel
 {
     ModelD dd;
     char ch;
-
-    // Invalid Injection
-    ORMAP ("ModelE", dd, ch);
+    ORMAP ("SickModel", dd, ch);
 };
 
-int main ()
+TEST_CASE ("invalid field", "[not-compile]")
 {
-    auto begTime = time (nullptr);
     ORMapper mapper (TESTDB);
 
-    // Create Brand New Tables
-    auto initTables = [&mapper] ()
-    {
-        auto initTable = [&mapper] (const auto &model)
-        {
-            try
-            {
-                mapper.CreateTbl (model);
-            }
-            catch (...)
-            {
-                mapper.DropTbl (model);
-                mapper.CreateTbl (model);
-            }
-        };
-        initTable (ModelA {});
-        initTable (ModelB {});
-        initTable (ModelC {});
-        initTable (ModelD {});
-    };
-    initTables ();
-
-    //
-    // Case: Not Compile - NO ORMAP
-    //
-    {
-        //mapper.CreateTbl (int ());
-        //mapper.CreateTbl (int (), Constraint::Unique (Field<int> {"", nullptr}));
-        //mapper.DropTbl (int ());
-        //mapper.Insert (int ());
-        //mapper.Insert (int (), false);
-        ////mapper.InsertRange (int ());
-        //mapper.InsertRange (std::vector<int> ());
-        //mapper.InsertRange (std::vector<int> (), false);
-        //mapper.Update (int ());
-        ////mapper.UpdateRange (int ());
-        //mapper.UpdateRange (std::vector<int> ());
-        //mapper.Update (int (), SetExpr { "" }, Expr { Selectable<int> {"", nullptr}, "" });
-        //mapper.Delete (int ());
-        //mapper.Delete (int (), Expr { Selectable<int> {"", nullptr}, "" });
-        //mapper.Query (int ());
-        //FieldExtractor { int (), double () };
-        ////mapper.Query (ModelA {})
-        ////	.Join (int (), Expr { Selectable<int> {"", nullptr}, "" });
-        ////mapper.Query (ModelA {})
-        ////	.LeftJoin (int (), Expr { Selectable<int> {"", nullptr}, "" });
-    }
-
-    //
-    // Case: Not Compile - Not Support Field
-    //
-    {
-        //mapper.CreateTbl (ModelE {});
-        //mapper.Insert (ModelE {});
-        //mapper.Update (ModelE {});
-        //mapper.Delete (ModelE {});
-        //mapper.Query (ModelE {}).ToList ();
-    }
-
-    //
-    // Case: Only One Field Mapping
-    //
-    {
-        ModelA ma;
-        ModelD md;
-        auto field = FieldExtractor { ma, md };
-
-        mapper.Insert (ModelD { 0 });
-        mapper.Insert (ModelD { 0 }, false);
-        mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
-        mapper.InsertRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } }, false);
-        mapper.Update (ModelD { 0 });
-        mapper.UpdateRange (std::list<ModelD> { ModelD { 2 }, ModelD { 3 } });
-        mapper.Update (ModelD {}, field (md.d_int) = 6, field (md.d_int) == 0);  // 0 -> 6
-        mapper.Delete (ModelD { 1 });
-        mapper.Delete (ModelD {}, field (md.d_int) == 0);  // No such one
-
-        constexpr auto countExpected = 5;
-        constexpr auto firstIdExpected = 2;
-        constexpr auto lastIdExpected = 6;
-        // Expected: 2, 3, 4, 5, 6
-
-        assert (mapper.Query (ModelD {})
-            .Aggregate (Count ()).Value () == countExpected);
-        assert (mapper.Query (ModelD {})
-            .LeftJoin (ModelA {}, field (ma.a_int) == field (md.d_int))
-            .Aggregate (Count ()).Value () == countExpected);
-        mapper.Insert (ModelA {}, false);
-        assert (mapper.Query (ModelD {}).Select (field (md.d_int))
-            .Union (mapper.Query (ModelA {}).Select (field (ma.a_int)))
-            .ToList ().size () == countExpected + 1);
-        assert (mapper.Query (ModelD {})
-            .ToVector ()[countExpected - 1].d_int == lastIdExpected);
-        auto firstTuple = mapper.Query (ModelD {})
-            .Select (field (md.d_int))
-            .ToList ().front ();
-        assert (std::get<0> (firstTuple).Value () == firstIdExpected);
-    }
-
-    //
-    // Case: Scope of Mapper
-    //
-    {
-        Queryable<ModelA> *queryable;
-        {
-            ORMapper mapper2 (TESTDB);
-            queryable = new Queryable<ModelA> { mapper2.Query (ModelA {}) };
-        }
-        assert (queryable->ToList ().size () == 1);
-        delete queryable;
-    }
-
-    //
-    // Case: Not Code First Cases
-    //
-    {
-        mapper.DropTbl (ModelD {});
-        {
-            sqlite3 *db;
-            sqlite3_open (TESTDB, &db);
-            sqlite3_exec (
-                db,
-                "CREATE TABLE ModelD (d_int INTEGER,d_str TEXT);"
-                "INSERT INTO ModelD values (1, 'John');",
-                0, 0, 0);
-            sqlite3_close (db);
-
-            std::string exMsg;
-            try
-            {
-                mapper.Query (ModelD {}).ToList ();
-            }
-            catch (const std::exception &ex)
-            {
-                exMsg = ex.what ();
-            }
-            assert (exMsg == "SQL error: 'Bad Column Count' at 'select * from ModelD;'");
-        }
-        mapper.DropTbl (ModelD {});
-        mapper.CreateTbl (ModelD {});
-    }
-
-    //
-    // Case: Chinese Chars
-    //
-    {
-        mapper.DropTbl (ModelA {});
-        mapper.CreateTbl (ModelA {});
-        mapper.Insert (ModelA { 0, "你好", 3.14, nullptr, nullptr, nullptr }, false);
-        mapper.Insert (ModelA { 0, u8"世界", 7.28, nullptr, nullptr, nullptr }, false);
-        auto chinese = mapper.Query (ModelA {}).ToVector ();
-        assert (chinese[0].a_string == "你好" &&
-            chinese[1].a_string == u8"世界");
-    }
-
-    std::cout << "Done in " << time (nullptr) - begTime << " seconds" << std::endl;
-    return 0;
+    //mapper.CreateTbl (SickModel {});
+    //mapper.Insert (SickModel {});
+    //mapper.Update (SickModel {});
+    //mapper.Delete (SickModel {});
+    //mapper.Query (SickModel {}).ToList ();
 }
