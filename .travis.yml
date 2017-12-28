@@ -4,12 +4,11 @@ compiler:
   - gcc
   - clang
 script:
-  - unzip src/sqlite3.h.zip -d src
-  - unzip src/sqlite3.c.zip -d src
-  - make -C sample
-  - make -C test
-  - ./sample/sample
-  - ./test/test
+  - unzip -qu src/sqlite3.h.zip -d src
+  - unzip -qu src/sqlite3.c.zip -d src
+  - unzip -qu test/catch.hpp.zip -d test
+  - make -C sample && ./sample/sample
+  - make -C test && ./test/test
 install:
   - if [ "$CC" = "gcc" ]; then export CXX="g++-5" CC="gcc-5"; fi
   - if [ "$CC" = "clang" ]; then export CXX="clang++-3.8" CC="clang-3.8"; fi

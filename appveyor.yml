@@ -3,6 +3,7 @@ image: Visual Studio 2017
 build_script:
   - ps: Expand-Archive src/sqlite3.h.zip -DestinationPath src
   - ps: Expand-Archive src/sqlite3.c.zip -DestinationPath src
+  - ps: Expand-Archive test/catch.hpp.zip -DestinationPath test
   - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Debug;Platform=Win32"
   - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Debug;Platform=x64"
   - ps: msbuild /verbosity:minimal sample/sample.vcxproj "/p:Configuration=Release;Platform=Win32"

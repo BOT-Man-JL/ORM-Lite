@@ -269,6 +269,9 @@ xcuserdata/
 src/sqlite3.c
 src/sqlite3.h
 
+# Catch
+catch.hpp
+
 # Make Output
 *.db
 *.o
