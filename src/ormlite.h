@@ -240,7 +240,8 @@ namespace BOT_ORM_Impl
             std::ostream &os,
             const BOT_ORM::Nullable<T> &value)
         {
-            if (value == nullptr) return false;
+            if (value == nullptr)
+                return false;
             return Serialize (os, value.Value ());
         }
     };
@@ -292,13 +293,14 @@ namespace BOT_ORM_Impl
             std::vector<std::string> ret;
             std::string tmpStr;
 
-            for (const auto &ch : std::move (input) + ",")
+            for (char ch : std::move (input) + ",")
             {
                 if (isalnum (ch) || ch == '_')
                     tmpStr += ch;
                 else if (ch == ',')
                 {
-                    if (!tmpStr.empty ()) ret.push_back (tmpStr);
+                    if (!tmpStr.empty ())
+                        ret.push_back (tmpStr);
                     tmpStr.clear ();
                 }
             }
@@ -306,13 +308,12 @@ namespace BOT_ORM_Impl
         };
 
     public:
-
         // Checking Injection
         template <typename T> class HasInjected
         {
-            template <typename...> struct void_t_Tester { using type = void; };
+            template <typename...> struct make_void { using type = void; };
             template <typename... _Types>
-            using void_t = typename void_t_Tester<_Types...>::type;
+            using void_t = typename make_void<_Types...>::type;
 
             template <typename, typename = void_t<>>
             struct Test : std::false_type {};
@@ -372,21 +373,21 @@ namespace BOT_ORM
         struct SetExpr
         {
             SetExpr (std::string field_op_val)
-                : expr { std::move (field_op_val) }
+                : _expr { std::move (field_op_val) }
             {}
 
             const std::string &ToString () const
             {
-                return expr;
+                return _expr;
             }
 
-            inline SetExpr operator && (const SetExpr &right) const
+            inline SetExpr operator && (const SetExpr &rhs) const
             {
-                return SetExpr { expr + "," + right.expr };
+                return SetExpr { _expr + "," + rhs._expr };
             }
 
-        protected:
-            std::string expr;
+        private:
+            std::string _expr;
         };
 
         // Selectable
@@ -464,26 +465,24 @@ namespace BOT_ORM
         struct Expr
         {
             template <typename T>
-            Expr (const Selectable<T> &field,
-                std::string op_val)
-                : exprs { { field.fieldName + op_val, field.tableName } }
+            Expr (const Selectable<T> &field, std::string op_val)
+                : _exprs { { field.fieldName + op_val, field.tableName } }
             {}
 
             template <typename T>
-            Expr (const Selectable<T> &field,
-                std::string op, T value)
+            Expr (const Selectable<T> &field, std::string op, T value)
             {
                 std::ostringstream os;
                 BOT_ORM_Impl::SerializationHelper::
                     Serialize (os << field.fieldName << op, value);
-                exprs.emplace_back (os.str (), field.tableName);
+                _exprs.emplace_back (os.str (), field.tableName);
             }
 
             template <typename T>
             Expr (const Field<T> &field1,
                 std::string op,
                 const Field<T> &field2)
-                : exprs
+                : _exprs
             {
                 { field1.fieldName, field1.tableName },
                 { std::move (op), nullptr },
@@ -491,39 +490,39 @@ namespace BOT_ORM
             }
             {}
 
-            std::string ToString (bool withTableName) const
+            std::string ToString () const
             {
                 std::ostringstream out;
-                for (const auto &expr : exprs)
+                for (const auto &expr : _exprs)
                 {
-                    if (withTableName && expr.second != nullptr)
+                    if (expr.second != nullptr)
                         out << *(expr.second) << ".";
                     out << expr.first;
                 }
                 return out.str ();
             }
 
-            inline Expr operator && (const Expr &right) const
+            inline Expr operator && (const Expr &rhs) const
             {
-                return And_Or (right, " and ");
+                return And_Or (rhs, " and ");
             }
-            inline Expr operator || (const Expr &right) const
+            inline Expr operator || (const Expr &rhs) const
             {
-                return And_Or (right, " or ");
+                return And_Or (rhs, " or ");
             }
 
-        protected:
-            std::list<std::pair<std::string, const std::string *>> exprs;
+        private:
+            std::list<std::pair<std::string, const std::string *>> _exprs;
 
-            Expr And_Or (const Expr &right, std::string logOp) const
+            Expr And_Or (const Expr &rhs, std::string logOp) const
             {
                 auto ret = *this;
-                auto rigthExprs = right.exprs;
-                ret.exprs.emplace_front ("(", nullptr);
-                ret.exprs.emplace_back (std::move (logOp), nullptr);
-                ret.exprs.splice (ret.exprs.cend (),
+                auto rigthExprs = rhs._exprs;
+                ret._exprs.emplace_front ("(", nullptr);
+                ret._exprs.emplace_back (std::move (logOp), nullptr);
+                ret._exprs.splice (ret._exprs.cend (),
                     std::move (rigthExprs));
-                ret.exprs.emplace_back (")", nullptr);
+                ret._exprs.emplace_back (")", nullptr);
                 return ret;
             }
         };
@@ -729,7 +728,7 @@ namespace BOT_ORM
         static inline Constraint Check (
             const Expression::Expr &expr)
         {
-            return Constraint { "check (" + expr.ToString (false) + ")" };
+            return Constraint { "check (" + expr.ToString () + ")" };
         }
 
         template <typename T>
@@ -977,12 +976,12 @@ namespace BOT_ORM
         inline Queryable Where (const Expression::Expr &expr) const &
         {
             auto ret = *this;
-            ret._sqlWhere = " where (" + expr.ToString (true) + ")";
+            ret._sqlWhere = " where (" + expr.ToString () + ")";
             return ret;
         }
         inline Queryable Where (const Expression::Expr &expr) &&
         {
-            (*this)._sqlWhere = " where (" + expr.ToString (true) + ")";
+            (*this)._sqlWhere = " where (" + expr.ToString () + ")";
             return std::move (*this);
         }
 
@@ -1007,12 +1006,12 @@ namespace BOT_ORM
         inline Queryable Having (const Expression::Expr &expr) const &
         {
             auto ret = *this;
-            ret._sqlHaving = " having " + expr.ToString (true);
+            ret._sqlHaving = " having " + expr.ToString ();
             return ret;
         }
         inline Queryable Having (const Expression::Expr &expr) &&
         {
-            (*this)._sqlHaving = " having " + expr.ToString (true);
+            (*this)._sqlHaving = " having " + expr.ToString ();
             return std::move (*this);
         }
 
@@ -1234,7 +1233,7 @@ namespace BOT_ORM
                 _sqlTarget,
                 _sqlFrom + std::move (joinStr) +
                 BOT_ORM_Impl::InjectionHelper::TableName (queryHelper2) +
-                " on " + onExpr.ToString (true),
+                " on " + onExpr.ToString (),
                 BOT_ORM_Impl::QueryableHelper::JoinToTuple (
                     _queryHelper, queryHelper2));
         }
@@ -1487,7 +1486,7 @@ namespace BOT_ORM
                 BOT_ORM_Impl::InjectionHelper::TableName (entity) +
                 " set " + setExpr.ToString () +
                 " where " +
-                whereExpr.ToString (false) + ";");
+                whereExpr.ToString () + ";");
         }
 
         template <typename C>
@@ -1548,7 +1547,7 @@ namespace BOT_ORM
                 "delete from " +
                 BOT_ORM_Impl::InjectionHelper::TableName (entity) +
                 " where " +
-                whereExpr.ToString (false) + ";");
+                whereExpr.ToString () + ";");
         }
 
         template <typename C>
