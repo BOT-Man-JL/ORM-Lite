@@ -35,5 +35,5 @@ if you have any idea. 😎
 
 Posts in **Chinese** only:
 
-- [How to Design a Naive C++ ORM](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Naive-Cpp-ORM)
-- [How to Design a Better C++ ORM](https://BOT-Man-JL.github.io/articles/#2016/How-to-Design-a-Better-Cpp-ORM)
+- [How to Design a Naive C++ ORM](https://BOT-Man-JL.github.io/articles/?post=2016/How-to-Design-a-Naive-Cpp-ORM)
+- [How to Design a Better C++ ORM](https://bot-man-jl.github.io/articles/?post=2016/How-to-Design-a-Better-Cpp-ORM)
